@@ -9,9 +9,27 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VendorsRouteImport } from './routes/vendors'
+import { Route as UtilizationRouteImport } from './routes/utilization'
+import { Route as LeadershipRouteImport } from './routes/leadership'
 import { Route as FinancialRouteImport } from './routes/financial'
 import { Route as IndexRouteImport } from './routes/index'
 
+const VendorsRoute = VendorsRouteImport.update({
+  id: '/vendors',
+  path: '/vendors',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UtilizationRoute = UtilizationRouteImport.update({
+  id: '/utilization',
+  path: '/utilization',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeadershipRoute = LeadershipRouteImport.update({
+  id: '/leadership',
+  path: '/leadership',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FinancialRoute = FinancialRouteImport.update({
   id: '/financial',
   path: '/financial',
@@ -26,31 +44,70 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/financial': typeof FinancialRoute
+  '/leadership': typeof LeadershipRoute
+  '/utilization': typeof UtilizationRoute
+  '/vendors': typeof VendorsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/financial': typeof FinancialRoute
+  '/leadership': typeof LeadershipRoute
+  '/utilization': typeof UtilizationRoute
+  '/vendors': typeof VendorsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/financial': typeof FinancialRoute
+  '/leadership': typeof LeadershipRoute
+  '/utilization': typeof UtilizationRoute
+  '/vendors': typeof VendorsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/financial'
+  fullPaths: '/' | '/financial' | '/leadership' | '/utilization' | '/vendors'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/financial'
-  id: '__root__' | '/' | '/financial'
+  to: '/' | '/financial' | '/leadership' | '/utilization' | '/vendors'
+  id:
+    | '__root__'
+    | '/'
+    | '/financial'
+    | '/leadership'
+    | '/utilization'
+    | '/vendors'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   FinancialRoute: typeof FinancialRoute
+  LeadershipRoute: typeof LeadershipRoute
+  UtilizationRoute: typeof UtilizationRoute
+  VendorsRoute: typeof VendorsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/vendors': {
+      id: '/vendors'
+      path: '/vendors'
+      fullPath: '/vendors'
+      preLoaderRoute: typeof VendorsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/utilization': {
+      id: '/utilization'
+      path: '/utilization'
+      fullPath: '/utilization'
+      preLoaderRoute: typeof UtilizationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/leadership': {
+      id: '/leadership'
+      path: '/leadership'
+      fullPath: '/leadership'
+      preLoaderRoute: typeof LeadershipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/financial': {
       id: '/financial'
       path: '/financial'
@@ -71,6 +128,9 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   FinancialRoute: FinancialRoute,
+  LeadershipRoute: LeadershipRoute,
+  UtilizationRoute: UtilizationRoute,
+  VendorsRoute: VendorsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
