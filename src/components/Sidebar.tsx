@@ -26,7 +26,7 @@ interface NavItem {
 }
 
 const dashboards: NavItem[] = [
-  { label: "Procurement", to: "/", icon: LayoutDashboard },
+  { label: "Procurement", to: "/dashboard", icon: LayoutDashboard },
   { label: "Financial", to: "/financial", icon: Wallet },
   { label: "Leadership", to: "/leadership", icon: Crown },
   { label: "Vendor Performance", to: "/vendors", icon: Users },

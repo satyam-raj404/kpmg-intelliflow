@@ -54,7 +54,7 @@ function Signup() {
       return;
     }
     setRole(selectedRole);
-    navigate({ to: "/" });
+    navigate({ to: "/dashboard" });
   };
 
   return (
