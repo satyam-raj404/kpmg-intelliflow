@@ -9,38 +9,261 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VendorsRouteImport } from './routes/vendors'
+import { Route as VendorRepoRouteImport } from './routes/vendor-repo'
+import { Route as UtilizationRouteImport } from './routes/utilization'
+import { Route as P2pRouteImport } from './routes/p2p'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as LeadershipRouteImport } from './routes/leadership'
+import { Route as FinancialRouteImport } from './routes/financial'
+import { Route as ComplianceRouteImport } from './routes/compliance'
+import { Route as ActionsRouteImport } from './routes/actions'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
+import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 
+const VendorsRoute = VendorsRouteImport.update({
+  id: '/vendors',
+  path: '/vendors',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VendorRepoRoute = VendorRepoRouteImport.update({
+  id: '/vendor-repo',
+  path: '/vendor-repo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UtilizationRoute = UtilizationRouteImport.update({
+  id: '/utilization',
+  path: '/utilization',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const P2pRoute = P2pRouteImport.update({
+  id: '/p2p',
+  path: '/p2p',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeadershipRoute = LeadershipRouteImport.update({
+  id: '/leadership',
+  path: '/leadership',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FinancialRoute = FinancialRouteImport.update({
+  id: '/financial',
+  path: '/financial',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ComplianceRoute = ComplianceRouteImport.update({
+  id: '/compliance',
+  path: '/compliance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ActionsRoute = ActionsRouteImport.update({
+  id: '/actions',
+  path: '/actions',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/admin/settings',
+  path: '/admin/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminAuditRoute = AdminAuditRouteImport.update({
+  id: '/admin/audit',
+  path: '/admin/audit',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/actions': typeof ActionsRoute
+  '/compliance': typeof ComplianceRoute
+  '/financial': typeof FinancialRoute
+  '/leadership': typeof LeadershipRoute
+  '/login': typeof LoginRoute
+  '/p2p': typeof P2pRoute
+  '/utilization': typeof UtilizationRoute
+  '/vendor-repo': typeof VendorRepoRoute
+  '/vendors': typeof VendorsRoute
+  '/admin/audit': typeof AdminAuditRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/users': typeof AdminUsersRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/actions': typeof ActionsRoute
+  '/compliance': typeof ComplianceRoute
+  '/financial': typeof FinancialRoute
+  '/leadership': typeof LeadershipRoute
+  '/login': typeof LoginRoute
+  '/p2p': typeof P2pRoute
+  '/utilization': typeof UtilizationRoute
+  '/vendor-repo': typeof VendorRepoRoute
+  '/vendors': typeof VendorsRoute
+  '/admin/audit': typeof AdminAuditRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/users': typeof AdminUsersRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/actions': typeof ActionsRoute
+  '/compliance': typeof ComplianceRoute
+  '/financial': typeof FinancialRoute
+  '/leadership': typeof LeadershipRoute
+  '/login': typeof LoginRoute
+  '/p2p': typeof P2pRoute
+  '/utilization': typeof UtilizationRoute
+  '/vendor-repo': typeof VendorRepoRoute
+  '/vendors': typeof VendorsRoute
+  '/admin/audit': typeof AdminAuditRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/users': typeof AdminUsersRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/actions'
+    | '/compliance'
+    | '/financial'
+    | '/leadership'
+    | '/login'
+    | '/p2p'
+    | '/utilization'
+    | '/vendor-repo'
+    | '/vendors'
+    | '/admin/audit'
+    | '/admin/settings'
+    | '/admin/users'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/actions'
+    | '/compliance'
+    | '/financial'
+    | '/leadership'
+    | '/login'
+    | '/p2p'
+    | '/utilization'
+    | '/vendor-repo'
+    | '/vendors'
+    | '/admin/audit'
+    | '/admin/settings'
+    | '/admin/users'
+  id:
+    | '__root__'
+    | '/'
+    | '/actions'
+    | '/compliance'
+    | '/financial'
+    | '/leadership'
+    | '/login'
+    | '/p2p'
+    | '/utilization'
+    | '/vendor-repo'
+    | '/vendors'
+    | '/admin/audit'
+    | '/admin/settings'
+    | '/admin/users'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ActionsRoute: typeof ActionsRoute
+  ComplianceRoute: typeof ComplianceRoute
+  FinancialRoute: typeof FinancialRoute
+  LeadershipRoute: typeof LeadershipRoute
+  LoginRoute: typeof LoginRoute
+  P2pRoute: typeof P2pRoute
+  UtilizationRoute: typeof UtilizationRoute
+  VendorRepoRoute: typeof VendorRepoRoute
+  VendorsRoute: typeof VendorsRoute
+  AdminAuditRoute: typeof AdminAuditRoute
+  AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminUsersRoute: typeof AdminUsersRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/vendors': {
+      id: '/vendors'
+      path: '/vendors'
+      fullPath: '/vendors'
+      preLoaderRoute: typeof VendorsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vendor-repo': {
+      id: '/vendor-repo'
+      path: '/vendor-repo'
+      fullPath: '/vendor-repo'
+      preLoaderRoute: typeof VendorRepoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/utilization': {
+      id: '/utilization'
+      path: '/utilization'
+      fullPath: '/utilization'
+      preLoaderRoute: typeof UtilizationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/p2p': {
+      id: '/p2p'
+      path: '/p2p'
+      fullPath: '/p2p'
+      preLoaderRoute: typeof P2pRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/leadership': {
+      id: '/leadership'
+      path: '/leadership'
+      fullPath: '/leadership'
+      preLoaderRoute: typeof LeadershipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/financial': {
+      id: '/financial'
+      path: '/financial'
+      fullPath: '/financial'
+      preLoaderRoute: typeof FinancialRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/compliance': {
+      id: '/compliance'
+      path: '/compliance'
+      fullPath: '/compliance'
+      preLoaderRoute: typeof ComplianceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/actions': {
+      id: '/actions'
+      path: '/actions'
+      fullPath: '/actions'
+      preLoaderRoute: typeof ActionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,21 +271,45 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/admin/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/audit': {
+      id: '/admin/audit'
+      path: '/admin/audit'
+      fullPath: '/admin/audit'
+      preLoaderRoute: typeof AdminAuditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ActionsRoute: ActionsRoute,
+  ComplianceRoute: ComplianceRoute,
+  FinancialRoute: FinancialRoute,
+  LeadershipRoute: LeadershipRoute,
+  LoginRoute: LoginRoute,
+  P2pRoute: P2pRoute,
+  UtilizationRoute: UtilizationRoute,
+  VendorRepoRoute: VendorRepoRoute,
+  VendorsRoute: VendorsRoute,
+  AdminAuditRoute: AdminAuditRoute,
+  AdminSettingsRoute: AdminSettingsRoute,
+  AdminUsersRoute: AdminUsersRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
