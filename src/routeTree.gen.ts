@@ -17,6 +17,7 @@ import { Route as P2pRouteImport } from './routes/p2p'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LeadershipRouteImport } from './routes/leadership'
 import { Route as FinancialRouteImport } from './routes/financial'
+import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ComplianceRouteImport } from './routes/compliance'
 import { Route as ActionsRouteImport } from './routes/actions'
 import { Route as IndexRouteImport } from './routes/index'
@@ -64,6 +65,11 @@ const FinancialRoute = FinancialRouteImport.update({
   path: '/financial',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ComplianceRoute = ComplianceRouteImport.update({
   id: '/compliance',
   path: '/compliance',
@@ -99,6 +105,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/actions': typeof ActionsRoute
   '/compliance': typeof ComplianceRoute
+  '/dashboard': typeof DashboardRoute
   '/financial': typeof FinancialRoute
   '/leadership': typeof LeadershipRoute
   '/login': typeof LoginRoute
@@ -115,6 +122,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/actions': typeof ActionsRoute
   '/compliance': typeof ComplianceRoute
+  '/dashboard': typeof DashboardRoute
   '/financial': typeof FinancialRoute
   '/leadership': typeof LeadershipRoute
   '/login': typeof LoginRoute
@@ -132,6 +140,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/actions': typeof ActionsRoute
   '/compliance': typeof ComplianceRoute
+  '/dashboard': typeof DashboardRoute
   '/financial': typeof FinancialRoute
   '/leadership': typeof LeadershipRoute
   '/login': typeof LoginRoute
@@ -150,6 +159,7 @@ export interface FileRouteTypes {
     | '/'
     | '/actions'
     | '/compliance'
+    | '/dashboard'
     | '/financial'
     | '/leadership'
     | '/login'
@@ -166,6 +176,7 @@ export interface FileRouteTypes {
     | '/'
     | '/actions'
     | '/compliance'
+    | '/dashboard'
     | '/financial'
     | '/leadership'
     | '/login'
@@ -182,6 +193,7 @@ export interface FileRouteTypes {
     | '/'
     | '/actions'
     | '/compliance'
+    | '/dashboard'
     | '/financial'
     | '/leadership'
     | '/login'
@@ -199,6 +211,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ActionsRoute: typeof ActionsRoute
   ComplianceRoute: typeof ComplianceRoute
+  DashboardRoute: typeof DashboardRoute
   FinancialRoute: typeof FinancialRoute
   LeadershipRoute: typeof LeadershipRoute
   LoginRoute: typeof LoginRoute
@@ -270,6 +283,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FinancialRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/compliance': {
       id: '/compliance'
       path: '/compliance'
@@ -319,6 +339,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActionsRoute: ActionsRoute,
   ComplianceRoute: ComplianceRoute,
+  DashboardRoute: DashboardRoute,
   FinancialRoute: FinancialRoute,
   LeadershipRoute: LeadershipRoute,
   LoginRoute: LoginRoute,

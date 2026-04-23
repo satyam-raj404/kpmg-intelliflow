@@ -17,7 +17,7 @@ function Login() {
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    navigate({ to: "/" });
+    navigate({ to: "/dashboard" });
   };
 
   const pickRole = (r: Role) => {
