@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Download, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { useApp } from "@/context/AppContext";
@@ -13,6 +13,12 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, subtitle, actions, showExport = true }: PageHeaderProps) {
   const { period } = useApp();
+  const [updatedAt, setUpdatedAt] = useState<string>("");
+
+  useEffect(() => {
+    setUpdatedAt(format(new Date(), "dd-MMM-yyyy HH:mm"));
+  }, []);
+
   return (
     <div className="flex items-end justify-between mb-6 pb-4 border-b border-border">
       <div>
@@ -22,7 +28,7 @@ export function PageHeader({ title, subtitle, actions, showExport = true }: Page
         {subtitle && <p className="text-[13px] text-muted-foreground mt-1">{subtitle}</p>}
         <p className="text-[11px] text-muted-foreground mt-2">
           Period: <span className="font-semibold text-foreground">{period}</span> · Last updated:{" "}
-          <span className="font-semibold text-foreground">{format(new Date(), "dd-MMM-yyyy HH:mm")}</span>
+          <span className="font-semibold text-foreground">{updatedAt || "—"}</span>
         </p>
       </div>
       <div className="flex items-center gap-2">
