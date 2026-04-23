@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as VendorsRouteImport } from './routes/vendors'
 import { Route as VendorRepoRouteImport } from './routes/vendor-repo'
 import { Route as UtilizationRouteImport } from './routes/utilization'
+import { Route as SignupRouteImport } from './routes/signup'
 import { Route as P2pRouteImport } from './routes/p2p'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LeadershipRouteImport } from './routes/leadership'
@@ -36,6 +37,11 @@ const VendorRepoRoute = VendorRepoRouteImport.update({
 const UtilizationRoute = UtilizationRouteImport.update({
   id: '/utilization',
   path: '/utilization',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const P2pRoute = P2pRouteImport.update({
@@ -97,6 +103,7 @@ export interface FileRoutesByFullPath {
   '/leadership': typeof LeadershipRoute
   '/login': typeof LoginRoute
   '/p2p': typeof P2pRoute
+  '/signup': typeof SignupRoute
   '/utilization': typeof UtilizationRoute
   '/vendor-repo': typeof VendorRepoRoute
   '/vendors': typeof VendorsRoute
@@ -112,6 +119,7 @@ export interface FileRoutesByTo {
   '/leadership': typeof LeadershipRoute
   '/login': typeof LoginRoute
   '/p2p': typeof P2pRoute
+  '/signup': typeof SignupRoute
   '/utilization': typeof UtilizationRoute
   '/vendor-repo': typeof VendorRepoRoute
   '/vendors': typeof VendorsRoute
@@ -128,6 +136,7 @@ export interface FileRoutesById {
   '/leadership': typeof LeadershipRoute
   '/login': typeof LoginRoute
   '/p2p': typeof P2pRoute
+  '/signup': typeof SignupRoute
   '/utilization': typeof UtilizationRoute
   '/vendor-repo': typeof VendorRepoRoute
   '/vendors': typeof VendorsRoute
@@ -145,6 +154,7 @@ export interface FileRouteTypes {
     | '/leadership'
     | '/login'
     | '/p2p'
+    | '/signup'
     | '/utilization'
     | '/vendor-repo'
     | '/vendors'
@@ -160,6 +170,7 @@ export interface FileRouteTypes {
     | '/leadership'
     | '/login'
     | '/p2p'
+    | '/signup'
     | '/utilization'
     | '/vendor-repo'
     | '/vendors'
@@ -175,6 +186,7 @@ export interface FileRouteTypes {
     | '/leadership'
     | '/login'
     | '/p2p'
+    | '/signup'
     | '/utilization'
     | '/vendor-repo'
     | '/vendors'
@@ -191,6 +203,7 @@ export interface RootRouteChildren {
   LeadershipRoute: typeof LeadershipRoute
   LoginRoute: typeof LoginRoute
   P2pRoute: typeof P2pRoute
+  SignupRoute: typeof SignupRoute
   UtilizationRoute: typeof UtilizationRoute
   VendorRepoRoute: typeof VendorRepoRoute
   VendorsRoute: typeof VendorsRoute
@@ -220,6 +233,13 @@ declare module '@tanstack/react-router' {
       path: '/utilization'
       fullPath: '/utilization'
       preLoaderRoute: typeof UtilizationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/p2p': {
@@ -303,6 +323,7 @@ const rootRouteChildren: RootRouteChildren = {
   LeadershipRoute: LeadershipRoute,
   LoginRoute: LoginRoute,
   P2pRoute: P2pRoute,
+  SignupRoute: SignupRoute,
   UtilizationRoute: UtilizationRoute,
   VendorRepoRoute: VendorRepoRoute,
   VendorsRoute: VendorsRoute,
