@@ -25,6 +25,7 @@ import { ProgressBar } from "@/components/ProgressBar";
 import { formatINR, formatPercent } from "@/lib/format";
 import { financialHistory, projects, spendByCategory, topVendorsBySpend, vendors } from "@/data/mock";
 import { brand, chartPalette } from "@/lib/brand";
+import { leadership as dd } from "@/data/kpiDrillDowns";
 
 export const Route = createFileRoute("/leadership")({
   head: () => ({
