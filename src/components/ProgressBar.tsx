@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 export function ProgressBar({
@@ -29,10 +30,12 @@ export function ProgressBar({
 
   return (
     <div className={cn("w-full", className)}>
-      <div className="h-2 w-full bg-muted rounded-sm overflow-hidden">
-        <div
-          className={cn("h-full rounded-sm", colorMap[resolved as keyof typeof colorMap])}
-          style={{ width: `${Math.min(pct, 100)}%` }}
+      <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${Math.min(pct, 100)}%` }}
+          transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94], delay: 0.2 }}
+          className={cn("h-full rounded-full", colorMap[resolved as keyof typeof colorMap])}
         />
       </div>
       {showLabel && (
