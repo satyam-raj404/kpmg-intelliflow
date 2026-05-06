@@ -63,7 +63,7 @@ function UtilizationDashboard() {
         {/* KPI 5: Upcoming Renewals (60 days) */}
         <KpiCard label="Upcoming Renewals (60 days)" value={renewals} size="md" sublabel="IT contracts renewing soon" threshold={{ label: "Track", tone: "warning" }} index={4} />
         {/* KPI 6: Potential Savings Identified (₹/month) */}
-        <KpiCard label="Potential Savings (₹/month)" value={`${formatINR(savings)}/mo`} size="md" sublabel="SUM(cost × (1 - util%)) for < 80% tools" threshold={{ label: "Optimize →", tone: "info" }} index={5} />
+        <KpiCard label="Potential Savings Identified (₹/month)" value={`${formatINR(savings)}/mo`} size="md" sublabel="SUM(cost × (1 - util%)) for < 80% tools" threshold={{ label: "Optimize →", tone: "info" }} index={5} />
       </div>
 
       {/* Drill-downs */}

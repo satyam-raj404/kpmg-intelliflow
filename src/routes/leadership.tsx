@@ -84,11 +84,11 @@ function LeadershipDashboard() {
 
       <div className="grid grid-cols-4 gap-3 mt-3">
         {/* KPI 5: Vendor Concentration Risk (Top-3) */}
-        <KpiCard label="Vendor Concentration Risk (Top 3)" value="38.2%" size="md" sublabel="Target: < 40%" threshold={{ label: "Near limit", tone: "warning" }} index={4} />
+        <KpiCard label="Vendor Concentration Risk (Top-3)" value="38.2%" size="md" sublabel="Target: < 40%" threshold={{ label: "Near limit", tone: "warning" }} index={4} />
         {/* KPI 6: Process Maverick PO Rate */}
-        <KpiCard label="Maverick PO Rate" value="4.1%" size="md" sublabel="POs without upstream PR" threshold={{ label: "< 5% target", tone: "success" }} index={5} />
+        <KpiCard label="Process Maverick PO Rate" value="4.1%" size="md" sublabel="POs without upstream PR" threshold={{ label: "< 5% target", tone: "success" }} index={5} />
         {/* KPI 7: End-to-End P2P Cycle Time */}
-        <KpiCard label="E2E P2P Cycle Time" value="42d" size="md" sublabel="PR → Payment average" threshold={{ label: "Target: ≤ 45d", tone: "success" }} index={6} />
+        <KpiCard label="End-to-End P2P Cycle Time" value="42d" size="md" sublabel="PR → Payment average" threshold={{ label: "Target: ≤ 45d", tone: "success" }} index={6} />
         {/* KPI 8: Procurement ROI */}
         <KpiCard label="Procurement ROI" value="3.4x" size="md" sublabel="Savings / procurement function cost" threshold={{ label: "> 3x target", tone: "success" }} index={7} />
       </div>

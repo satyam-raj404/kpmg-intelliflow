@@ -56,7 +56,7 @@ function FinancialDashboard() {
           index={1}
         />
         {/* KPI 3: Three-Way Match Success Rate */}
-        <KpiCard label="3-Way Match Success Rate" value="94.2%" size="lg" sublabel="PO + GRN + Invoice match" threshold={{ label: "Target: > 95%", tone: "warning" }} index={2} />
+        <KpiCard label="Three-Way Match Success Rate" value="94.2%" size="lg" sublabel="PO + GRN + Invoice match" threshold={{ label: "Target: > 95%", tone: "warning" }} index={2} />
         {/* KPI 4: Invoice Processing Cycle Time */}
         <KpiCard label="Invoice Processing Cycle Time" value="4.8d" delta={{ text: "↓ 0.5d", positive: true }} size="lg" sublabel="Target: ≤ 5 days" threshold={{ label: "On target", tone: "success" }} index={3} />
       </div>
@@ -69,7 +69,7 @@ function FinancialDashboard() {
         {/* KPI 7: Open Invoice Aging (Total ₹) */}
         <KpiCard label="Open Invoice Aging (Total ₹)" value={formatINR(2_82_10_000)} size="md" sublabel="₹18.6L in 90+ bucket" threshold={{ label: "< ₹5 Cr in 90+", tone: "warning" }} index={6} />
         {/* KPI 8: Early Payment Discount Capture Rate */}
-        <KpiCard label="Early Payment Discount Capture" value="72%" size="md" sublabel="Of available discounts captured" threshold={{ label: "Target: > 80%", tone: "warning" }} index={7} />
+        <KpiCard label="Early Payment Discount Capture Rate" value="72%" size="md" sublabel="Of available discounts captured" threshold={{ label: "Target: > 80%", tone: "warning" }} index={7} />
       </div>
 
       {/* Drill-downs */}

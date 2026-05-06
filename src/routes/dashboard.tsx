@@ -84,7 +84,7 @@ function KpiRow() {
         {/* KPI 3: High-Value PO Count */}
         <KpiCard label="High-Value PO Count" value={highValue} size="lg" sublabel="net_order_value > ₹1 Cr" threshold={{ label: "Configurable threshold", tone: "info" }} index={2} />
         {/* KPI 4: Avg PR→PO Conversion Time */}
-        <KpiCard label="Avg PR→PO Conversion Time" value="4.2d" delta={{ text: "↑ 0.3d", positive: false }} size="lg" sublabel="Target: ≤ 5 days" threshold={{ label: "Within target", tone: "success" }} index={3} />
+        <KpiCard label="Average PR-to-PO Conversion Time" value="4.2d" delta={{ text: "↑ 0.3d", positive: false }} size="lg" sublabel="Target: ≤ 5 days" threshold={{ label: "Within target", tone: "success" }} index={3} />
       </div>
       <div className="grid grid-cols-4 gap-3 mt-3">
         {/* KPI 5: PO Cycle Time (Creation → Approval) */}
