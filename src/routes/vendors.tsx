@@ -12,18 +12,18 @@ import {
   Pie,
   Cell,
   Legend,
-  LineChart,
-  Line,
   ComposedChart,
+  Line,
 } from "recharts";
-import { Star, Plus, ShieldCheck, ShieldAlert, ShieldX } from "lucide-react";
+import { ShieldCheck, ShieldAlert, ShieldX } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
+import { KpiCard } from "@/components/KpiCard";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 import { ProgressBar } from "@/components/ProgressBar";
-import { formatINR, formatDateShort } from "@/lib/format";
-import { vendors, totalActiveVendors, abacCertifiedCount, expiringContracts, singleSourceCount } from "@/data/mock";
+import { formatINR } from "@/lib/format";
+import { vendors, totalActiveVendors } from "@/data/mock";
 import { brand } from "@/lib/brand";
 import { roleInitials } from "@/context/AppContext";
 
@@ -31,65 +31,49 @@ export const Route = createFileRoute("/vendors")({
   head: () => ({
     meta: [
       { title: "Vendor Performance — KPMG IntelliSource" },
-      { name: "description", content: "Vendor scorecards, compliance, ratings and risk." },
+      { name: "description", content: "Vendor scorecards, compliance, delivery performance and risk." },
     ],
   }),
   component: VendorPerformance,
 });
 
 function VendorPerformance() {
+  const compliant = vendors.filter((v) => v.compliance === "Compliant").length;
+  const complianceRate = ((compliant / vendors.length) * 100).toFixed(1);
+  const blocked = vendors.filter((v) => v.compliance === "Non-Compliant").length;
+  const avgOTIF = (vendors.reduce((s, v) => s + v.otifRate, 0) / vendors.length).toFixed(1);
+  const avgDelay = (vendors.reduce((s, v) => s + v.responsivenessDays, 0) / vendors.length).toFixed(1);
+
   return (
     <AppShell>
-      <PageHeader
-        title="Vendor Performance"
-        subtitle="Assess vendor performance, compliance and portfolio risk"
-        actions={
-          <button className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-[12px] font-semibold flex items-center gap-1.5 hover:bg-primary-dark">
-            <Plus className="h-3.5 w-3.5" />
-            Add Vendor
-          </button>
-        }
-      />
+      <PageHeader title="Vendor Performance" subtitle="Assess vendor performance, compliance and concentration risk" />
 
-      <SummaryRibbon />
+      <div className="grid grid-cols-4 gap-3">
+        <KpiCard label="Total Active Vendors" value={totalActiveVendors} size="lg" sublabel="Excluding blocked & deleted" />
+        <KpiCard label="Compliance Pass Rate" value={`${complianceRate}%`} size="lg" sublabel={`${compliant} of ${vendors.length} compliant`} threshold={parseFloat(complianceRate) > 95 ? { label: ">95% target", tone: "success" } : { label: "Below 95%", tone: "warning" }} />
+        <KpiCard label="On-Time Delivery (OTIF)" value={`${avgOTIF}%`} size="lg" sublabel="GRN ≤ expected delivery date" threshold={parseFloat(avgOTIF) > 90 ? { label: ">90% target", tone: "success" } : { label: "Below target", tone: "warning" }} />
+        <KpiCard label="Avg Delivery Delay" value={`${avgDelay}d`} size="lg" sublabel="Late deliveries only" threshold={parseFloat(avgDelay) <= 3 ? { label: "≤3d target", tone: "success" } : { label: "Above target", tone: "danger" }} />
+      </div>
+
+      <div className="grid grid-cols-4 gap-3 mt-3">
+        <KpiCard label="Quantity Variance Rate" value="3.8%" size="md" sublabel="Short supply vs PO" threshold={{ label: "<5% target", tone: "success" }} />
+        <KpiCard label="Top Vendor Spend Share" value="18.4%" size="md" sublabel="Highest single vendor" threshold={{ label: "<20% target", tone: "success" }} />
+        <KpiCard label="Payment Blocked" value={blocked} size="md" sublabel="Vendors currently blocked" threshold={blocked > 5 ? { label: "Investigate", tone: "danger" } : { label: "Within limit", tone: "info" }} />
+        <KpiCard label="Master Data Changes" value="28" size="md" sublabel="Vendor modifications this month" threshold={{ label: "<3/vendor/mo", tone: "info" }} />
+      </div>
 
       <div className="grid grid-cols-2 gap-4 mt-4">
         <RatingHistogram />
         <ComplianceStatusPie />
       </div>
 
-      <div className="mt-4">
-        <ScorecardTable />
-      </div>
+      <div className="mt-4"><ScorecardTable /></div>
 
       <div className="grid grid-cols-2 gap-4 mt-4">
-        <RenewalCalendar />
+        <SpendConcentration />
         <PerformanceTrend />
       </div>
     </AppShell>
-  );
-}
-
-function SummaryRibbon() {
-  const breaches = 18;
-  const avgRating = (vendors.reduce((s, v) => s + v.rating, 0) / vendors.length).toFixed(1);
-  const items = [
-    { label: "Total Active Vendors", value: totalActiveVendors + 437 }, // pad to 487 to match brief feel
-    { label: "ABAC Certified", value: `${abacCertifiedCount + 365} (${(((abacCertifiedCount + 365) / (totalActiveVendors + 437)) * 100).toFixed(1)}%)` },
-    { label: "Compliance Breaches (YTD)", value: breaches },
-    { label: "Avg Vendor Rating", value: `${avgRating} / 5.0` },
-    { label: "Contracts Expiring (60d)", value: expiringContracts + 5 },
-    { label: "Single-Source Vendors", value: `${singleSourceCount + 17} ⚠`, danger: true },
-  ];
-  return (
-    <div className="bg-surface border border-border rounded-md p-4 grid grid-cols-6 divide-x divide-border">
-      {items.map((i) => (
-        <div key={i.label} className="px-4 first:pl-0 last:pr-0">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{i.label}</div>
-          <div className={`text-xl font-bold font-tabular mt-1 ${i.danger ? "text-warning" : ""}`}>{i.value}</div>
-        </div>
-      ))}
-    </div>
   );
 }
 
@@ -108,17 +92,16 @@ function RatingHistogram() {
     else if (v.rating < 4.5) buckets[3].count++;
     else buckets[4].count++;
   });
-
   return (
-    <SectionCard title="Vendor Rating Distribution" subtitle="50 active vendors">
-      <div className="h-64">
+    <SectionCard title="Rating Distribution" subtitle={`${vendors.length} vendors`}>
+      <div className="h-56">
         <ResponsiveContainer>
           <BarChart data={buckets}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#E8E8E8" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
             <XAxis dataKey="range" tickLine={false} axisLine={false} />
             <YAxis tickLine={false} axisLine={false} />
             <Tooltip />
-            <Bar dataKey="count" fill={brand.colors.primary} radius={[2, 2, 0, 0]} />
+            <Bar dataKey="count" fill={brand.colors.primary} radius={[3, 3, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -127,21 +110,18 @@ function RatingHistogram() {
 }
 
 function ComplianceStatusPie() {
-  const compliant = vendors.filter((v) => v.compliance === "Compliant").length;
-  const review = vendors.filter((v) => v.compliance === "Under Review").length;
-  const non = vendors.filter((v) => v.compliance === "Non-Compliant").length;
   const data = [
-    { name: "Compliant", value: compliant, color: brand.colors.success },
-    { name: "Under Review", value: review, color: brand.colors.warning },
-    { name: "Non-Compliant", value: non, color: brand.colors.danger },
+    { name: "Compliant", value: vendors.filter((v) => v.compliance === "Compliant").length, color: brand.colors.success },
+    { name: "Under Review", value: vendors.filter((v) => v.compliance === "Under Review").length, color: brand.colors.warning },
+    { name: "Non-Compliant", value: vendors.filter((v) => v.compliance === "Non-Compliant").length, color: brand.colors.danger },
   ];
   return (
-    <SectionCard title="Compliance Status" subtitle="Vendor portfolio">
-      <div className="h-64">
+    <SectionCard title="Compliance Status">
+      <div className="h-56">
         <ResponsiveContainer>
           <PieChart>
-            <Pie data={data} dataKey="value" outerRadius={90} label={(e) => `${e.value}`} labelLine={false}>
-              {data.map((d, i) => (<Cell key={i} fill={d.color} />))}
+            <Pie data={data} dataKey="value" outerRadius={80} label={(e) => `${e.value}`} labelLine={false}>
+              {data.map((d, i) => <Cell key={i} fill={d.color} />)}
             </Pie>
             <Tooltip />
             <Legend wrapperStyle={{ fontSize: 11 }} iconType="square" />
@@ -154,102 +134,76 @@ function ComplianceStatusPie() {
 
 function ScorecardTable() {
   const [search, setSearch] = useState("");
-  const [region, setRegion] = useState<string>("All");
   const [sort, setSort] = useState<"spend" | "rating">("spend");
 
   const rows = useMemo(() => {
     let r = [...vendors];
     if (search) r = r.filter((v) => v.name.toLowerCase().includes(search.toLowerCase()));
-    if (region !== "All") r = r.filter((v) => v.region === region);
     r.sort((a, b) => (sort === "spend" ? b.spendYTD - a.spendYTD : b.rating - a.rating));
-    return r.slice(0, 25);
-  }, [search, region, sort]);
+    return r.slice(0, 20);
+  }, [search, sort]);
 
   return (
     <SectionCard
       title="Vendor Scorecard"
-      subtitle="Top 25 by selected sort"
+      subtitle="Top 20 by selected sort"
       bodyClassName="p-0"
       actions={
         <div className="flex gap-2">
-          <input
-            type="search"
-            placeholder="Search vendors..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-8 px-3 rounded border border-border text-[12px] bg-surface w-44 focus:border-accent focus:outline-none"
-          />
-          {["All", "APAC", "EMEA", "Americas"].map((r) => (
-            <button
-              key={r}
-              onClick={() => setRegion(r)}
-              className={`text-[11px] px-2 py-1 rounded border ${region === r ? "bg-primary text-primary-foreground border-primary" : "bg-surface border-border hover:border-accent"}`}
-            >
-              {r}
-            </button>
+          <input type="search" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)}
+            className="h-7 px-2.5 rounded-md border border-border text-[11px] bg-background w-36 focus:border-accent focus:outline-none" />
+          {(["spend", "rating"] as const).map((s) => (
+            <button key={s} onClick={() => setSort(s)}
+              className={`text-[10px] px-2 py-1 rounded-md border transition-colors capitalize ${sort === s ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border hover:border-accent/50"}`}
+            >{s}</button>
           ))}
         </div>
       }
     >
       <div className="overflow-x-auto">
         <table className="w-full text-[12px]">
-          <thead className="bg-secondary text-muted-foreground">
+          <thead className="bg-secondary/50 text-muted-foreground">
             <tr className="text-left">
-              <th className="px-4 py-2.5 font-semibold">Vendor</th>
-              <th className="px-4 py-2.5 font-semibold">Category</th>
-              <th className="px-4 py-2.5 font-semibold">Region</th>
-              <th className="px-4 py-2.5 font-semibold cursor-pointer" onClick={() => setSort("rating")}>Rating</th>
-              <th className="px-4 py-2.5 font-semibold w-32">Delivery</th>
-              <th className="px-4 py-2.5 font-semibold w-32">Quality</th>
-              <th className="px-4 py-2.5 font-semibold">Compliance</th>
-              <th className="px-4 py-2.5 font-semibold text-right">Active POs</th>
-              <th className="px-4 py-2.5 font-semibold text-right cursor-pointer" onClick={() => setSort("spend")}>Spend YTD</th>
-              <th className="px-4 py-2.5 font-semibold">Contract</th>
-              <th className="px-4 py-2.5 font-semibold">Risk</th>
+              <th className="px-4 py-2 font-medium">Vendor</th>
+              <th className="px-4 py-2 font-medium">Category</th>
+              <th className="px-4 py-2 font-medium">Rating</th>
+              <th className="px-4 py-2 font-medium w-24">Delivery</th>
+              <th className="px-4 py-2 font-medium">Compliance</th>
+              <th className="px-4 py-2 font-medium text-right">Active POs</th>
+              <th className="px-4 py-2 font-medium text-right">Spend YTD</th>
+              <th className="px-4 py-2 font-medium">Contract</th>
+              <th className="px-4 py-2 font-medium">Risk</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {rows.map((v) => (
-              <tr key={v.id} className="hover:bg-secondary/50 cursor-pointer">
-                <td className="px-4 py-2.5">
+              <tr key={v.id} className="hover:bg-secondary/30 transition-colors">
+                <td className="px-4 py-2">
                   <div className="flex items-center gap-2">
-                    <div className="h-7 w-7 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center shrink-0">
+                    <div className="h-6 w-6 rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center shrink-0">
                       {roleInitials(v.name)}
                     </div>
                     <div className="min-w-0">
-                      <div className="font-semibold truncate">{v.name}</div>
-                      <div className="text-[10px] text-muted-foreground font-mono">{v.code}</div>
+                      <div className="font-medium truncate text-[11px]">{v.name}</div>
+                      <div className="text-[9px] text-muted-foreground font-mono">{v.code}</div>
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-2.5">
-                  <StatusPill tone="info">{v.category}</StatusPill>
+                <td className="px-4 py-2"><StatusPill tone="info">{v.category}</StatusPill></td>
+                <td className="px-4 py-2 font-tabular font-medium">{v.rating.toFixed(1)}</td>
+                <td className="px-4 py-2"><ProgressBar value={v.deliveryScore} tone={v.deliveryScore >= 85 ? "success" : v.deliveryScore >= 70 ? "warning" : "danger"} /></td>
+                <td className="px-4 py-2">
+                  {v.compliance === "Compliant" && <ShieldCheck className="h-3.5 w-3.5 text-success" />}
+                  {v.compliance === "Under Review" && <ShieldAlert className="h-3.5 w-3.5 text-warning" />}
+                  {v.compliance === "Non-Compliant" && <ShieldX className="h-3.5 w-3.5 text-danger" />}
                 </td>
-                <td className="px-4 py-2.5 text-muted-foreground">{v.region}</td>
-                <td className="px-4 py-2.5">
-                  <div className="flex items-center gap-1">
-                    <Star className="h-3 w-3 fill-warning text-warning" />
-                    <span className="font-semibold font-tabular">{v.rating.toFixed(1)}</span>
-                  </div>
+                <td className="px-4 py-2 text-right font-tabular">{v.activePOs}</td>
+                <td className="px-4 py-2 text-right font-tabular font-medium">{formatINR(v.spendYTD)}</td>
+                <td className="px-4 py-2">
+                  <StatusPill tone={v.contractStatus === "Active" ? "success" : v.contractStatus === "Expiring Soon" ? "warning" : "danger"}>{v.contractStatus}</StatusPill>
                 </td>
-                <td className="px-4 py-2.5"><ProgressBar value={v.deliveryScore} tone={v.deliveryScore >= 85 ? "success" : v.deliveryScore >= 70 ? "warning" : "danger"} /></td>
-                <td className="px-4 py-2.5"><ProgressBar value={v.qualityScore} tone={v.qualityScore >= 85 ? "success" : v.qualityScore >= 70 ? "warning" : "danger"} /></td>
-                <td className="px-4 py-2.5">
-                  {v.compliance === "Compliant" && <ShieldCheck className="h-4 w-4 text-success" />}
-                  {v.compliance === "Under Review" && <ShieldAlert className="h-4 w-4 text-warning" />}
-                  {v.compliance === "Non-Compliant" && <ShieldX className="h-4 w-4 text-danger" />}
-                </td>
-                <td className="px-4 py-2.5 text-right font-tabular">{v.activePOs}</td>
-                <td className="px-4 py-2.5 text-right font-tabular font-semibold">{formatINR(v.spendYTD)}</td>
-                <td className="px-4 py-2.5">
-                  <StatusPill tone={v.contractStatus === "Active" ? "success" : v.contractStatus === "Expiring Soon" ? "warning" : "danger"}>
-                    {v.contractStatus}
-                  </StatusPill>
-                </td>
-                <td className="px-4 py-2.5">
-                  <StatusPill tone={v.riskTier === "Low" ? "success" : v.riskTier === "Medium" ? "warning" : "danger"} dot>
-                    {v.riskTier}
-                  </StatusPill>
+                <td className="px-4 py-2">
+                  <StatusPill tone={v.riskTier === "Low" ? "success" : v.riskTier === "Medium" ? "warning" : "danger"} dot>{v.riskTier}</StatusPill>
                 </td>
               </tr>
             ))}
@@ -260,32 +214,22 @@ function ScorecardTable() {
   );
 }
 
-function RenewalCalendar() {
-  const upcoming = vendors
-    .filter((v) => v.contractStatus !== "Expired")
-    .sort((a, b) => +new Date(a.contractEnd) - +new Date(b.contractEnd))
-    .slice(0, 8);
+function SpendConcentration() {
+  const sorted = [...vendors].sort((a, b) => b.spendYTD - a.spendYTD).slice(0, 10);
+  const total = vendors.reduce((s, v) => s + v.spendYTD, 0);
   return (
-    <SectionCard title="Contract Renewal Calendar" subtitle="Next 90 days">
-      <ul className="space-y-2.5">
-        {upcoming.map((v) => {
-          const days = Math.ceil((+new Date(v.contractEnd) - Date.now()) / 86400000);
-          const tone = days <= 30 ? "danger" : days <= 60 ? "warning" : "info";
-          const pct = Math.max(0, Math.min(100, ((90 - Math.max(0, days)) / 90) * 100));
-          return (
-            <li key={v.id}>
-              <div className="flex items-baseline justify-between text-[12px] mb-1">
-                <span className="font-semibold truncate flex-1">{v.name}</span>
-                <span className={`font-tabular font-semibold ${tone === "danger" ? "text-danger" : tone === "warning" ? "text-warning" : "text-accent"}`}>{days}d</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex-1"><ProgressBar value={pct} tone={tone} /></div>
-                <span className="text-[11px] text-muted-foreground font-tabular w-20 text-right">{formatINR(v.spendYTD)}</span>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+    <SectionCard title="Vendor Spend Concentration" subtitle="Top 10 vendors">
+      <div className="h-56">
+        <ResponsiveContainer>
+          <BarChart data={sorted.map((v) => ({ name: v.name, pct: (v.spendYTD / total) * 100 }))} layout="vertical" margin={{ top: 4, right: 40, left: 80, bottom: 4 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false} />
+            <XAxis type="number" tickFormatter={(v) => `${v.toFixed(0)}%`} tickLine={false} axisLine={false} />
+            <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} fontSize={10} width={80} />
+            <Tooltip formatter={(v: number) => `${v.toFixed(1)}%`} />
+            <Bar dataKey="pct" fill={brand.colors.primary} radius={[0, 3, 3, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </SectionCard>
   );
 }
@@ -297,18 +241,18 @@ function PerformanceTrend() {
     compliance: 78 + i * 1.5,
   }));
   return (
-    <SectionCard title="Vendor Performance Trend" subtitle="Last 6 quarters">
-      <div className="h-64">
+    <SectionCard title="Performance Trend" subtitle="Last 6 quarters">
+      <div className="h-56">
         <ResponsiveContainer>
           <ComposedChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#E8E8E8" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
             <XAxis dataKey="quarter" tickLine={false} axisLine={false} />
             <YAxis yAxisId="left" tickLine={false} axisLine={false} domain={[3, 5]} tickFormatter={(v) => v.toFixed(1)} />
             <YAxis yAxisId="right" orientation="right" tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
             <Tooltip />
             <Legend wrapperStyle={{ fontSize: 11 }} iconType="line" />
             <Line yAxisId="left" type="monotone" dataKey="rating" stroke={brand.colors.primary} strokeWidth={2} name="Avg Rating" />
-            <Line yAxisId="right" type="monotone" dataKey="compliance" stroke={brand.colors.success} strokeWidth={2} name="Compliance Pass %" />
+            <Line yAxisId="right" type="monotone" dataKey="compliance" stroke={brand.colors.success} strokeWidth={2} name="Compliance %" />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
