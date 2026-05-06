@@ -7,7 +7,6 @@ import {
   Activity,
   Workflow,
   BookOpen,
-  ShieldCheck,
   ListTodo,
   UserCog,
   History,
