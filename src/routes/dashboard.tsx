@@ -21,6 +21,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { formatINR, formatDateShort } from "@/lib/format";
 import { purchaseOrders, financialHistory, vendors } from "@/data/mock";
 import { brand } from "@/lib/brand";
+import { procurement as dd } from "@/data/kpiDrillDowns";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -63,7 +64,6 @@ function KpiRow() {
   return (
     <>
       <div className="grid grid-cols-4 gap-3">
-        {/* KPI 1: Total PO Value (MTD) */}
         <KpiCard
           label="Total PO Value (MTD)"
           value={formatINR(totalMTD)}
@@ -71,6 +71,7 @@ function KpiRow() {
           sublabel="SUM of net_order_value this month"
           size="lg"
           index={0}
+          drillDown={dd.totalPOValue}
           sparkline={
             <ResponsiveContainer>
               <AreaChart data={spark} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
@@ -79,22 +80,15 @@ function KpiRow() {
             </ResponsiveContainer>
           }
         />
-        {/* KPI 2: Active PO Count */}
-        <KpiCard label="Active PO Count" value={activePOs.length} size="lg" sublabel="delivery_completed ≠ X, not deleted" index={1} />
-        {/* KPI 3: High-Value PO Count */}
-        <KpiCard label="High-Value PO Count" value={highValue} size="lg" sublabel="net_order_value > ₹1 Cr" threshold={{ label: "Configurable threshold", tone: "info" }} index={2} />
-        {/* KPI 4: Avg PR→PO Conversion Time */}
-        <KpiCard label="Average PR-to-PO Conversion Time" value="4.2d" delta={{ text: "↑ 0.3d", positive: false }} size="lg" sublabel="Target: ≤ 5 days" threshold={{ label: "Within target", tone: "success" }} index={3} />
+        <KpiCard label="Active PO Count" value={activePOs.length} size="lg" sublabel="delivery_completed ≠ X, not deleted" index={1} drillDown={dd.activePOCount} />
+        <KpiCard label="High-Value PO Count" value={highValue} size="lg" sublabel="net_order_value > ₹1 Cr" threshold={{ label: "Configurable threshold", tone: "info" }} index={2} drillDown={dd.highValuePO} />
+        <KpiCard label="Average PR-to-PO Conversion Time" value="4.2d" delta={{ text: "↑ 0.3d", positive: false }} size="lg" sublabel="Target: ≤ 5 days" threshold={{ label: "Within target", tone: "success" }} index={3} drillDown={dd.avgPRtoPO} />
       </div>
       <div className="grid grid-cols-4 gap-3 mt-3">
-        {/* KPI 5: PO Cycle Time (Creation → Approval) */}
-        <KpiCard label="PO Cycle Time (Creation → Approval)" value="2.6d" size="md" sublabel="Target: ≤ 3 days" threshold={{ label: "Within target", tone: "success" }} index={4} />
-        {/* KPI 6: PO Deletion Frequency (MTD) */}
-        <KpiCard label="PO Deletion Frequency (MTD)" value={deleted} size="md" sublabel="Target: ≤ 5 per month" threshold={deleted > 5 ? { label: "Above target", tone: "danger" } : { label: "Within limit", tone: "success" }} index={5} />
-        {/* KPI 7: PO Amendment Rate */}
-        <KpiCard label="PO Amendment Rate" value={`${amendRate}%`} size="md" sublabel={`${amended} of ${purchaseOrders.length} POs modified`} threshold={parseFloat(amendRate) > 15 ? { label: "> 15% threshold", tone: "danger" } : { label: "< 15% target", tone: "success" }} index={6} />
-        {/* KPI 8: Open PR Aging (> 7 days) */}
-        <KpiCard label="Open PR Aging (> 7 days)" value="14" size="md" sublabel="PRs stuck without conversion" threshold={{ label: "Target: ≤ 10", tone: "warning" }} index={7} />
+        <KpiCard label="PO Cycle Time (Creation → Approval)" value="2.6d" size="md" sublabel="Target: ≤ 3 days" threshold={{ label: "Within target", tone: "success" }} index={4} drillDown={dd.poCycleTime} />
+        <KpiCard label="PO Deletion Frequency (MTD)" value={deleted} size="md" sublabel="Target: ≤ 5 per month" threshold={deleted > 5 ? { label: "Above target", tone: "danger" } : { label: "Within limit", tone: "success" }} index={5} drillDown={dd.poDeletionFreq} />
+        <KpiCard label="PO Amendment Rate" value={`${amendRate}%`} size="md" sublabel={`${amended} of ${purchaseOrders.length} POs modified`} threshold={parseFloat(amendRate) > 15 ? { label: "> 15% threshold", tone: "danger" } : { label: "< 15% target", tone: "success" }} index={6} drillDown={dd.poAmendRate} />
+        <KpiCard label="Open PR Aging (> 7 days)" value="14" size="md" sublabel="PRs stuck without conversion" threshold={{ label: "Target: ≤ 10", tone: "warning" }} index={7} drillDown={dd.openPRAging} />
       </div>
     </>
   );
