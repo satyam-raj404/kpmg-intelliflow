@@ -39,38 +39,46 @@ function FinancialDashboard() {
 
   return (
     <AppShell>
-      <PageHeader title="Financial Dashboard" subtitle="Spend vs budget, invoice processing & payment cycle health" />
+      <PageHeader title="Financial Dashboard" subtitle="Spend vs budget tracking, cash flow, invoice/payment cycle health" />
 
+      {/* KPI 02-Financial: 8 KPIs */}
       <div className="grid grid-cols-4 gap-3">
-        <KpiCard label="Total Spend (YTD)" value={formatINR(totalSpend)} size="lg" delta={{ text: "↑ 12.4% YoY", positive: false }} sublabel="Across all active projects" />
+        {/* KPI 1: Total Spend (YTD) */}
+        <KpiCard label="Total Spend (YTD)" value={formatINR(totalSpend)} size="lg" delta={{ text: "↑ 12.4% YoY", positive: false }} sublabel="SUM(payment_dump.amount_local_ccy)" index={0} />
+        {/* KPI 2: Budget Utilization % */}
         <KpiCard
-          label="Budget Utilization"
+          label="Budget Utilization %"
           value={formatPercent(budgetUtil)}
           size="lg"
           sublabel={<>{formatINR(totalSpend)} of {formatINR(totalBudget)}</>}
-          threshold={budgetUtil > 100 ? { label: "Over budget", tone: "danger" } : budgetUtil > 90 ? { label: "Near limit", tone: "warning" } : { label: "Within budget", tone: "success" }}
+          threshold={budgetUtil > 100 ? { label: "> 100% — Over budget", tone: "danger" } : budgetUtil > 90 ? { label: "90-100% — Amber", tone: "warning" } : { label: "< 90% — Green", tone: "success" }}
           rightSlot={<div className="w-16"><ProgressBar value={budgetUtil} /></div>}
+          index={1}
         />
-        <KpiCard label="3-Way Match Rate" value="94.2%" size="lg" sublabel="PO + GRN + Invoice match" threshold={{ label: "Target: >95%", tone: "warning" }} />
-        <KpiCard label="Invoice Processing Time" value="4.8d" delta={{ text: "↓ 0.5d", positive: true }} size="lg" sublabel="Target: ≤5 days" threshold={{ label: "On target", tone: "success" }} />
+        {/* KPI 3: Three-Way Match Success Rate */}
+        <KpiCard label="3-Way Match Success Rate" value="94.2%" size="lg" sublabel="PO + GRN + Invoice match" threshold={{ label: "Target: > 95%", tone: "warning" }} index={2} />
+        {/* KPI 4: Invoice Processing Cycle Time */}
+        <KpiCard label="Invoice Processing Cycle Time" value="4.8d" delta={{ text: "↓ 0.5d", positive: true }} size="lg" sublabel="Target: ≤ 5 days" threshold={{ label: "On target", tone: "success" }} index={3} />
       </div>
 
       <div className="grid grid-cols-4 gap-3 mt-3">
-        <KpiCard label="Payment On-Time Rate" value="91.3%" size="md" sublabel="Paid on or before due date" threshold={{ label: ">90% target", tone: "success" }} />
-        <KpiCard label="Days Payable Outstanding" value="38d" size="md" sublabel="Avg payment cycle" threshold={{ label: "Within terms", tone: "info" }} />
-        <KpiCard label="Open Invoice Aging" value={formatINR(2_82_10_000)} size="md" sublabel="₹18.6L in 90+ bucket" threshold={{ label: "Monitor 90+", tone: "warning" }} />
-        <KpiCard label="Early Payment Discount" value="72%" size="md" sublabel="Of available discounts captured" threshold={{ label: "Target: >80%", tone: "warning" }} />
+        {/* KPI 5: Payment On-Time Rate */}
+        <KpiCard label="Payment On-Time Rate" value="91.3%" size="md" sublabel="Paid on or before due date" threshold={{ label: "> 90% target", tone: "success" }} index={4} />
+        {/* KPI 6: Days Payable Outstanding (DPO) */}
+        <KpiCard label="Days Payable Outstanding (DPO)" value="38d" size="md" sublabel="Match payment terms (30/45/60)" threshold={{ label: "Within terms", tone: "info" }} index={5} />
+        {/* KPI 7: Open Invoice Aging (Total ₹) */}
+        <KpiCard label="Open Invoice Aging (Total ₹)" value={formatINR(2_82_10_000)} size="md" sublabel="₹18.6L in 90+ bucket" threshold={{ label: "< ₹5 Cr in 90+", tone: "warning" }} index={6} />
+        {/* KPI 8: Early Payment Discount Capture Rate */}
+        <KpiCard label="Early Payment Discount Capture" value="72%" size="md" sublabel="Of available discounts captured" threshold={{ label: "Target: > 80%", tone: "warning" }} index={7} />
       </div>
 
+      {/* Drill-downs */}
       <div className="mt-4"><DivisionBudgets /></div>
-
       <div className="grid grid-cols-2 gap-4 mt-4">
         <VarianceWaterfall />
         <InvoiceStatus />
       </div>
-
       <div className="mt-4"><ProjectPL /></div>
-
       <div className="grid grid-cols-2 gap-4 mt-4">
         <InvoiceAging />
         <TaxSummary />
@@ -81,7 +89,7 @@ function FinancialDashboard() {
 
 function DivisionBudgets() {
   return (
-    <SectionCard title="Budget Utilization by Division" subtitle="YTD actual vs allocated">
+    <SectionCard title="Budget Utilization by Division" subtitle="KPI 2 segmented by business unit">
       <div className="h-72">
         <ResponsiveContainer>
           <BarChart data={divisionBudgets} layout="vertical" margin={{ top: 8, right: 24, left: 90, bottom: 4 }}>
@@ -140,7 +148,7 @@ function InvoiceStatus() {
   const total = data.reduce((s, d) => s + d.value, 0);
 
   return (
-    <SectionCard title="Invoice Status" subtitle={`${total} invoices`}>
+    <SectionCard title="Invoice Status Donut" subtitle={`${total} invoices from 06_Invoice_Dump`}>
       <div className="h-72 relative">
         <ResponsiveContainer>
           <PieChart>
@@ -163,7 +171,7 @@ function InvoiceStatus() {
 function ProjectPL() {
   const rows = [...projects].sort((a, b) => b.revenue - a.revenue).slice(0, 10);
   return (
-    <SectionCard title="Project P&L" subtitle="Top 10 by revenue" bodyClassName="p-0">
+    <SectionCard title="Project P&L" subtitle="Revenue vs cost (07_Payment_Dump grouped by project)" bodyClassName="p-0">
       <div className="overflow-x-auto">
         <table className="w-full text-[12px]">
           <thead className="bg-secondary/50 text-muted-foreground">
@@ -204,7 +212,7 @@ function InvoiceAging() {
     { range: "90+", value: 18_60_000, color: brand.colors.purple },
   ];
   return (
-    <SectionCard title="Invoice Aging" subtitle="Open receivables">
+    <SectionCard title="Invoice Aging Stack" subtitle="KPI 7 — 0-30/31-60/61-90/90+ buckets">
       <div className="h-52">
         <ResponsiveContainer>
           <BarChart data={buckets}>
@@ -231,7 +239,7 @@ function TaxSummary() {
   ];
   const total = items.reduce((s, i) => s + i.value, 0);
   return (
-    <SectionCard title="Tax Summary (YTD)" subtitle={`Total: ${formatINR(total)}`}>
+    <SectionCard title="TDS + GST Input Credit" subtitle={`Total: ${formatINR(total)} from 06_Invoice_Dump`}>
       <ul className="space-y-3 mt-1">
         {items.map((i) => (
           <li key={i.type}>

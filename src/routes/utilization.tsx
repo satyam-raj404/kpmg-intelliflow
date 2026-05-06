@@ -25,7 +25,7 @@ export const Route = createFileRoute("/utilization")({
   head: () => ({
     meta: [
       { title: "Utilization Dashboard — KPMG IntelliSource" },
-      { name: "description", content: "Tool & infrastructure utilization, optimization opportunities." },
+      { name: "description", content: "Optimize tool & infrastructure utilization, identify waste." },
     ],
   }),
   component: UtilizationDashboard,
@@ -45,20 +45,28 @@ function UtilizationDashboard() {
 
   return (
     <AppShell>
-      <PageHeader title="Utilization Dashboard" subtitle="Optimize tool & infrastructure utilization" />
+      <PageHeader title="Utilization Dashboard" subtitle="Optimize tool & infrastructure utilization, identify waste" />
 
+      {/* KPI 05-Utilization: 6 KPIs */}
       <div className="grid grid-cols-3 gap-3">
-        <KpiCard label="Total IT/Tool Spend (YTD)" value={formatINR(monthlyCost * 12)} size="lg" delta={{ text: "↑ 4.2%", positive: false }} sublabel="Annual projected from monthly" />
-        <KpiCard label="License Utilization Rate" value={`${utilPct.toFixed(1)}%`} size="lg" sublabel={`${activeUsers.toLocaleString("en-IN")} active of ${totalLicenses.toLocaleString("en-IN")} owned`} threshold={utilPct > 80 ? { label: ">80% target", tone: "success" } : { label: "Below 80%", tone: "warning" }} />
-        <KpiCard label="Potential Savings" value={`${formatINR(savings)}/mo`} size="lg" sublabel={`${underutil} underutilized tools identified`} threshold={{ label: "Optimize →", tone: "info" }} />
+        {/* KPI 1: Total IT/Tool Spend (YTD) */}
+        <KpiCard label="Total IT/Tool Spend (YTD)" value={formatINR(monthlyCost * 12)} size="lg" delta={{ text: "↑ 4.2%", positive: false }} sublabel="material_group IN [IT, CLOUD, LICENSE, SOFTWARE]" index={0} />
+        {/* KPI 2: License Utilization Rate */}
+        <KpiCard label="License Utilization Rate" value={`${utilPct.toFixed(1)}%`} size="lg" sublabel={`${activeUsers.toLocaleString("en-IN")} active of ${totalLicenses.toLocaleString("en-IN")} owned`} threshold={utilPct > 80 ? { label: "> 80% target", tone: "success" } : { label: "Below 80%", tone: "warning" }} index={1} />
+        {/* KPI 3: Cost Per Active User */}
+        <KpiCard label="Cost Per Active User" value={`₹${Math.round(monthlyCost / activeUsers).toLocaleString("en-IN")}`} size="lg" sublabel="Annual license cost / active users" index={2} />
       </div>
 
       <div className="grid grid-cols-3 gap-3 mt-3">
-        <KpiCard label="Underutilized Licenses" value={underutil} size="md" sublabel="Tools with <50% utilization" threshold={underutil > 5 ? { label: "Review needed", tone: "danger" } : { label: "Within limit", tone: "success" }} />
-        <KpiCard label="Upcoming Renewals (60d)" value={renewals} size="md" sublabel="Contracts renewing soon" threshold={{ label: "Track", tone: "warning" }} />
-        <KpiCard label="Avg Cost/Active User" value={`₹${Math.round(monthlyCost / activeUsers).toLocaleString("en-IN")}`} size="md" sublabel="Monthly per active user" />
+        {/* KPI 4: Underutilized License Count */}
+        <KpiCard label="Underutilized License Count" value={underutil} size="md" sublabel="Tools with < 50% utilization" threshold={underutil > 5 ? { label: "Review needed", tone: "danger" } : { label: "≤ 5 target", tone: "success" }} index={3} />
+        {/* KPI 5: Upcoming Renewals (60 days) */}
+        <KpiCard label="Upcoming Renewals (60 days)" value={renewals} size="md" sublabel="IT contracts renewing soon" threshold={{ label: "Track", tone: "warning" }} index={4} />
+        {/* KPI 6: Potential Savings Identified (₹/month) */}
+        <KpiCard label="Potential Savings (₹/month)" value={`${formatINR(savings)}/mo`} size="md" sublabel="SUM(cost × (1 - util%)) for < 80% tools" threshold={{ label: "Optimize →", tone: "info" }} index={5} />
       </div>
 
+      {/* Drill-downs */}
       <div className="grid grid-cols-5 gap-4 mt-4">
         <div className="col-span-3"><UtilByTool /></div>
         <div className="col-span-2"><MonthlyTrend /></div>
@@ -72,7 +80,7 @@ function UtilizationDashboard() {
 function UtilByTool() {
   const data = [...utilization].sort((a, b) => b.monthlyCost - a.monthlyCost).slice(0, 12).map((u) => ({ name: u.toolName, pct: u.utilPercent }));
   return (
-    <SectionCard title="Utilization by Tool" subtitle="Top 12 by cost">
+    <SectionCard title="Utilization by Tool" subtitle="KPI 2 per tool, color-coded">
       <div className="h-80">
         <ResponsiveContainer>
           <BarChart data={data} layout="vertical" margin={{ top: 4, right: 50, left: 90, bottom: 4 }}>
@@ -116,7 +124,7 @@ function MonthlyTrend() {
 function OptimizationTable() {
   const rows = [...utilization].sort((a, b) => b.potentialSavings - a.potentialSavings);
   return (
-    <SectionCard title="License Optimization" subtitle="Sorted by potential savings" bodyClassName="p-0">
+    <SectionCard title="License Optimization Table" subtitle="KPI 4 sorted by potential savings desc" bodyClassName="p-0">
       <div className="overflow-x-auto">
         <table className="w-full text-[12px]">
           <thead className="bg-secondary/50 text-muted-foreground">

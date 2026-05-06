@@ -7,7 +7,6 @@ import {
   Activity,
   Workflow,
   BookOpen,
-  ShieldCheck,
   ListTodo,
   UserCog,
   History,
@@ -36,7 +35,6 @@ const dashboards: NavItem[] = [
 const operations: NavItem[] = [
   { label: "P2P Lifecycle", to: "/p2p", icon: Workflow },
   { label: "Vendor Repository", to: "/vendor-repo", icon: BookOpen },
-  { label: "Compliance Center", to: "/compliance", icon: ShieldCheck },
   { label: "Action Items", to: "/actions", icon: ListTodo },
 ];
 
