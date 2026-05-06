@@ -1,6 +1,7 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
+@import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600;700&display=swap');
 
 @theme inline {
   --radius-sm: 2px;
@@ -9,8 +10,8 @@
   --radius-xl: 8px;
   --radius-2xl: 12px;
 
-  --font-sans: "Inter", "SF Pro Display", -apple-system, "Helvetica Neue", sans-serif;
-  --font-serif: "Inter", -apple-system, sans-serif;
+  --font-sans: "Source Sans 3", "Arial", "Helvetica Neue", sans-serif;
+  --font-heading: "Georgia", "KPMG Slab", serif;
   --font-mono: "JetBrains Mono", "SF Mono", "Consolas", monospace;
 
   --color-background: var(--background);
@@ -70,12 +71,12 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.15 0.01 250);
 
-  /* KPMG Blue — refined */
+  /* KPMG Blue */
   --primary: oklch(0.35 0.16 260);
   --primary-foreground: oklch(1 0 0);
   --primary-dark: oklch(0.25 0.14 262);
 
-  /* Subtle accent */
+  /* KPMG Cyan accent */
   --accent: oklch(0.58 0.14 240);
   --accent-foreground: oklch(1 0 0);
 
@@ -106,13 +107,13 @@
   --chart-4: oklch(0.35 0.14 300);
   --chart-5: oklch(0.72 0.14 70);
 
-  --sidebar: oklch(0.17 0.02 250);
+  --sidebar: oklch(0.17 0.04 260);
   --sidebar-foreground: oklch(0.92 0.005 250);
   --sidebar-primary: oklch(0.58 0.14 240);
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.22 0.02 250);
+  --sidebar-accent: oklch(0.22 0.04 260);
   --sidebar-accent-foreground: oklch(1 0 0);
-  --sidebar-border: oklch(0.25 0.015 250);
+  --sidebar-border: oklch(0.25 0.03 260);
   --sidebar-ring: oklch(0.58 0.14 240);
 }
 
@@ -123,7 +124,7 @@
 
   html, body {
     font-family: var(--font-sans);
-    font-feature-settings: "tnum" 1, "kern" 1, "cv11" 1;
+    font-feature-settings: "tnum" 1, "kern" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -134,9 +135,9 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-sans);
+    font-family: var(--font-heading);
     font-weight: 600;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.01em;
   }
 
   .font-tabular {
@@ -151,11 +152,12 @@
 }
 .recharts-tooltip-wrapper { outline: none !important; }
 .recharts-default-tooltip {
-  border-radius: 6px !important;
+  border-radius: 8px !important;
   border: 1px solid var(--color-border) !important;
   background: var(--color-surface) !important;
   font-size: 12px !important;
-  box-shadow: 0 4px 12px oklch(0 0 0 / 0.06) !important;
+  box-shadow: 0 8px 24px oklch(0 0 0 / 0.08) !important;
+  backdrop-filter: blur(8px) !important;
 }
 
 :focus-visible {
@@ -164,7 +166,14 @@
 }
 
 /* Scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: oklch(0.8 0 0); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: oklch(0.85 0 0); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: oklch(0.7 0 0); }
+
+/* Glassmorphism utility */
+.glass {
+  background: oklch(1 0 0 / 0.7);
+  backdrop-filter: blur(12px) saturate(1.2);
+  border: 1px solid oklch(0.92 0 0 / 0.5);
+}

@@ -13,6 +13,7 @@ import {
   History,
   Settings,
 } from "lucide-react";
+import { motion } from "framer-motion";
 import { Logo } from "./Logo";
 import { useApp } from "@/context/AppContext";
 import { cn } from "@/lib/utils";
@@ -51,11 +52,11 @@ function Section({ title, items, isAdmin }: { title: string; items: NavItem[]; i
   if (!filtered.length) return null;
   return (
     <div className="mb-5">
-      <div className="px-4 mb-1.5 text-[10px] font-medium uppercase tracking-[0.08em] text-sidebar-foreground/40">
+      <div className="px-4 mb-1.5 text-[10px] font-medium uppercase tracking-[0.1em] text-sidebar-foreground/30">
         {title}
       </div>
       <nav className="flex flex-col gap-0.5 px-2">
-        {filtered.map((item) => {
+        {filtered.map((item, i) => {
           const active = location.pathname === item.to;
           const Icon = item.icon;
           return (
@@ -63,12 +64,19 @@ function Section({ title, items, isAdmin }: { title: string; items: NavItem[]; i
               key={item.to}
               to={item.to}
               className={cn(
-                "flex items-center gap-2.5 px-3 py-2 text-[13px] rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all duration-150",
-                active && "bg-sidebar-accent text-sidebar-foreground font-medium",
+                "group relative flex items-center gap-2.5 px-3 py-2 text-[13px] rounded-md text-sidebar-foreground/60 hover:text-sidebar-foreground transition-all duration-200",
+                active && "text-sidebar-foreground font-medium",
               )}
             >
-              <Icon className="h-[15px] w-[15px] shrink-0 opacity-70" />
-              <span className="truncate">{item.label}</span>
+              {active && (
+                <motion.div
+                  layoutId="sidebar-active"
+                  className="absolute inset-0 bg-sidebar-accent rounded-md"
+                  transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                />
+              )}
+              <Icon className="h-[15px] w-[15px] shrink-0 opacity-60 group-hover:opacity-100 transition-opacity relative z-10" />
+              <span className="truncate relative z-10">{item.label}</span>
             </Link>
           );
         })}
@@ -85,7 +93,7 @@ export function Sidebar() {
     <aside className="w-56 shrink-0 bg-sidebar text-sidebar-foreground flex flex-col h-screen sticky top-0">
       <div className="h-14 px-4 flex items-center gap-2.5 border-b border-sidebar-border">
         <Logo variant="white" size={24} />
-        <span className="text-[14px] font-semibold text-sidebar-foreground tracking-tight">IntelliSource</span>
+        <span className="text-[14px] font-semibold text-sidebar-foreground tracking-tight font-heading">IntelliSource</span>
       </div>
 
       <div className="flex-1 overflow-y-auto py-4">
@@ -95,7 +103,7 @@ export function Sidebar() {
       </div>
 
       <div className="border-t border-sidebar-border px-4 py-3">
-        <div className="text-[10px] text-sidebar-foreground/30">© 2024 KPMG</div>
+        <div className="text-[10px] text-sidebar-foreground/25">© 2024 KPMG</div>
       </div>
     </aside>
   );

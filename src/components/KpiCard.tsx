@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { TrendingUp, TrendingDown } from "lucide-react";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface KpiCardProps {
@@ -12,6 +13,7 @@ interface KpiCardProps {
   sparkline?: ReactNode;
   rightSlot?: ReactNode;
   icon?: ReactNode;
+  index?: number;
 }
 
 const valueSizes = {
@@ -38,13 +40,20 @@ export function KpiCard({
   sparkline,
   rightSlot,
   icon,
+  index = 0,
 }: KpiCardProps) {
   return (
-    <div className="bg-surface border border-border rounded-lg p-4 flex flex-col h-full hover:shadow-[0_1px_4px_oklch(0_0_0/0.04)] transition-shadow">
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: index * 0.08, ease: [0.25, 0.46, 0.45, 0.94] }}
+      whileHover={{ y: -2, boxShadow: "0 8px 24px oklch(0 0 0 / 0.06)" }}
+      className="bg-surface border border-border rounded-lg p-4 flex flex-col h-full transition-colors"
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           {icon && <div className="text-muted-foreground">{icon}</div>}
-          <div className="text-[11px] font-medium text-muted-foreground tracking-wide">
+          <div className="text-[11px] font-medium text-muted-foreground tracking-wide uppercase">
             {label}
           </div>
         </div>
@@ -52,16 +61,26 @@ export function KpiCard({
       </div>
 
       <div className="mt-2.5 flex items-baseline gap-2">
-        <span className={cn("font-semibold font-tabular text-foreground", valueSizes[size])}>
+        <motion.span
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, delay: index * 0.08 + 0.2 }}
+          className={cn("font-semibold font-tabular text-foreground", valueSizes[size])}
+        >
           {value}
-        </span>
+        </motion.span>
         {delta && (
-          <span className={cn("inline-flex items-center gap-0.5 text-[11px] font-medium",
-            delta.positive ? "text-success" : "text-danger",
-          )}>
+          <motion.span
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.3, delay: index * 0.08 + 0.3 }}
+            className={cn("inline-flex items-center gap-0.5 text-[11px] font-medium",
+              delta.positive ? "text-success" : "text-danger",
+            )}
+          >
             {delta.positive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
             {delta.text}
-          </span>
+          </motion.span>
         )}
       </div>
 
@@ -70,12 +89,17 @@ export function KpiCard({
       )}
 
       {threshold && (
-        <span className={cn("mt-2 inline-flex items-center self-start px-1.5 py-0.5 rounded text-[10px] font-medium", toneClasses[threshold.tone])}>
+        <motion.span
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3, delay: 0.4 }}
+          className={cn("mt-2 inline-flex items-center self-start px-1.5 py-0.5 rounded text-[10px] font-medium", toneClasses[threshold.tone])}
+        >
           {threshold.label}
-        </span>
+        </motion.span>
       )}
 
       {sparkline && <div className="mt-3 -mx-1 h-8">{sparkline}</div>}
-    </div>
+    </motion.div>
   );
 }
