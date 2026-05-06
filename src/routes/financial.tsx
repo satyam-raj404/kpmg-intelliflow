@@ -21,6 +21,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { formatINR, formatPercent } from "@/lib/format";
 import { divisionBudgets, projects, invoices } from "@/data/mock";
 import { brand } from "@/lib/brand";
+import { financial as dd } from "@/data/kpiDrillDowns";
 
 export const Route = createFileRoute("/financial")({
   head: () => ({
@@ -41,11 +42,8 @@ function FinancialDashboard() {
     <AppShell>
       <PageHeader title="Financial Dashboard" subtitle="Spend vs budget tracking, cash flow, invoice/payment cycle health" />
 
-      {/* KPI 02-Financial: 8 KPIs */}
       <div className="grid grid-cols-4 gap-3">
-        {/* KPI 1: Total Spend (YTD) */}
-        <KpiCard label="Total Spend (YTD)" value={formatINR(totalSpend)} size="lg" delta={{ text: "↑ 12.4% YoY", positive: false }} sublabel="SUM(payment_dump.amount_local_ccy)" index={0} />
-        {/* KPI 2: Budget Utilization % */}
+        <KpiCard label="Total Spend (YTD)" value={formatINR(totalSpend)} size="lg" delta={{ text: "↑ 12.4% YoY", positive: false }} sublabel="SUM(payment_dump.amount_local_ccy)" index={0} drillDown={dd.totalSpend} />
         <KpiCard
           label="Budget Utilization %"
           value={formatPercent(budgetUtil)}
@@ -54,22 +52,17 @@ function FinancialDashboard() {
           threshold={budgetUtil > 100 ? { label: "> 100% — Over budget", tone: "danger" } : budgetUtil > 90 ? { label: "90-100% — Amber", tone: "warning" } : { label: "< 90% — Green", tone: "success" }}
           rightSlot={<div className="w-16"><ProgressBar value={budgetUtil} /></div>}
           index={1}
+          drillDown={dd.budgetUtil}
         />
-        {/* KPI 3: Three-Way Match Success Rate */}
-        <KpiCard label="Three-Way Match Success Rate" value="94.2%" size="lg" sublabel="PO + GRN + Invoice match" threshold={{ label: "Target: > 95%", tone: "warning" }} index={2} />
-        {/* KPI 4: Invoice Processing Cycle Time */}
-        <KpiCard label="Invoice Processing Cycle Time" value="4.8d" delta={{ text: "↓ 0.5d", positive: true }} size="lg" sublabel="Target: ≤ 5 days" threshold={{ label: "On target", tone: "success" }} index={3} />
+        <KpiCard label="Three-Way Match Success Rate" value="94.2%" size="lg" sublabel="PO + GRN + Invoice match" threshold={{ label: "Target: > 95%", tone: "warning" }} index={2} drillDown={dd.threeWayMatch} />
+        <KpiCard label="Invoice Processing Cycle Time" value="4.8d" delta={{ text: "↓ 0.5d", positive: true }} size="lg" sublabel="Target: ≤ 5 days" threshold={{ label: "On target", tone: "success" }} index={3} drillDown={dd.invoiceProcessing} />
       </div>
 
       <div className="grid grid-cols-4 gap-3 mt-3">
-        {/* KPI 5: Payment On-Time Rate */}
-        <KpiCard label="Payment On-Time Rate" value="91.3%" size="md" sublabel="Paid on or before due date" threshold={{ label: "> 90% target", tone: "success" }} index={4} />
-        {/* KPI 6: Days Payable Outstanding (DPO) */}
-        <KpiCard label="Days Payable Outstanding (DPO)" value="38d" size="md" sublabel="Match payment terms (30/45/60)" threshold={{ label: "Within terms", tone: "info" }} index={5} />
-        {/* KPI 7: Open Invoice Aging (Total ₹) */}
-        <KpiCard label="Open Invoice Aging (Total ₹)" value={formatINR(2_82_10_000)} size="md" sublabel="₹18.6L in 90+ bucket" threshold={{ label: "< ₹5 Cr in 90+", tone: "warning" }} index={6} />
-        {/* KPI 8: Early Payment Discount Capture Rate */}
-        <KpiCard label="Early Payment Discount Capture Rate" value="72%" size="md" sublabel="Of available discounts captured" threshold={{ label: "Target: > 80%", tone: "warning" }} index={7} />
+        <KpiCard label="Payment On-Time Rate" value="91.3%" size="md" sublabel="Paid on or before due date" threshold={{ label: "> 90% target", tone: "success" }} index={4} drillDown={dd.paymentOnTime} />
+        <KpiCard label="Days Payable Outstanding (DPO)" value="38d" size="md" sublabel="Match payment terms (30/45/60)" threshold={{ label: "Within terms", tone: "info" }} index={5} drillDown={dd.dpo} />
+        <KpiCard label="Open Invoice Aging (Total ₹)" value={formatINR(2_82_10_000)} size="md" sublabel="₹18.6L in 90+ bucket" threshold={{ label: "< ₹5 Cr in 90+", tone: "warning" }} index={6} drillDown={dd.openInvoiceAging} />
+        <KpiCard label="Early Payment Discount Capture Rate" value="72%" size="md" sublabel="Of available discounts captured" threshold={{ label: "Target: > 80%", tone: "warning" }} index={7} drillDown={dd.earlyPayment} />
       </div>
 
       {/* Drill-downs */}

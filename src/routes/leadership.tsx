@@ -25,6 +25,7 @@ import { ProgressBar } from "@/components/ProgressBar";
 import { formatINR, formatPercent } from "@/lib/format";
 import { financialHistory, projects, spendByCategory, topVendorsBySpend, vendors } from "@/data/mock";
 import { brand, chartPalette } from "@/lib/brand";
+import { leadership as dd } from "@/data/kpiDrillDowns";
 
 export const Route = createFileRoute("/leadership")({
   head: () => ({
@@ -41,9 +42,7 @@ function LeadershipDashboard() {
     <AppShell>
       <PageHeader title="Leadership Dashboard" subtitle="Strategic portfolio view · Scannable in 30 seconds" />
 
-      {/* KPI 03-Leadership: 8 KPIs */}
       <div className="grid grid-cols-4 gap-3">
-        {/* KPI 1: Portfolio Gross Margin % */}
         <KpiCard
           label="Portfolio Gross Margin %"
           value="27.4%"
@@ -52,6 +51,7 @@ function LeadershipDashboard() {
           sublabel="Target: > 25%"
           threshold={{ label: "Above target", tone: "success" }}
           index={0}
+          drillDown={dd.portfolioGM}
           sparkline={
             <ResponsiveContainer>
               <AreaChart data={financialHistory.slice(-12)}>
@@ -60,9 +60,7 @@ function LeadershipDashboard() {
             </ResponsiveContainer>
           }
         />
-        {/* KPI 2: Total Procurement Value (YTD) */}
-        <KpiCard label="Total Procurement Value (YTD)" value="₹128 Cr" delta={{ text: "↑ 8.3% YoY", positive: true }} size="xl" sublabel="SUM(PO_Dump.net_order_value) YTD" index={1} />
-        {/* KPI 3: Strategic Risk Index */}
+        <KpiCard label="Total Procurement Value (YTD)" value="₹128 Cr" delta={{ text: "↑ 8.3% YoY", positive: true }} size="xl" sublabel="SUM(PO_Dump.net_order_value) YTD" index={1} drillDown={dd.totalProcurement} />
         <KpiCard
           label="Strategic Risk Index"
           value={<span className="text-warning">Medium</span>}
@@ -70,8 +68,8 @@ function LeadershipDashboard() {
           sublabel="0.4×compliance + 0.3×concentration + 0.3×anomaly"
           rightSlot={<StatusPill tone="warning" dot>Watch</StatusPill>}
           index={2}
+          drillDown={dd.riskIndex}
         />
-        {/* KPI 4: Cost Savings Realized (YTD) */}
         <KpiCard
           label="Cost Savings Realized (YTD)"
           value="₹14.2 Cr"
@@ -79,18 +77,15 @@ function LeadershipDashboard() {
           sublabel={<>Target ₹18 Cr · 79% achieved</>}
           rightSlot={<div className="w-16"><ProgressBar value={79} tone="success" /></div>}
           index={3}
+          drillDown={dd.costSavings}
         />
       </div>
 
       <div className="grid grid-cols-4 gap-3 mt-3">
-        {/* KPI 5: Vendor Concentration Risk (Top-3) */}
-        <KpiCard label="Vendor Concentration Risk (Top-3)" value="38.2%" size="md" sublabel="Target: < 40%" threshold={{ label: "Near limit", tone: "warning" }} index={4} />
-        {/* KPI 6: Process Maverick PO Rate */}
-        <KpiCard label="Process Maverick PO Rate" value="4.1%" size="md" sublabel="POs without upstream PR" threshold={{ label: "< 5% target", tone: "success" }} index={5} />
-        {/* KPI 7: End-to-End P2P Cycle Time */}
-        <KpiCard label="End-to-End P2P Cycle Time" value="42d" size="md" sublabel="PR → Payment average" threshold={{ label: "Target: ≤ 45d", tone: "success" }} index={6} />
-        {/* KPI 8: Procurement ROI */}
-        <KpiCard label="Procurement ROI" value="3.4x" size="md" sublabel="Savings / procurement function cost" threshold={{ label: "> 3x target", tone: "success" }} index={7} />
+        <KpiCard label="Vendor Concentration Risk (Top-3)" value="38.2%" size="md" sublabel="Target: < 40%" threshold={{ label: "Near limit", tone: "warning" }} index={4} drillDown={dd.vendorConcentration} />
+        <KpiCard label="Process Maverick PO Rate" value="4.1%" size="md" sublabel="POs without upstream PR" threshold={{ label: "< 5% target", tone: "success" }} index={5} drillDown={dd.maverickPO} />
+        <KpiCard label="End-to-End P2P Cycle Time" value="42d" size="md" sublabel="PR → Payment average" threshold={{ label: "Target: ≤ 45d", tone: "success" }} index={6} drillDown={dd.e2eCycleTime} />
+        <KpiCard label="Procurement ROI" value="3.4x" size="md" sublabel="Savings / procurement function cost" threshold={{ label: "> 3x target", tone: "success" }} index={7} drillDown={dd.procurementROI} />
       </div>
 
       {/* Drill-downs per spec */}

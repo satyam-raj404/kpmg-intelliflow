@@ -26,6 +26,7 @@ import { formatINR } from "@/lib/format";
 import { vendors, totalActiveVendors } from "@/data/mock";
 import { brand } from "@/lib/brand";
 import { roleInitials } from "@/context/AppContext";
+import { vendor as dd } from "@/data/kpiDrillDowns";
 
 export const Route = createFileRoute("/vendors")({
   head: () => ({
@@ -48,27 +49,18 @@ function VendorPerformance() {
     <AppShell>
       <PageHeader title="Vendor Performance Dashboard" subtitle="Assess vendor performance, compliance, and concentration risk" />
 
-      {/* KPI 04-Vendor: 8 KPIs */}
       <div className="grid grid-cols-4 gap-3">
-        {/* KPI 1: Total Active Vendors */}
-        <KpiCard label="Total Active Vendors" value={totalActiveVendors} size="lg" sublabel="deletion_flag ≠ X, not blocked" index={0} />
-        {/* KPI 2: Compliance Pass Rate */}
-        <KpiCard label="Compliance Pass Rate" value={`${complianceRate}%`} size="lg" sublabel={`${compliant} of ${vendors.length} compliant`} threshold={parseFloat(complianceRate) > 95 ? { label: "> 95% target", tone: "success" } : { label: "Below 95%", tone: "warning" }} index={1} />
-        {/* KPI 3: On-Time Delivery Rate (OTIF) */}
-        <KpiCard label="On-Time Delivery Rate (OTIF)" value={`${avgOTIF}%`} size="lg" sublabel="GRN ≤ expected delivery date" threshold={parseFloat(avgOTIF) > 90 ? { label: "> 90% target", tone: "success" } : { label: "Below target", tone: "warning" }} index={2} />
-        {/* KPI 4: Average Delivery Delay */}
-        <KpiCard label="Average Delivery Delay" value={`${avgDelay}d`} size="lg" sublabel="Late deliveries only · Target: ≤ 3d" threshold={parseFloat(avgDelay) <= 3 ? { label: "≤ 3d target", tone: "success" } : { label: "Above target", tone: "danger" }} index={3} />
+        <KpiCard label="Total Active Vendors" value={totalActiveVendors} size="lg" sublabel="deletion_flag ≠ X, not blocked" index={0} drillDown={dd.totalActive} />
+        <KpiCard label="Compliance Pass Rate" value={`${complianceRate}%`} size="lg" sublabel={`${compliant} of ${vendors.length} compliant`} threshold={parseFloat(complianceRate) > 95 ? { label: "> 95% target", tone: "success" } : { label: "Below 95%", tone: "warning" }} index={1} drillDown={dd.compliancePass} />
+        <KpiCard label="On-Time Delivery Rate (OTIF)" value={`${avgOTIF}%`} size="lg" sublabel="GRN ≤ expected delivery date" threshold={parseFloat(avgOTIF) > 90 ? { label: "> 90% target", tone: "success" } : { label: "Below target", tone: "warning" }} index={2} drillDown={dd.otif} />
+        <KpiCard label="Average Delivery Delay" value={`${avgDelay}d`} size="lg" sublabel="Late deliveries only · Target: ≤ 3d" threshold={parseFloat(avgDelay) <= 3 ? { label: "≤ 3d target", tone: "success" } : { label: "Above target", tone: "danger" }} index={3} drillDown={dd.avgDelay} />
       </div>
 
       <div className="grid grid-cols-4 gap-3 mt-3">
-        {/* KPI 5: Quantity Variance Rate */}
-        <KpiCard label="Quantity Variance Rate" value="3.8%" size="md" sublabel="Short supply vs PO · Target: < 5%" threshold={{ label: "< 5% target", tone: "success" }} index={4} />
-        {/* KPI 6: Vendor Spend Share % */}
-        <KpiCard label="Vendor Spend Share %" value="18.4%" size="md" sublabel="Highest single vendor · Target: < 20%" threshold={{ label: "< 20% target", tone: "success" }} index={5} />
-        {/* KPI 7: Payment Block Vendors */}
-        <KpiCard label="Payment Block Vendors" value={blocked} size="md" sublabel="payment_block = * or posting_block" threshold={blocked > 5 ? { label: "Investigate each", tone: "danger" } : { label: "≤ 5 limit", tone: "info" }} index={6} />
-        {/* KPI 8: Vendor Master Change Frequency */}
-        <KpiCard label="Vendor Master Change Frequency" value="28" size="md" sublabel="object_class = KRED this month" threshold={{ label: "< 3/vendor/mo", tone: "info" }} index={7} />
+        <KpiCard label="Quantity Variance Rate" value="3.8%" size="md" sublabel="Short supply vs PO · Target: < 5%" threshold={{ label: "< 5% target", tone: "success" }} index={4} drillDown={dd.quantityVariance} />
+        <KpiCard label="Vendor Spend Share %" value="18.4%" size="md" sublabel="Highest single vendor · Target: < 20%" threshold={{ label: "< 20% target", tone: "success" }} index={5} drillDown={dd.spendShare} />
+        <KpiCard label="Payment Block Vendors" value={blocked} size="md" sublabel="payment_block = * or posting_block" threshold={blocked > 5 ? { label: "Investigate each", tone: "danger" } : { label: "≤ 5 limit", tone: "info" }} index={6} drillDown={dd.paymentBlock} />
+        <KpiCard label="Vendor Master Change Frequency" value="28" size="md" sublabel="object_class = KRED this month" threshold={{ label: "< 3/vendor/mo", tone: "info" }} index={7} drillDown={dd.masterChangeFreq} />
       </div>
 
       {/* Drill-downs */}
