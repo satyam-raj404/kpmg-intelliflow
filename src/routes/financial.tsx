@@ -21,6 +21,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { formatINR, formatPercent } from "@/lib/format";
 import { divisionBudgets, projects, invoices } from "@/data/mock";
 import { brand } from "@/lib/brand";
+import { financial as dd } from "@/data/kpiDrillDowns";
 
 export const Route = createFileRoute("/financial")({
   head: () => ({
