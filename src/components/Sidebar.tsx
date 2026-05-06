@@ -12,7 +12,6 @@ import {
   UserCog,
   History,
   Settings,
-  HelpCircle,
 } from "lucide-react";
 import { Logo } from "./Logo";
 import { useApp } from "@/context/AppContext";
@@ -37,7 +36,7 @@ const operations: NavItem[] = [
   { label: "P2P Lifecycle", to: "/p2p", icon: Workflow },
   { label: "Vendor Repository", to: "/vendor-repo", icon: BookOpen },
   { label: "Compliance Center", to: "/compliance", icon: ShieldCheck },
-  { label: "Action Management", to: "/actions", icon: ListTodo },
+  { label: "Action Items", to: "/actions", icon: ListTodo },
 ];
 
 const admin: NavItem[] = [
@@ -51,11 +50,11 @@ function Section({ title, items, isAdmin }: { title: string; items: NavItem[]; i
   const filtered = items.filter((i) => !i.adminOnly || isAdmin);
   if (!filtered.length) return null;
   return (
-    <div className="mb-6">
-      <div className="px-5 mb-2 text-[10px] font-semibold uppercase tracking-wider text-white/50">
+    <div className="mb-5">
+      <div className="px-4 mb-1.5 text-[10px] font-medium uppercase tracking-[0.08em] text-sidebar-foreground/40">
         {title}
       </div>
-      <nav className="flex flex-col">
+      <nav className="flex flex-col gap-0.5 px-2">
         {filtered.map((item) => {
           const active = location.pathname === item.to;
           const Icon = item.icon;
@@ -64,11 +63,11 @@ function Section({ title, items, isAdmin }: { title: string; items: NavItem[]; i
               key={item.to}
               to={item.to}
               className={cn(
-                "flex items-center gap-3 px-5 py-2.5 text-[13px] text-white/80 hover:bg-sidebar-accent hover:text-white transition-colors border-l-[3px] border-transparent",
-                active && "bg-sidebar-accent text-white border-accent font-semibold",
+                "flex items-center gap-2.5 px-3 py-2 text-[13px] rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-all duration-150",
+                active && "bg-sidebar-accent text-sidebar-foreground font-medium",
               )}
             >
-              <Icon className="h-4 w-4 shrink-0" />
+              <Icon className="h-[15px] w-[15px] shrink-0 opacity-70" />
               <span className="truncate">{item.label}</span>
             </Link>
           );
@@ -83,28 +82,20 @@ export function Sidebar() {
   const isAdmin = role === "Admin";
 
   return (
-    <aside className="w-60 shrink-0 bg-sidebar text-sidebar-foreground flex flex-col h-screen sticky top-0">
-      <div className="h-16 px-5 flex items-center gap-3 border-b border-sidebar-border">
-        <Logo variant="white" size={28} />
-        <div className="h-6 w-px bg-white/20" />
-        <span className="font-serif italic text-white text-[15px] tracking-tight">IntelliSource</span>
+    <aside className="w-56 shrink-0 bg-sidebar text-sidebar-foreground flex flex-col h-screen sticky top-0">
+      <div className="h-14 px-4 flex items-center gap-2.5 border-b border-sidebar-border">
+        <Logo variant="white" size={24} />
+        <span className="text-[14px] font-semibold text-sidebar-foreground tracking-tight">IntelliSource</span>
       </div>
 
-      <div className="flex-1 overflow-y-auto py-5">
+      <div className="flex-1 overflow-y-auto py-4">
         <Section title="Dashboards" items={dashboards} />
         <Section title="Operations" items={operations} />
         <Section title="Admin" items={admin} isAdmin={isAdmin} />
       </div>
 
-      <div className="border-t border-sidebar-border p-4 flex items-center justify-between">
-        <a
-          href="#"
-          className="flex items-center gap-2 text-[12px] text-white/70 hover:text-white"
-        >
-          <HelpCircle className="h-4 w-4" />
-          Help & Support
-        </a>
-        <Logo variant="white" size={22} />
+      <div className="border-t border-sidebar-border px-4 py-3">
+        <div className="text-[10px] text-sidebar-foreground/30">© 2024 KPMG</div>
       </div>
     </aside>
   );
