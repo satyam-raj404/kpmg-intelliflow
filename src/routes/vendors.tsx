@@ -26,6 +26,7 @@ import { formatINR } from "@/lib/format";
 import { vendors, totalActiveVendors } from "@/data/mock";
 import { brand } from "@/lib/brand";
 import { roleInitials } from "@/context/AppContext";
+import { vendor as dd } from "@/data/kpiDrillDowns";
 
 export const Route = createFileRoute("/vendors")({
   head: () => ({
