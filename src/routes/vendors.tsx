@@ -57,18 +57,18 @@ function VendorPerformance() {
         {/* KPI 3: On-Time Delivery Rate (OTIF) */}
         <KpiCard label="On-Time Delivery Rate (OTIF)" value={`${avgOTIF}%`} size="lg" sublabel="GRN ≤ expected delivery date" threshold={parseFloat(avgOTIF) > 90 ? { label: "> 90% target", tone: "success" } : { label: "Below target", tone: "warning" }} index={2} />
         {/* KPI 4: Average Delivery Delay */}
-        <KpiCard label="Avg Delivery Delay" value={`${avgDelay}d`} size="lg" sublabel="Late deliveries only · Target: ≤ 3d" threshold={parseFloat(avgDelay) <= 3 ? { label: "≤ 3d target", tone: "success" } : { label: "Above target", tone: "danger" }} index={3} />
+        <KpiCard label="Average Delivery Delay" value={`${avgDelay}d`} size="lg" sublabel="Late deliveries only · Target: ≤ 3d" threshold={parseFloat(avgDelay) <= 3 ? { label: "≤ 3d target", tone: "success" } : { label: "Above target", tone: "danger" }} index={3} />
       </div>
 
       <div className="grid grid-cols-4 gap-3 mt-3">
         {/* KPI 5: Quantity Variance Rate */}
         <KpiCard label="Quantity Variance Rate" value="3.8%" size="md" sublabel="Short supply vs PO · Target: < 5%" threshold={{ label: "< 5% target", tone: "success" }} index={4} />
         {/* KPI 6: Vendor Spend Share % */}
-        <KpiCard label="Top Vendor Spend Share" value="18.4%" size="md" sublabel="Highest single vendor · Target: < 20%" threshold={{ label: "< 20% target", tone: "success" }} index={5} />
+        <KpiCard label="Vendor Spend Share %" value="18.4%" size="md" sublabel="Highest single vendor · Target: < 20%" threshold={{ label: "< 20% target", tone: "success" }} index={5} />
         {/* KPI 7: Payment Block Vendors */}
         <KpiCard label="Payment Block Vendors" value={blocked} size="md" sublabel="payment_block = * or posting_block" threshold={blocked > 5 ? { label: "Investigate each", tone: "danger" } : { label: "≤ 5 limit", tone: "info" }} index={6} />
         {/* KPI 8: Vendor Master Change Frequency */}
-        <KpiCard label="Vendor Master Change Freq." value="28" size="md" sublabel="object_class = KRED this month" threshold={{ label: "< 3/vendor/mo", tone: "info" }} index={7} />
+        <KpiCard label="Vendor Master Change Frequency" value="28" size="md" sublabel="object_class = KRED this month" threshold={{ label: "< 3/vendor/mo", tone: "info" }} index={7} />
       </div>
 
       {/* Drill-downs */}
