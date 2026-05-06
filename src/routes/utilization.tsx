@@ -48,23 +48,16 @@ function UtilizationDashboard() {
     <AppShell>
       <PageHeader title="Utilization Dashboard" subtitle="Optimize tool & infrastructure utilization, identify waste" />
 
-      {/* KPI 05-Utilization: 6 KPIs */}
       <div className="grid grid-cols-3 gap-3">
-        {/* KPI 1: Total IT/Tool Spend (YTD) */}
-        <KpiCard label="Total IT/Tool Spend (YTD)" value={formatINR(monthlyCost * 12)} size="lg" delta={{ text: "↑ 4.2%", positive: false }} sublabel="material_group IN [IT, CLOUD, LICENSE, SOFTWARE]" index={0} />
-        {/* KPI 2: License Utilization Rate */}
-        <KpiCard label="License Utilization Rate" value={`${utilPct.toFixed(1)}%`} size="lg" sublabel={`${activeUsers.toLocaleString("en-IN")} active of ${totalLicenses.toLocaleString("en-IN")} owned`} threshold={utilPct > 80 ? { label: "> 80% target", tone: "success" } : { label: "Below 80%", tone: "warning" }} index={1} />
-        {/* KPI 3: Cost Per Active User */}
-        <KpiCard label="Cost Per Active User" value={`₹${Math.round(monthlyCost / activeUsers).toLocaleString("en-IN")}`} size="lg" sublabel="Annual license cost / active users" index={2} />
+        <KpiCard label="Total IT/Tool Spend (YTD)" value={formatINR(monthlyCost * 12)} size="lg" delta={{ text: "↑ 4.2%", positive: false }} sublabel="material_group IN [IT, CLOUD, LICENSE, SOFTWARE]" index={0} drillDown={dd.totalITSpend} />
+        <KpiCard label="License Utilization Rate" value={`${utilPct.toFixed(1)}%`} size="lg" sublabel={`${activeUsers.toLocaleString("en-IN")} active of ${totalLicenses.toLocaleString("en-IN")} owned`} threshold={utilPct > 80 ? { label: "> 80% target", tone: "success" } : { label: "Below 80%", tone: "warning" }} index={1} drillDown={dd.licenseUtil} />
+        <KpiCard label="Cost Per Active User" value={`₹${Math.round(monthlyCost / activeUsers).toLocaleString("en-IN")}`} size="lg" sublabel="Annual license cost / active users" index={2} drillDown={dd.costPerUser} />
       </div>
 
       <div className="grid grid-cols-3 gap-3 mt-3">
-        {/* KPI 4: Underutilized License Count */}
-        <KpiCard label="Underutilized License Count" value={underutil} size="md" sublabel="Tools with < 50% utilization" threshold={underutil > 5 ? { label: "Review needed", tone: "danger" } : { label: "≤ 5 target", tone: "success" }} index={3} />
-        {/* KPI 5: Upcoming Renewals (60 days) */}
-        <KpiCard label="Upcoming Renewals (60 days)" value={renewals} size="md" sublabel="IT contracts renewing soon" threshold={{ label: "Track", tone: "warning" }} index={4} />
-        {/* KPI 6: Potential Savings Identified (₹/month) */}
-        <KpiCard label="Potential Savings Identified (₹/month)" value={`${formatINR(savings)}/mo`} size="md" sublabel="SUM(cost × (1 - util%)) for < 80% tools" threshold={{ label: "Optimize →", tone: "info" }} index={5} />
+        <KpiCard label="Underutilized License Count" value={underutil} size="md" sublabel="Tools with < 50% utilization" threshold={underutil > 5 ? { label: "Review needed", tone: "danger" } : { label: "≤ 5 target", tone: "success" }} index={3} drillDown={dd.underutilized} />
+        <KpiCard label="Upcoming Renewals (60 days)" value={renewals} size="md" sublabel="IT contracts renewing soon" threshold={{ label: "Track", tone: "warning" }} index={4} drillDown={dd.upcomingRenewals} />
+        <KpiCard label="Potential Savings Identified (₹/month)" value={`${formatINR(savings)}/mo`} size="md" sublabel="SUM(cost × (1 - util%)) for < 80% tools" threshold={{ label: "Optimize →", tone: "info" }} index={5} drillDown={dd.potentialSavings} />
       </div>
 
       {/* Drill-downs */}
