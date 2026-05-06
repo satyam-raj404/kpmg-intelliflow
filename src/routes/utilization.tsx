@@ -20,6 +20,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { formatINR, formatDateShort } from "@/lib/format";
 import { utilization } from "@/data/mock";
 import { brand } from "@/lib/brand";
+import { util as dd } from "@/data/kpiDrillDowns";
 
 export const Route = createFileRoute("/utilization")({
   head: () => ({
