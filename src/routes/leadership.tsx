@@ -23,7 +23,7 @@ import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 import { ProgressBar } from "@/components/ProgressBar";
 import { formatINR, formatPercent } from "@/lib/format";
-import { financialHistory, projects, spendByCategory, topVendorsBySpend, complianceChecks } from "@/data/mock";
+import { financialHistory, projects, spendByCategory, topVendorsBySpend, vendors } from "@/data/mock";
 import { brand, chartPalette } from "@/lib/brand";
 
 export const Route = createFileRoute("/leadership")({
@@ -39,16 +39,19 @@ export const Route = createFileRoute("/leadership")({
 function LeadershipDashboard() {
   return (
     <AppShell>
-      <PageHeader title="Leadership Dashboard" subtitle="Strategic portfolio view · 30-second scan" />
+      <PageHeader title="Leadership Dashboard" subtitle="Strategic portfolio view · Scannable in 30 seconds" />
 
+      {/* KPI 03-Leadership: 8 KPIs */}
       <div className="grid grid-cols-4 gap-3">
+        {/* KPI 1: Portfolio Gross Margin % */}
         <KpiCard
-          label="Portfolio Gross Margin"
+          label="Portfolio Gross Margin %"
           value="27.4%"
           delta={{ text: "↑ 2.1 pp", positive: true }}
           size="xl"
-          sublabel="Target: >25%"
+          sublabel="Target: > 25%"
           threshold={{ label: "Above target", tone: "success" }}
+          index={0}
           sparkline={
             <ResponsiveContainer>
               <AreaChart data={financialHistory.slice(-12)}>
@@ -57,30 +60,40 @@ function LeadershipDashboard() {
             </ResponsiveContainer>
           }
         />
-        <KpiCard label="Total Procurement (YTD)" value="₹128 Cr" delta={{ text: "↑ 8.3% YoY", positive: true }} size="xl" sublabel="Committed PO value" />
+        {/* KPI 2: Total Procurement Value (YTD) */}
+        <KpiCard label="Total Procurement Value (YTD)" value="₹128 Cr" delta={{ text: "↑ 8.3% YoY", positive: true }} size="xl" sublabel="SUM(PO_Dump.net_order_value) YTD" index={1} />
+        {/* KPI 3: Strategic Risk Index */}
         <KpiCard
           label="Strategic Risk Index"
           value={<span className="text-warning">Medium</span>}
           size="xl"
-          sublabel="Vendor concentration + compliance + anomalies"
+          sublabel="0.4×compliance + 0.3×concentration + 0.3×anomaly"
           rightSlot={<StatusPill tone="warning" dot>Watch</StatusPill>}
+          index={2}
         />
+        {/* KPI 4: Cost Savings Realized (YTD) */}
         <KpiCard
-          label="Cost Savings (YTD)"
+          label="Cost Savings Realized (YTD)"
           value="₹14.2 Cr"
           size="xl"
           sublabel={<>Target ₹18 Cr · 79% achieved</>}
           rightSlot={<div className="w-16"><ProgressBar value={79} tone="success" /></div>}
+          index={3}
         />
       </div>
 
       <div className="grid grid-cols-4 gap-3 mt-3">
-        <KpiCard label="Vendor Concentration (Top 3)" value="38.2%" size="md" sublabel="Target: <40%" threshold={{ label: "Near limit", tone: "warning" }} />
-        <KpiCard label="Maverick PO Rate" value="4.1%" size="md" sublabel="POs without upstream PR" threshold={{ label: "< 5% target", tone: "success" }} />
-        <KpiCard label="E2E P2P Cycle Time" value="42d" size="md" sublabel="PR → Payment avg" threshold={{ label: "Target: ≤45d", tone: "success" }} />
-        <KpiCard label="Procurement ROI" value="3.4x" size="md" sublabel="Savings / function cost" threshold={{ label: "> 3x target", tone: "success" }} />
+        {/* KPI 5: Vendor Concentration Risk (Top-3) */}
+        <KpiCard label="Vendor Concentration Risk (Top 3)" value="38.2%" size="md" sublabel="Target: < 40%" threshold={{ label: "Near limit", tone: "warning" }} index={4} />
+        {/* KPI 6: Process Maverick PO Rate */}
+        <KpiCard label="Maverick PO Rate" value="4.1%" size="md" sublabel="POs without upstream PR" threshold={{ label: "< 5% target", tone: "success" }} index={5} />
+        {/* KPI 7: End-to-End P2P Cycle Time */}
+        <KpiCard label="E2E P2P Cycle Time" value="42d" size="md" sublabel="PR → Payment average" threshold={{ label: "Target: ≤ 45d", tone: "success" }} index={6} />
+        {/* KPI 8: Procurement ROI */}
+        <KpiCard label="Procurement ROI" value="3.4x" size="md" sublabel="Savings / procurement function cost" threshold={{ label: "> 3x target", tone: "success" }} index={7} />
       </div>
 
+      {/* Drill-downs per spec */}
       <div className="grid grid-cols-5 gap-4 mt-4">
         <div className="col-span-3"><PortfolioGMTrend /></div>
         <div className="col-span-2"><TopProjectsByMargin /></div>
@@ -101,7 +114,7 @@ function LeadershipDashboard() {
 function PortfolioGMTrend() {
   const data = financialHistory.slice(-12);
   return (
-    <SectionCard title="Portfolio Gross Margin Trend" subtitle="12 months">
+    <SectionCard title="Portfolio GM Trend" subtitle="KPI 1 — last 12 months">
       <div className="h-64">
         <ResponsiveContainer>
           <AreaChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
@@ -147,19 +160,19 @@ function TopProjectsByMargin() {
 }
 
 function ComplianceHealthRing() {
-  const pass = complianceChecks.filter((c) => c.status === "Pass").length;
-  const fail = complianceChecks.filter((c) => c.status === "Fail").length;
-  const pending = complianceChecks.filter((c) => c.status === "Pending").length;
-  const total = pass + fail + pending;
-  const pct = (pass / total) * 100;
+  const compliant = vendors.filter((v) => v.compliance === "Compliant").length;
+  const underReview = vendors.filter((v) => v.compliance === "Under Review").length;
+  const nonCompliant = vendors.filter((v) => v.compliance === "Non-Compliant").length;
+  const total = compliant + underReview + nonCompliant;
+  const pct = (compliant / total) * 100;
   const data = [
-    { name: "Pass", value: pass, color: brand.colors.success },
-    { name: "Fail", value: fail, color: brand.colors.danger },
-    { name: "Pending", value: pending, color: brand.colors.warning },
+    { name: "Compliant", value: compliant, color: brand.colors.success },
+    { name: "Under Review", value: underReview, color: brand.colors.warning },
+    { name: "Non-Compliant", value: nonCompliant, color: brand.colors.danger },
   ];
 
   return (
-    <SectionCard title="Compliance Health" subtitle={`${total} checks YTD`}>
+    <SectionCard title="Compliance Health" subtitle="% of vendors compliant from 08_Vendor_Master">
       <div className="flex items-center gap-4">
         <div className="relative w-28 h-28 shrink-0">
           <ResponsiveContainer>
@@ -171,7 +184,7 @@ function ComplianceHealthRing() {
           </ResponsiveContainer>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <div className="text-xl font-semibold font-tabular text-success">{pct.toFixed(0)}%</div>
-            <div className="text-[9px] text-muted-foreground">pass</div>
+            <div className="text-[9px] text-muted-foreground">compliant</div>
           </div>
         </div>
         <ul className="flex-1 text-[11px] space-y-1.5">
@@ -194,7 +207,7 @@ function SpendByCategory() {
   const data = spendByCategory.map((s, i) => ({ ...s, color: chartPalette[i % chartPalette.length] }));
   const total = data.reduce((s, d) => s + d.value, 0);
   return (
-    <SectionCard title="Spend by Category" subtitle="YTD">
+    <SectionCard title="Spend by Category" subtitle="SUM(net_order_value) GROUP BY material_group">
       <div className="h-40">
         <ResponsiveContainer>
           <PieChart>
@@ -223,7 +236,7 @@ function SpendByCategory() {
 function TopVendors() {
   const total = topVendorsBySpend.reduce((s, v) => s + v.spendYTD, 0);
   return (
-    <SectionCard title="Top 10 Vendors" subtitle="By spend YTD">
+    <SectionCard title="Top 10 Vendors by Spend" subtitle="SUM by 02_PO_Dump.vendor desc">
       <div className="h-64">
         <ResponsiveContainer>
           <BarChart data={topVendorsBySpend.map((v) => ({ name: v.name, spend: v.spendYTD }))} layout="vertical" margin={{ top: 4, right: 16, left: 80, bottom: 4 }}>
@@ -263,12 +276,12 @@ function BottomRibbon() {
 function NeedsAttention() {
   const items = [
     { title: "Wipro contract renewal — decision needed", date: "Decision by 15-May", severity: "warning" as const },
-    { title: "Q1 compliance audit: 4 high-severity findings", date: "Submitted 2 days ago", severity: "critical" as const },
-    { title: "3 projects showing margin erosion >5%", date: "PRJ-2024000, PRJ-2024003, PRJ-2024007", severity: "warning" as const },
-    { title: "Splunk vendor delisting recommendation", date: "Awaiting CXO sign-off", severity: "critical" as const },
+    { title: "3 projects showing margin erosion > 5%", date: "PRJ-2024000, PRJ-2024003, PRJ-2024007", severity: "critical" as const },
+    { title: "Vendor concentration nearing 40% threshold", date: "Top-3 at 38.2%", severity: "warning" as const },
+    { title: "Budget overruns in Cloud Infrastructure", date: "96.4% utilized", severity: "critical" as const },
   ];
   return (
-    <SectionCard title="Needs Your Attention" subtitle="Items requiring leadership action" accent="warning">
+    <SectionCard title="Needs Your Attention" subtitle="Contracts expiring + budget overruns + compliance" accent="warning">
       <ul className="divide-y divide-border">
         {items.map((it, i) => (
           <li key={i} className="py-2.5 first:pt-0 last:pb-0 flex items-center gap-2.5">

@@ -46,22 +46,32 @@ function VendorPerformance() {
 
   return (
     <AppShell>
-      <PageHeader title="Vendor Performance" subtitle="Assess vendor performance, compliance and concentration risk" />
+      <PageHeader title="Vendor Performance Dashboard" subtitle="Assess vendor performance, compliance, and concentration risk" />
 
+      {/* KPI 04-Vendor: 8 KPIs */}
       <div className="grid grid-cols-4 gap-3">
-        <KpiCard label="Total Active Vendors" value={totalActiveVendors} size="lg" sublabel="Excluding blocked & deleted" />
-        <KpiCard label="Compliance Pass Rate" value={`${complianceRate}%`} size="lg" sublabel={`${compliant} of ${vendors.length} compliant`} threshold={parseFloat(complianceRate) > 95 ? { label: ">95% target", tone: "success" } : { label: "Below 95%", tone: "warning" }} />
-        <KpiCard label="On-Time Delivery (OTIF)" value={`${avgOTIF}%`} size="lg" sublabel="GRN ≤ expected delivery date" threshold={parseFloat(avgOTIF) > 90 ? { label: ">90% target", tone: "success" } : { label: "Below target", tone: "warning" }} />
-        <KpiCard label="Avg Delivery Delay" value={`${avgDelay}d`} size="lg" sublabel="Late deliveries only" threshold={parseFloat(avgDelay) <= 3 ? { label: "≤3d target", tone: "success" } : { label: "Above target", tone: "danger" }} />
+        {/* KPI 1: Total Active Vendors */}
+        <KpiCard label="Total Active Vendors" value={totalActiveVendors} size="lg" sublabel="deletion_flag ≠ X, not blocked" index={0} />
+        {/* KPI 2: Compliance Pass Rate */}
+        <KpiCard label="Compliance Pass Rate" value={`${complianceRate}%`} size="lg" sublabel={`${compliant} of ${vendors.length} compliant`} threshold={parseFloat(complianceRate) > 95 ? { label: "> 95% target", tone: "success" } : { label: "Below 95%", tone: "warning" }} index={1} />
+        {/* KPI 3: On-Time Delivery Rate (OTIF) */}
+        <KpiCard label="On-Time Delivery Rate (OTIF)" value={`${avgOTIF}%`} size="lg" sublabel="GRN ≤ expected delivery date" threshold={parseFloat(avgOTIF) > 90 ? { label: "> 90% target", tone: "success" } : { label: "Below target", tone: "warning" }} index={2} />
+        {/* KPI 4: Average Delivery Delay */}
+        <KpiCard label="Avg Delivery Delay" value={`${avgDelay}d`} size="lg" sublabel="Late deliveries only · Target: ≤ 3d" threshold={parseFloat(avgDelay) <= 3 ? { label: "≤ 3d target", tone: "success" } : { label: "Above target", tone: "danger" }} index={3} />
       </div>
 
       <div className="grid grid-cols-4 gap-3 mt-3">
-        <KpiCard label="Quantity Variance Rate" value="3.8%" size="md" sublabel="Short supply vs PO" threshold={{ label: "<5% target", tone: "success" }} />
-        <KpiCard label="Top Vendor Spend Share" value="18.4%" size="md" sublabel="Highest single vendor" threshold={{ label: "<20% target", tone: "success" }} />
-        <KpiCard label="Payment Blocked" value={blocked} size="md" sublabel="Vendors currently blocked" threshold={blocked > 5 ? { label: "Investigate", tone: "danger" } : { label: "Within limit", tone: "info" }} />
-        <KpiCard label="Master Data Changes" value="28" size="md" sublabel="Vendor modifications this month" threshold={{ label: "<3/vendor/mo", tone: "info" }} />
+        {/* KPI 5: Quantity Variance Rate */}
+        <KpiCard label="Quantity Variance Rate" value="3.8%" size="md" sublabel="Short supply vs PO · Target: < 5%" threshold={{ label: "< 5% target", tone: "success" }} index={4} />
+        {/* KPI 6: Vendor Spend Share % */}
+        <KpiCard label="Top Vendor Spend Share" value="18.4%" size="md" sublabel="Highest single vendor · Target: < 20%" threshold={{ label: "< 20% target", tone: "success" }} index={5} />
+        {/* KPI 7: Payment Block Vendors */}
+        <KpiCard label="Payment Block Vendors" value={blocked} size="md" sublabel="payment_block = * or posting_block" threshold={blocked > 5 ? { label: "Investigate each", tone: "danger" } : { label: "≤ 5 limit", tone: "info" }} index={6} />
+        {/* KPI 8: Vendor Master Change Frequency */}
+        <KpiCard label="Vendor Master Change Freq." value="28" size="md" sublabel="object_class = KRED this month" threshold={{ label: "< 3/vendor/mo", tone: "info" }} index={7} />
       </div>
 
+      {/* Drill-downs */}
       <div className="grid grid-cols-2 gap-4 mt-4">
         <RatingHistogram />
         <ComplianceStatusPie />
@@ -93,7 +103,7 @@ function RatingHistogram() {
     else buckets[4].count++;
   });
   return (
-    <SectionCard title="Rating Distribution" subtitle={`${vendors.length} vendors`}>
+    <SectionCard title="Vendor Rating Distribution" subtitle={`${vendors.length} vendors`}>
       <div className="h-56">
         <ResponsiveContainer>
           <BarChart data={buckets}>
@@ -116,7 +126,7 @@ function ComplianceStatusPie() {
     { name: "Non-Compliant", value: vendors.filter((v) => v.compliance === "Non-Compliant").length, color: brand.colors.danger },
   ];
   return (
-    <SectionCard title="Compliance Status">
+    <SectionCard title="Compliance Status" subtitle="Blocked vs unblocked from 08_Vendor_Master">
       <div className="h-56">
         <ResponsiveContainer>
           <PieChart>
@@ -146,7 +156,7 @@ function ScorecardTable() {
   return (
     <SectionCard
       title="Vendor Scorecard"
-      subtitle="Top 20 by selected sort"
+      subtitle="KPIs 3, 4, 5, 6, 7 per vendor"
       bodyClassName="p-0"
       actions={
         <div className="flex gap-2">
@@ -218,7 +228,7 @@ function SpendConcentration() {
   const sorted = [...vendors].sort((a, b) => b.spendYTD - a.spendYTD).slice(0, 10);
   const total = vendors.reduce((s, v) => s + v.spendYTD, 0);
   return (
-    <SectionCard title="Vendor Spend Concentration" subtitle="Top 10 vendors">
+    <SectionCard title="Vendor Spend Concentration" subtitle="KPI 6 — Top 10 by spend share">
       <div className="h-56">
         <ResponsiveContainer>
           <BarChart data={sorted.map((v) => ({ name: v.name, pct: (v.spendYTD / total) * 100 }))} layout="vertical" margin={{ top: 4, right: 40, left: 80, bottom: 4 }}>

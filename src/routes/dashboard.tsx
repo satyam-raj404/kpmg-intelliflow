@@ -11,16 +11,16 @@ import {
   Bar,
   Legend,
 } from "recharts";
-import { AlertTriangle, Trash2, CalendarClock, ChevronRight } from "lucide-react";
+import { CalendarClock, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
 import { KpiCard } from "@/components/KpiCard";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 import { formatINR, formatDateShort } from "@/lib/format";
-import { purchaseOrders, financialHistory, vendors, complianceChecks } from "@/data/mock";
+import { purchaseOrders, financialHistory, vendors } from "@/data/mock";
 import { brand } from "@/lib/brand";
-import { useState } from "react";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -35,15 +35,14 @@ export const Route = createFileRoute("/dashboard")({
 function ProcurementDashboard() {
   return (
     <AppShell>
-      <PageHeader title="Procurement Dashboard" subtitle="Real-time visibility into PO activity, breaches, and priorities" />
+      <PageHeader title="Procurement Dashboard" subtitle="Real-time visibility into PO activity, breaches, and operational priorities" />
       <KpiRow />
       <div className="grid grid-cols-2 gap-4 mt-4">
-        <GrossMarginTrend />
+        <POValueTrend />
         <POStatusBreakdown />
       </div>
       <div className="mt-4"><HighValuePOMonitor /></div>
-      <div className="grid grid-cols-3 gap-4 mt-4">
-        <ComplianceAlerts />
+      <div className="grid grid-cols-2 gap-4 mt-4">
         <PODeletions />
         <UpcomingRenewals />
       </div>
@@ -51,6 +50,7 @@ function ProcurementDashboard() {
   );
 }
 
+/* ── KPI 01-Procurement: 8 KPIs ── */
 function KpiRow() {
   const activePOs = purchaseOrders.filter((p) => p.status !== "Deleted" && p.status !== "Cancelled");
   const totalMTD = activePOs.reduce((s, p) => s + p.value, 0);
@@ -58,33 +58,50 @@ function KpiRow() {
   const deleted = purchaseOrders.filter((p) => p.status === "Deleted").length;
   const amended = purchaseOrders.filter((p) => p.amended).length;
   const amendRate = ((amended / purchaseOrders.length) * 100).toFixed(1);
-  const openPRAging = 14;
   const spark = financialHistory.slice(-12).map((p) => ({ x: p.period, y: p.spend }));
 
   return (
-    <div className="grid grid-cols-4 gap-3">
-      <KpiCard
-        label="Total PO Value (MTD)"
-        value={formatINR(totalMTD)}
-        delta={{ text: "↑ 8.7%", positive: true }}
-        sublabel="vs last month"
-        size="lg"
-        sparkline={
-          <ResponsiveContainer>
-            <AreaChart data={spark} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
-              <Area type="monotone" dataKey="y" stroke={brand.colors.accent} fill={brand.colors.accent} fillOpacity={0.12} strokeWidth={1.5} />
-            </AreaChart>
-          </ResponsiveContainer>
-        }
-      />
-      <KpiCard label="Active PO Count" value={activePOs.length} size="lg" sublabel={`${highValue} high-value (>₹1 Cr)`} />
-      <KpiCard label="Avg PR→PO Time" value="4.2d" delta={{ text: "↑ 0.3d", positive: false }} size="lg" sublabel="Target: ≤5 days" threshold={{ label: "Within target", tone: "success" }} />
-      <KpiCard label="PO Amendment Rate" value={`${amendRate}%`} size="lg" sublabel={`${amended} of ${purchaseOrders.length} POs modified`} threshold={parseFloat(amendRate) > 15 ? { label: "> 15% threshold", tone: "danger" } : { label: "Within limit", tone: "success" }} />
-    </div>
+    <>
+      <div className="grid grid-cols-4 gap-3">
+        {/* KPI 1: Total PO Value (MTD) */}
+        <KpiCard
+          label="Total PO Value (MTD)"
+          value={formatINR(totalMTD)}
+          delta={{ text: "↑ 8.7%", positive: true }}
+          sublabel="SUM of net_order_value this month"
+          size="lg"
+          index={0}
+          sparkline={
+            <ResponsiveContainer>
+              <AreaChart data={spark} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
+                <Area type="monotone" dataKey="y" stroke={brand.colors.accent} fill={brand.colors.accent} fillOpacity={0.12} strokeWidth={1.5} />
+              </AreaChart>
+            </ResponsiveContainer>
+          }
+        />
+        {/* KPI 2: Active PO Count */}
+        <KpiCard label="Active PO Count" value={activePOs.length} size="lg" sublabel="delivery_completed ≠ X, not deleted" index={1} />
+        {/* KPI 3: High-Value PO Count */}
+        <KpiCard label="High-Value PO Count" value={highValue} size="lg" sublabel="net_order_value > ₹1 Cr" threshold={{ label: "Configurable threshold", tone: "info" }} index={2} />
+        {/* KPI 4: Avg PR→PO Conversion Time */}
+        <KpiCard label="Avg PR→PO Conversion Time" value="4.2d" delta={{ text: "↑ 0.3d", positive: false }} size="lg" sublabel="Target: ≤ 5 days" threshold={{ label: "Within target", tone: "success" }} index={3} />
+      </div>
+      <div className="grid grid-cols-4 gap-3 mt-3">
+        {/* KPI 5: PO Cycle Time (Creation → Approval) */}
+        <KpiCard label="PO Cycle Time (Creation → Approval)" value="2.6d" size="md" sublabel="Target: ≤ 3 days" threshold={{ label: "Within target", tone: "success" }} index={4} />
+        {/* KPI 6: PO Deletion Frequency (MTD) */}
+        <KpiCard label="PO Deletion Frequency (MTD)" value={deleted} size="md" sublabel="Target: ≤ 5 per month" threshold={deleted > 5 ? { label: "Above target", tone: "danger" } : { label: "Within limit", tone: "success" }} index={5} />
+        {/* KPI 7: PO Amendment Rate */}
+        <KpiCard label="PO Amendment Rate" value={`${amendRate}%`} size="md" sublabel={`${amended} of ${purchaseOrders.length} POs modified`} threshold={parseFloat(amendRate) > 15 ? { label: "> 15% threshold", tone: "danger" } : { label: "< 15% target", tone: "success" }} index={6} />
+        {/* KPI 8: Open PR Aging (> 7 days) */}
+        <KpiCard label="Open PR Aging (> 7 days)" value="14" size="md" sublabel="PRs stuck without conversion" threshold={{ label: "Target: ≤ 10", tone: "warning" }} index={7} />
+      </div>
+    </>
   );
 }
 
-function GrossMarginTrend() {
+/* ── Drill-down: PO Value Trend (12 months) ── */
+function POValueTrend() {
   const data = financialHistory.slice(-12).map((p) => ({ period: p.period, spend: p.spend / 1_00_00_000 }));
   return (
     <SectionCard title="PO Value Trend (MTD)" subtitle="Last 12 months · ₹ Cr">
@@ -109,6 +126,7 @@ function GrossMarginTrend() {
   );
 }
 
+/* ── Drill-down: PO Status Bar (weekly) ── */
 function POStatusBreakdown() {
   const weeks = Array.from({ length: 8 }, (_, i) => ({
     wk: `W${i + 1}`,
@@ -118,7 +136,7 @@ function POStatusBreakdown() {
     Deleted: i === 5 ? 3 : i % 4 === 0 ? 1 : 0,
   }));
   return (
-    <SectionCard title="PO Status by Week" subtitle="Last 8 weeks">
+    <SectionCard title="PO Status by Week" subtitle="Active / Approved / Pending / Deleted">
       <div className="h-64">
         <ResponsiveContainer>
           <BarChart data={weeks} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
@@ -127,7 +145,7 @@ function POStatusBreakdown() {
             <YAxis tickLine={false} axisLine={false} />
             <Tooltip />
             <Legend wrapperStyle={{ fontSize: 11 }} iconType="square" />
-            <Bar dataKey="Approved" stackId="a" fill={brand.colors.success} radius={[0, 0, 0, 0]} />
+            <Bar dataKey="Approved" stackId="a" fill={brand.colors.success} />
             <Bar dataKey="Pending" stackId="a" fill={brand.colors.warning} />
             <Bar dataKey="Under Review" stackId="a" fill={brand.colors.accent} />
             <Bar dataKey="Deleted" stackId="a" fill={brand.colors.danger} />
@@ -138,18 +156,19 @@ function POStatusBreakdown() {
   );
 }
 
+/* ── Drill-down: High-Value PO Monitor Table ── */
 function HighValuePOMonitor() {
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const filters = ["All", "Approved", "Pending", "Under Review"];
   const rows = purchaseOrders
-    .filter((p) => p.value >= 50_00_000)
+    .filter((p) => p.value >= 1_00_00_000)
     .filter((p) => statusFilter === "All" || p.status === statusFilter)
     .slice(0, 10);
 
   return (
     <SectionCard
       title="High-Value PO Monitor"
-      subtitle="POs above ₹50L"
+      subtitle="POs above ₹1 Cr (configurable threshold)"
       actions={
         <div className="flex gap-1">
           {filters.map((f) => (
@@ -197,30 +216,11 @@ function HighValuePOMonitor() {
   );
 }
 
-function ComplianceAlerts() {
-  const alerts = complianceChecks.filter((c) => c.status === "Fail").slice(0, 5);
-  return (
-    <SectionCard title="Compliance Alerts" subtitle="Latest breaches" accent="danger">
-      <ul className="space-y-2.5">
-        {alerts.map((a) => (
-          <li key={a.id} className="flex items-start gap-2 pb-2.5 border-b border-border last:border-b-0 last:pb-0">
-            <AlertTriangle className="h-3.5 w-3.5 text-danger shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0">
-              <div className="text-[12px] font-medium truncate">{a.vendorName}</div>
-              <div className="text-[11px] text-muted-foreground">{a.type}</div>
-            </div>
-            <StatusPill tone={a.severity === "Critical" || a.severity === "High" ? "danger" : "warning"}>{a.severity}</StatusPill>
-          </li>
-        ))}
-      </ul>
-    </SectionCard>
-  );
-}
-
+/* ── Drill-down: PO Deletions ── */
 function PODeletions() {
   const deletions = purchaseOrders.filter((p) => p.status === "Deleted").slice(0, 5);
   return (
-    <SectionCard title="PO Deletions" subtitle="Last 5 · Anomaly monitor" accent="warning">
+    <SectionCard title="PO Deletions (Anomaly Monitor)" subtitle="deletion_indicator = L">
       <ul className="space-y-2.5">
         {deletions.map((p) => (
           <li key={p.id} className="flex items-start gap-2 pb-2.5 border-b border-border last:border-b-0 last:pb-0">
@@ -237,13 +237,14 @@ function PODeletions() {
   );
 }
 
+/* ── Drill-down: Upcoming Contract Renewals ── */
 function UpcomingRenewals() {
   const renewals = vendors
     .filter((v) => v.contractStatus === "Expiring Soon")
     .sort((a, b) => +new Date(a.contractEnd) - +new Date(b.contractEnd))
     .slice(0, 5);
   return (
-    <SectionCard title="Contract Renewals" subtitle="Within 60 days" accent="info">
+    <SectionCard title="Upcoming Contract Renewals" subtitle="end_date < today + 60 days">
       <ul className="space-y-2.5">
         {renewals.map((v) => {
           const days = Math.ceil((+new Date(v.contractEnd) - Date.now()) / (1000 * 60 * 60 * 24));
