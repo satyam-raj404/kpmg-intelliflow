@@ -68,25 +68,27 @@ def _upsert(conn, dashboard, kpi_code, kpi_name, value_numeric, value_text, unit
 def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
 
     # P1 — Total PO Value MTD
+    # Formula: SUM(net_order_value) WHERE created_on (ERDAT) in current month AND deletion_indicator != 'L'
     p1 = _run(conn, f"""
         SELECT SUM(CAST(net_order_value AS REAL))
         FROM po_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
-          AND document_date >= {MTD}
+          AND created_on >= {MTD}
     """)
     _upsert(conn, "procurement", "TOTAL_PO_VALUE_MTD", "Total PO Value (MTD)", p1, None, "INR")
 
-    # P2 — Active PO Count (not delivery-complete, not deleted)
-    p2 = _run(conn, f"""
-        SELECT COUNT(DISTINCT purchasing_document || '|' || item)
+    # P2 — Active PO Count: DISTINCT purchasing_document, no date filter, not delivery-complete, not deleted
+    # Spec: COUNT(DISTINCT purchasing_document) WHERE delivery_completed != 'X' AND deletion_indicator != 'L'
+    p2 = _run(conn, """
+        SELECT COUNT(DISTINCT purchasing_document)
         FROM po_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
           AND (delivery_completed IS NULL OR delivery_completed = '')
-          AND document_date >= {MTD}
     """)
-    _upsert(conn, "procurement", "ACTIVE_PO_COUNT", "Active PO Count (MTD)", p2, None, "count")
+    _upsert(conn, "procurement", "ACTIVE_PO_COUNT", "Active PO Count", p2, None, "count")
 
-    # P3 — High-Value PO Count (threshold from kpi_config — configurable by user)
+    # P3 — High-Value PO Count (threshold from kpi_config — user-configurable)
+    # Spec: COUNT(DISTINCT purchasing_document) WHERE net_order_value > threshold AND deletion_indicator != 'L'
     p3 = _run(conn, f"""
         SELECT COUNT(DISTINCT purchasing_document)
         FROM po_dump
@@ -96,32 +98,46 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
     _upsert(conn, "procurement", "HIGH_VALUE_PO_COUNT",
             f"High-Value PO Count (>₹{int(high_value_threshold):,})", p3, None, "count")
 
-    # P4 — Avg PR-to-PO Conversion Time (ITEM level: PR release_date → PO document_date)
+    # P4 — Avg PR-to-PO Conversion Time at ITEM LEVEL
+    # Spec: AVG(DATEDIFF(PO.created_on, PR.created_on)) joined at item level
+    # For PR:PO one-to-many at header, take MIN(PO created_on) per PR line item
     p4 = _run(conn, """
-        SELECT AVG(CAST(pr_to_po_days AS REAL))
-        FROM pr_po_grn_invoice
-        WHERE pr_to_po_days IS NOT NULL
-          AND pr_to_po_days >= 0
-          AND purchase_requisition IS NOT NULL
-          AND purchasing_document  IS NOT NULL
+        SELECT AVG(CAST(min_po_days AS REAL))
+        FROM (
+            SELECT pr.purchase_requisition,
+                   pr.item_of_requisition,
+                   MIN(CAST(julianday(po.created_on) - julianday(pr.created_on) AS INTEGER)) AS min_po_days
+            FROM pr_dump pr
+            JOIN po_dump po
+              ON po.purchase_requisition = pr.purchase_requisition
+             AND po.item_of_requisition  = pr.item_of_requisition
+            WHERE (po.deletion_indicator IS NULL OR po.deletion_indicator NOT IN ('L','X'))
+              AND pr.created_on IS NOT NULL AND pr.created_on != ''
+              AND po.created_on IS NOT NULL AND po.created_on != ''
+            GROUP BY pr.purchase_requisition, pr.item_of_requisition
+        )
+        WHERE min_po_days >= 0
     """)
     _upsert(conn, "procurement", "PR_TO_PO_DAYS", "Avg PR-to-PO Time (days)", p4, None, "days")
 
-    # P5 — PO Approval Cycle Time (PO document_date → release date from change_log)
+    # P5 — PO Cycle Time: Creation (created_on/ERDAT) → Approval (change_log FRGZU/FRGKE = X)
+    # Spec: AVG(DATEDIFF(release_date, creation_date)) WHERE release_indicator LIKE 'X%'
     p5 = _run(conn, """
-        SELECT AVG(CAST(julianday(cl.change_date) - julianday(po.document_date) AS REAL))
+        SELECT AVG(CAST(julianday(cl.change_date) - julianday(po.created_on) AS REAL))
         FROM po_dump po
         JOIN change_log cl
-          ON cl.object_id    = po.purchasing_document
-         AND cl.object_class = 'EINKBELEG'
-         AND cl.field_name   IN ('FRGZU','FRGKE')
+          ON cl.object_id       = po.purchasing_document
+         AND cl.object_class    = 'EINKBELEG'
+         AND cl.field_name      IN ('FRGZU','FRGKE')
          AND cl.change_indicator = 'U'
-         AND cl.new_value    = 'X'
+         AND cl.new_value        = 'X'
         WHERE po.release_indicator = 'X'
+          AND po.created_on IS NOT NULL AND po.created_on != ''
     """)
     _upsert(conn, "procurement", "PO_APPROVAL_CYCLE", "PO Approval Cycle (days)", p5, None, "days")
 
-    # P6 — PO Deletion Rate MTD
+    # P6 — PO Deletion Frequency MTD
+    # Spec: COUNT(purchasing_document) WHERE deletion_indicator = 'L' AND document_date in current month
     p6 = _run(conn, f"""
         SELECT COUNT(DISTINCT purchasing_document)
         FROM po_dump
@@ -130,35 +146,41 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
     """)
     _upsert(conn, "procurement", "PO_DELETION_MTD", "PO Deletions (MTD)", p6, None, "count")
 
-    # P7 — PO Amendment Rate: only U (Update) changes to meaningful fields
-    #       Excludes I (Insert, initial creation) and D (Delete)
+    # P7 — PO Amendment Rate
+    # Spec: (COUNT(DISTINCT amended POs) / COUNT(DISTINCT total POs)) * 100
+    # Amendment = change_indicator='U' (Update only — excludes I=Insert/creation, D=Delete)
+    # Also excludes release/approval field changes (FRGZU, FRGKE, FRGRL, FRGGR)
+    # Meaningful amendment fields: NETWR, NETPR, MATNR, MENGE, TXZ01, ERNAM, LOEKZ
     p7_amended = _run(conn, """
         SELECT COUNT(DISTINCT cl.object_id)
         FROM change_log cl
-        WHERE cl.object_class    = 'EINKBELEG'
-          AND cl.change_indicator = 'U'
-          AND cl.field_name NOT IN ('FRGZU','FRGKE')  -- exclude release approvals
+        WHERE cl.object_class     = 'EINKBELEG'
+          AND cl.change_indicator  = 'U'
+          AND cl.field_name NOT IN ('FRGZU','FRGKE','FRGRL','FRGGR')
     """)
     p7_total = _run(conn, """
         SELECT COUNT(DISTINCT purchasing_document) FROM po_dump
-        WHERE deletion_indicator IS NULL OR deletion_indicator = ''
+        WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
     """)
     p7 = round((p7_amended / p7_total * 100), 2) if p7_amended and p7_total else None
     _upsert(conn, "procurement", "PO_AMENDMENT_RATE", "PO Amendment Rate (%)", p7, None, "%")
 
     # P8 — Open PR Aging > 7 days with NO matching PO at item level
-    # Uses ref_date (latest data date) not actual 'now' — prevents all-zero on historical data
+    # Spec: COUNT(PR items) WHERE release_status='X' AND age(created_on) > 7d AND no PO exists for that item
+    # Note: PR:PO is one-to-many at header; check at item level to avoid false positives
+    # Uses ref_date (latest data date) to work correctly on historical datasets
     p8 = _run(conn, f"""
         SELECT COUNT(DISTINCT pr.purchase_requisition || '|' || pr.item_of_requisition)
         FROM pr_dump pr
         WHERE pr.release_status IN ('X','XX','XXX','XXXX','XXXXX')
           AND (pr.deletion_indicator IS NULL OR pr.deletion_indicator = '')
-          AND pr.release_date IS NOT NULL
-          AND julianday('{ref_date}') - julianday(pr.release_date) > 7
+          AND pr.created_on IS NOT NULL AND pr.created_on != ''
+          AND julianday('{ref_date}') - julianday(pr.created_on) > 7
           AND NOT EXISTS (
               SELECT 1 FROM po_dump po
               WHERE po.purchase_requisition = pr.purchase_requisition
                 AND po.item_of_requisition  = pr.item_of_requisition
+                AND (po.deletion_indicator IS NULL OR po.deletion_indicator NOT IN ('L','X'))
           )
     """)
     _upsert(conn, "procurement", "OPEN_PR_AGING", "Open PR Lines > 7 Days", p8, None, "count")
@@ -182,8 +204,14 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
 
     # ── Frontend-expected aliases ─────────────────────────────────────────────
 
-    # PO_COUNT_MTD — total PO lines created this month (frontend uses this code)
-    _upsert(conn, "procurement", "PO_COUNT_MTD", "PO Count (MTD)", p2, None, "count")
+    # PO_COUNT_MTD — count of distinct POs created this month (for chart/secondary use)
+    po_count_mtd = _run(conn, f"""
+        SELECT COUNT(DISTINCT purchasing_document)
+        FROM po_dump
+        WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+          AND created_on >= {MTD}
+    """)
+    _upsert(conn, "procurement", "PO_COUNT_MTD", "PO Count (MTD)", po_count_mtd, None, "count")
 
     # AVG_PO_VALUE — average net_order_value MTD
     avg_po = _run(conn, f"""

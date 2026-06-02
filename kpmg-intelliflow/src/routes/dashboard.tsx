@@ -67,14 +67,22 @@ function ProcurementDashboard() {
 
 function KpiRow() {
   const { isLoading } = useKpi("procurement");
+  // KPI 1 — Total PO Value MTD
   const p1 = useKpiValue("procurement", "TOTAL_PO_VALUE_MTD");
-  const p2 = useKpiValue("procurement", "PO_COUNT_MTD");
-  const p3 = useKpiValue("procurement", "AVG_PO_VALUE");
-  const p4 = useKpiValue("procurement", "OPEN_PR_AGING");
-  const p5 = useKpiValue("procurement", "MAVERICK_SPEND_RATE");
-  const p6 = useKpiValue("procurement", "HIGH_VALUE_PO_RATE");
-  const p7 = useKpiValue("procurement", "TOTAL_PO_VALUE_YTD");
-  const p8 = useKpiValue("procurement", "ACTIVE_VENDOR_COUNT_MTD");
+  // KPI 2 — Active PO Count (all active, no date filter)
+  const p2 = useKpiValue("procurement", "ACTIVE_PO_COUNT");
+  // KPI 3 — High-Value PO Count (threshold configurable)
+  const p3 = useKpiValue("procurement", "HIGH_VALUE_PO_COUNT");
+  // KPI 4 — Avg PR-to-PO Conversion Time
+  const p4 = useKpiValue("procurement", "PR_TO_PO_DAYS");
+  // KPI 5 — PO Cycle Time (Creation → Approval)
+  const p5 = useKpiValue("procurement", "PO_APPROVAL_CYCLE");
+  // KPI 6 — PO Deletion Frequency MTD
+  const p6 = useKpiValue("procurement", "PO_DELETION_MTD");
+  // KPI 7 — PO Amendment Rate
+  const p7 = useKpiValue("procurement", "PO_AMENDMENT_RATE");
+  // KPI 8 — Open PR Aging > 7 days without PO
+  const p8 = useKpiValue("procurement", "OPEN_PR_AGING");
 
   const fmt = (v: number | null | undefined, unit: string | null | undefined) => {
     if (v == null) return isLoading ? "—" : "No data";
@@ -84,19 +92,108 @@ function KpiRow() {
     return v.toFixed(0);
   };
 
+  // Extract threshold label from kpi_name for P3 (e.g. "High-Value PO Count (>₹1,00,00,000)")
+  const hvLabel = p3?.kpi_name?.match(/>\s*(₹[\d,]+)/)?.[1] ?? "₹1 Cr";
+
   return (
     <>
+      {/* Row 1 — Spend & Volume */}
       <div className="grid grid-cols-4 gap-3">
-        <KpiCard label="Total PO Value (MTD)" value={fmt(p1?.value_numeric, p1?.unit)} sublabel="Sum of net_order_value this month" size="lg" index={0} />
-        <KpiCard label="PO Count (MTD)" value={fmt(p2?.value_numeric, p2?.unit)} size="lg" sublabel="Active POs created this month" index={1} />
-        <KpiCard label="Average PO Value" value={fmt(p3?.value_numeric, p3?.unit)} size="lg" sublabel="Mean net_order_value MTD" index={2} />
-        <KpiCard label="Open PR Aging" value={fmt(p4?.value_numeric, p4?.unit)} size="lg" sublabel="PRs past delivery date without PO" threshold={p4?.value_numeric ? { label: "Needs attention", tone: "warning" } : undefined} index={3} />
+        <KpiCard
+          label="Total PO Value (MTD)"
+          value={fmt(p1?.value_numeric, p1?.unit)}
+          sublabel="SUM net_order_value · created_on in current month · active POs only"
+          size="lg"
+          index={0}
+        />
+        <KpiCard
+          label="Active PO Count"
+          value={fmt(p2?.value_numeric, p2?.unit)}
+          sublabel="COUNT DISTINCT purchasing_document · not delivery-complete · not deleted"
+          size="lg"
+          index={1}
+        />
+        <KpiCard
+          label="High-Value PO Count"
+          value={fmt(p3?.value_numeric, p3?.unit)}
+          sublabel={`POs above ${hvLabel} · threshold configurable in Admin → Settings`}
+          size="lg"
+          index={2}
+        />
+        <KpiCard
+          label="Open PR Aging (>7d)"
+          value={fmt(p8?.value_numeric, p8?.unit)}
+          sublabel="Released PR items with no PO > 7 days old · item-level check"
+          size="lg"
+          threshold={
+            p8?.value_numeric != null && p8.value_numeric > 10
+              ? { label: "> 10 target", tone: "danger" }
+              : p8?.value_numeric != null
+              ? { label: "Within target (≤ 10)", tone: "success" }
+              : undefined
+          }
+          index={3}
+        />
       </div>
+
+      {/* Row 2 — Cycle Times & Rate KPIs */}
       <div className="grid grid-cols-4 gap-3 mt-3">
-        <KpiCard label="Maverick Spend Rate" value={fmt(p5?.value_numeric, p5?.unit)} size="md" sublabel="POs without approved PR" threshold={p5?.value_numeric != null && p5.value_numeric > 20 ? { label: "> 20% threshold", tone: "danger" } : { label: "Within target", tone: "success" }} index={4} />
-        <KpiCard label="High-Value PO Rate" value={fmt(p6?.value_numeric, p6?.unit)} size="md" sublabel="POs above ₹1 Cr" index={5} />
-        <KpiCard label="Total PO Value (YTD)" value={fmt(p7?.value_numeric, p7?.unit)} size="md" sublabel="Sum of active PO values this FY" index={6} />
-        <KpiCard label="Active Vendors (YTD)" value={fmt(p8?.value_numeric, p8?.unit)} size="md" sublabel="Distinct vendors on POs this FY" index={7} />
+        <KpiCard
+          label="Avg PR→PO Time"
+          value={fmt(p4?.value_numeric, p4?.unit)}
+          sublabel="AVG days from PR created_on to first PO created_on · item level"
+          size="md"
+          threshold={
+            p4?.value_numeric != null && p4.value_numeric > 5
+              ? { label: "> 5d target", tone: "danger" }
+              : p4?.value_numeric != null
+              ? { label: "Within target (≤ 5d)", tone: "success" }
+              : undefined
+          }
+          index={4}
+        />
+        <KpiCard
+          label="PO Cycle Time"
+          value={fmt(p5?.value_numeric, p5?.unit)}
+          sublabel="AVG days from PO created_on to approval (change_log FRGZU=X)"
+          size="md"
+          threshold={
+            p5?.value_numeric != null && p5.value_numeric > 3
+              ? { label: "> 3d target", tone: "warning" }
+              : p5?.value_numeric != null
+              ? { label: "Within target (≤ 3d)", tone: "success" }
+              : undefined
+          }
+          index={5}
+        />
+        <KpiCard
+          label="PO Deletions (MTD)"
+          value={fmt(p6?.value_numeric, p6?.unit)}
+          sublabel="COUNT deletion_indicator = L · document_date in current month"
+          size="md"
+          threshold={
+            p6?.value_numeric != null && p6.value_numeric > 5
+              ? { label: "> 5 target", tone: "danger" }
+              : p6?.value_numeric != null
+              ? { label: "Within target (≤ 5)", tone: "success" }
+              : undefined
+          }
+          index={6}
+        />
+        <KpiCard
+          label="PO Amendment Rate"
+          value={fmt(p7?.value_numeric, p7?.unit)}
+          sublabel="% POs with post-creation changes · excludes release approvals"
+          size="md"
+          threshold={
+            p7?.value_numeric != null && p7.value_numeric > 15
+              ? { label: "> 15% target", tone: "danger" }
+              : p7?.value_numeric != null
+              ? { label: "Within target (< 15%)", tone: "success" }
+              : undefined
+          }
+          index={7}
+        />
       </div>
     </>
   );
