@@ -1,0 +1,6 @@
+rfq_id,rfq_title,sourcing_team,status,published_date,closing_date,currency
+RFQ001,Construction Materials for Bengaluru Plant,INDIRECT,CLOSED,2022-03-01,2022-03-31,INR
+RFQ002,IT Hardware Procurement FY22-23,IT,CLOSED,2022-04-01,2022-04-30,INR
+RFQ003,Logistics & Transport Services PAN India,LOGISTICS,ACTIVE,2022-05-01,2022-05-31,INR
+RFQ004,Office Supplies Annual Contract,ADMIN,DRAFT,2022-06-01,2022-06-30,INR
+RFQ005,Chemical Raw Materials Q3 2022,DIRECT,ACTIVE,2022-05-15,2022-06-15,INR

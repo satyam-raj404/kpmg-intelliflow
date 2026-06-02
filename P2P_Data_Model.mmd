@@ -1,0 +1,381 @@
+erDiagram
+
+    %% ─────────────────────────────────────────
+    %% SOURCE TABLES  (raw transactional data)
+    %% ─────────────────────────────────────────
+
+    VENDOR {
+        string  tracking_key       PK  "VENDOR@vendor_id@date@period"
+        string  vendor_id          UK  "Unique vendor code"
+        string  vendor_name            "Full legal name"
+        string  country
+        string  city
+        string  account_type           "Domestic / Foreign / One-Time"
+        string  tax_id                 "PAN or GSTIN"
+        string  purchasing_blocked     "Y = blocked from new orders"
+        string  payment_blocked        "Y = payments frozen"
+        string  deleted                "Y = removed from system"
+        string  payment_terms      FK  "-> PAYMENT_TERMS"
+        date    onboard_date           "Date added to system"
+        string  onboarded_by       FK  "-> USER"
+        string  period                 "Mon-YYYY"
+    }
+
+    REQUISITION {
+        string  tracking_key       PK  "PR@buyer_group@creation_date@period"
+        string  pr_id              UK  "Unique PR number"
+        string  pr_line                "Line item number"
+        string  description            "What is needed"
+        string  category           FK  "-> MATERIAL_CATEGORY"
+        string  plant              FK  "-> PLANT"
+        float   quantity               "Units required"
+        float   estimated_price        "Price per unit estimate"
+        date    required_by            "When goods are needed"
+        date    created_on             "PR creation date | KPI: PR_TO_PO_DAYS"
+        string  created_by         FK  "-> USER | KPI: SOD check"
+        string  buyer_group        FK  "-> BUYER_GROUP"
+        string  suggested_vendor   FK  "-> VENDOR (optional)"
+        string  release_status         "Released / Pending"
+        date    release_date           "Approval date | KPI: OPEN_PR_AGING"
+        string  release_strategy   FK  "-> RELEASE_STRATEGY"
+        string  deleted                "Y = cancelled"
+        string  converted_to_po    FK  "-> PURCHASE_ORDER (when converted)"
+        string  period                 "Mon-YYYY"
+    }
+
+    PURCHASE_ORDER {
+        string  tracking_key       PK  "PO@vendor_id@document_date@period"
+        string  po_id              UK  "Unique PO number"
+        string  company                "Company placing the order"
+        string  vendor_id          FK  "-> VENDOR"
+        string  buyer_group        FK  "-> BUYER_GROUP"
+        string  buyer_org              "Purchasing organisation"
+        string  payment_terms      FK  "-> PAYMENT_TERMS"
+        string  document_type      FK  "-> DOCUMENT_TYPE"
+        date    document_date          "PO creation date | KPI: MTD / YTD filters"
+        string  created_by         FK  "-> USER"
+        string  release_group      FK  "-> RELEASE_GROUP"
+        string  release_strategy   FK  "-> RELEASE_STRATEGY"
+        string  release_status         "Approved / Pending | KPI: PO_RELEASE_MISSING"
+        date    release_date           "Approval date | KPI: PO_CYCLE_TIME"
+        string  deleted                "Y = cancelled | KPI: PO_DELETION_MTD"
+        string  period                 "Mon-YYYY"
+    }
+
+    PO_LINE {
+        string  tracking_key       FK  "Inherits PURCHASE_ORDER key"
+        string  po_id              FK  "-> PURCHASE_ORDER"
+        string  line_id            PK  "Line item number"
+        string  description            "What is being ordered"
+        string  category           FK  "-> MATERIAL_CATEGORY | KPI: spend by category"
+        string  plant              FK  "-> PLANT"
+        string  storage_location       "Where goods go on arrival"
+        float   quantity               "Units ordered | KPI: OTIF denominator"
+        float   delivered_quantity     "Units received so far"
+        float   open_quantity          "= quantity - delivered_quantity"
+        float   unit_price             "Price per unit | KPI: PRICE_VARIANCE baseline"
+        float   net_value              "= quantity x unit_price | KPI: TOTAL_PO_VALUE_MTD"
+        string  tax_code           FK  "-> TAX_CODE"
+        string  item_type          FK  "-> ITEM_TYPE"
+        string  delivery_complete      "Y = fully received | KPI: ACTIVE_PO_COUNT"
+        string  deleted                "Y = line cancelled"
+        string  pr_id              FK  "-> REQUISITION (origin)"
+        string  pr_line                "Origin PR line"
+        string  period                 "Mon-YYYY"
+    }
+
+    DELIVERY_SCHEDULE {
+        string  tracking_key       FK  "Inherits PURCHASE_ORDER key"
+        string  po_id              FK  "-> PURCHASE_ORDER"
+        string  po_line            FK  "-> PO_LINE"
+        string  schedule_line      PK  "Schedule line number"
+        date    expected_date          "Planned delivery date | KPI: OTIF, DELAYED_GRN"
+        float   planned_qty            "Planned quantity | KPI: OTIF full check"
+        float   delivered_qty          "Actual delivered | KPI: OTIF"
+        float   open_qty               "= planned - delivered"
+    }
+
+    GOODS_RECEIPT {
+        string  tracking_key       PK  "GRN@{po_key}@receipt_date"
+        string  grn_id             UK  "Unique GRN document number"
+        string  po_id              FK  "-> PURCHASE_ORDER"
+        string  po_line            FK  "-> PO_LINE"
+        string  transaction_type       "Receipt / Return | KPI: GRN_RETURN_RATE"
+        string  movement_type      FK  "-> MOVEMENT_TYPE"
+        date    receipt_date           "Goods received date | KPI: OTIF, DELAYED_GRN"
+        float   quantity               "Qty received or returned | KPI: OTIF"
+        float   value                  "Value in local currency"
+        string  direction              "In = received  Out = returned | KPI: 3WAY_MATCH"
+        string  vendor_invoice_ref     "Vendor invoice number for 3-way match"
+        date    entry_date             "Date recorded in system"
+        string  period                 "Mon-YYYY"
+    }
+
+    INVOICE {
+        string  tracking_key       PK  "INV@{po_key}@invoice_date"
+        string  invoice_id         UK  "Unique invoice document number"
+        string  po_id              FK  "-> PURCHASE_ORDER"
+        string  po_line            FK  "-> PO_LINE"
+        string  vendor_invoice_ref     "Vendor invoice number | 3-way match key"
+        date    invoice_date           "Invoice posting date | KPI: GRN_TO_INVOICE_DAYS"
+        float   quantity               "Invoiced quantity | KPI: 3WAY_MATCH"
+        float   value                  "Invoiced amount | KPI: PRICE_VARIANCE"
+        string  direction              "Invoice / Credit Memo"
+        date    entry_date             "Date recorded in system"
+        string  period                 "Mon-YYYY"
+    }
+
+    PAYMENT {
+        string  tracking_key       PK  "PAY@{po_key}@payment_date"
+        string  payment_id         UK  "Unique payment document number"
+        string  vendor_id          FK  "-> VENDOR"
+        string  company                "Company making payment"
+        date    payment_date           "Payment date | KPI: DPO"
+        string  cleared_invoice    FK  "-> INVOICE"
+        float   amount                 "Amount paid | KPI: TOTAL_SPEND_YTD"
+        float   discount_taken         "Early payment discount"
+        string  payment_method         "Bank Transfer / Cheque / RTGS"
+        string  bank_reference         "UTR or wire reference"
+        string  period                 "Mon-YYYY"
+    }
+
+    CHANGE_LOG {
+        string  tracking_key       PK  "CHG@{parent_key}@change_date"
+        string  document_type          "PR / PO / Vendor"
+        string  document_id        FK  "-> REQUISITION, PURCHASE_ORDER, or VENDOR"
+        string  change_id          UK  "Unique change record"
+        string  changed_by         FK  "-> USER | KPI: SOD_VIOLATION"
+        date    change_date            "Date of change | KPI: PO_AMENDMENT_RATE"
+        string  action_code            "System transaction used"
+        string  table_changed          "Which table was edited"
+        string  field_changed          "Which column changed"
+        string  old_value              "Before | KPI: PRICE_VARIANCE baseline"
+        string  new_value              "After  | KPI: PRICE_VARIANCE detection"
+        string  change_type            "Insert / Update / Delete"
+        string  period                 "Mon-YYYY"
+    }
+
+    %% ─────────────────────────────────────────
+    %% REFERENCE TABLES  (lookup / master lists)
+    %% ─────────────────────────────────────────
+
+    PAYMENT_TERMS {
+        string  terms_id      PK  "e.g. NET30, CR15"
+        string  description       "e.g. Net 30 Days"
+        int     net_days          "Days until payment due | KPI: DPO baseline"
+    }
+
+    PLANT {
+        string  plant_id      PK  "Unique plant or location code"
+        string  plant_name        "Name of plant or warehouse"
+        string  city
+        string  country
+        string  buyer_org         "Which buying org serves this plant"
+    }
+
+    BUYER_GROUP {
+        string  group_id      PK  "e.g. ENG, MECH, IT"
+        string  group_name        "e.g. Engineering Procurement"
+        string  contact           "Phone or email"
+    }
+
+    MATERIAL_CATEGORY {
+        string  category_id   PK  "Short code"
+        string  short_name        "e.g. Mechanical Parts"
+        string  long_name         "Full description"
+    }
+
+    DOCUMENT_TYPE {
+        string  type_id       PK  "e.g. STD, FRAME, RFQ"
+        string  category          "PO / Contract / RFQ"
+        string  description       "e.g. Standard Purchase Order"
+    }
+
+    ITEM_TYPE {
+        string  type_id       PK  "e.g. Standard, Service, Limit"
+        string  description
+    }
+
+    MOVEMENT_TYPE {
+        string  type_id       PK  "e.g. 101, 102, 122"
+        string  direction         "In = receipt  Out = return"
+        string  description       "e.g. Goods Receipt, Return to Vendor"
+    }
+
+    TAX_CODE {
+        string  code_id       PK  "e.g. Z3, V0, GST18"
+        string  description       "Tax rate label"
+    }
+
+    RELEASE_GROUP {
+        string  group_id      PK  "Approval tier code"
+        string  description       "e.g. CAPEX Budget Approvals"
+    }
+
+    RELEASE_STRATEGY {
+        string  group_id      FK  "-> RELEASE_GROUP"
+        string  strategy_id   PK  "Strategy within the group"
+        string  description       "e.g. Two-level above 10 Lakhs"
+    }
+
+    USER {
+        string  user_id       PK  "Login username"
+        string  full_name         "Display name"
+        date    last_login        "Last active date | KPI: inactive user flag"
+        string  account_status    "Active / Locked / Expired"
+        string  user_type         "Human / System / Background"
+        date    valid_to          "Account expiry date"
+    }
+
+    %% ─────────────────────────────────────────
+    %% COMPUTED TABLES  (rebuilt on each upload)
+    %% ─────────────────────────────────────────
+
+    P2P_LIFECYCLE {
+        string  tracking_key            PK  "Same as PO tracking key"
+        string  pr_id                   FK  "-> REQUISITION  NULL = maverick buy"
+        string  po_id                   FK  "-> PURCHASE_ORDER"
+        string  vendor_id               FK  "-> VENDOR"
+        date    pr_created_on
+        date    pr_release_date
+        string  pr_created_by
+        date    po_created_on
+        date    po_release_date
+        string  po_created_by
+        float   po_value                    "Total PO value"
+        date    first_receipt_date
+        float   receipt_amount
+        date    first_invoice_date
+        float   invoice_amount
+        date    first_payment_date
+        float   payment_amount
+        int     pr_to_po_days               "KPI: PR_TO_PO_DAYS"
+        int     po_to_receipt_days          "KPI: FULFILLMENT_SPEED"
+        int     receipt_to_invoice_days     "KPI: INVOICE_LAG"
+        int     invoice_to_payment_days     "KPI: DPO"
+        int     total_cycle_days            "KPI: E2E_CYCLE_TIME"
+        int     is_maverick                 "KPI: MAVERICK_BUYING  1=yes"
+        int     has_return                  "KPI: REJECTION_RATE   1=yes"
+        int     has_credit_memo             "KPI: 3WAY_MATCH        1=yes"
+    }
+
+    PROCESS_EVENTS {
+        string  tracking_key    FK  "-> PURCHASE_ORDER tracking key"
+        string  po_id           FK  "One case = one PO"
+        int     step_number         "1 to 8 in sequence"
+        string  step_name           "e.g. PR Created, PO Approved, GRN Posted"
+        date    step_date           "When this step occurred"
+        string  done_by         FK  "-> USER | KPI: SOD_VIOLATION"
+        string  path_type           "Ideal / Outlier | KPI: COMPLIANCE_RATE"
+        string  anomaly_flags       "Comma list | KPI: ANOMALY_COUNT"
+    }
+
+    KPI_CACHE {
+        string  kpi_code    PK  "e.g. TOTAL_PO_VALUE_MTD"
+        string  dashboard       "procurement / leadership / vendor"
+        string  kpi_name        "Human-readable label"
+        string  period          "MTD / YTD / Current / All"
+        float   value           "Computed number"
+        string  unit            "INR / % / Days / Count"
+        float   target          "Threshold for Red-Amber-Green"
+        float   change_pct      "% change vs prior period"
+        date    last_updated
+    }
+
+    %% ─────────────────────────────────────────
+    %% APPLICATION TABLES  (app operations)
+    %% ─────────────────────────────────────────
+
+    ACTIONS {
+        int     action_id       PK  "Kanban card ID"
+        string  action_type         "Rate Revision / Vendor Negotiation / Audit"
+        string  description
+        string  assigned_to     FK  "-> USER"
+        string  linked_po       FK  "-> PURCHASE_ORDER (optional)"
+        string  linked_vendor   FK  "-> VENDOR (optional)"
+        float   expected_saving     "Estimated saving INR"
+        float   actual_saving       "Realized saving INR"
+        string  status              "Open / In Progress / Under Review / Closed"
+        date    due_date
+    }
+
+    UPLOAD_LOG {
+        string  batch_id      PK  "Unique upload session ID"
+        string  file_type         "Which table this file feeds"
+        string  file_name         "Original file name"
+        int     total_rows
+        int     valid_rows
+        int     rejected_rows
+        string  uploaded_by   FK  "-> USER"
+        date    uploaded_on
+        string  status            "Processing / Completed / Failed"
+    }
+
+    AUDIT_LOG {
+        int     log_id      PK
+        string  user_id     FK  "-> USER"
+        string  action          "Upload / Login / KPI Refresh / Delete"
+        string  target_type     "Which table was affected"
+        string  target_id       "Which record was affected"
+        date    done_on
+    }
+
+    %% ─────────────────────────────────────────
+    %% RELATIONSHIPS
+    %% ─────────────────────────────────────────
+
+    %% --- Core P2P chain ---
+    VENDOR              ||--o{  PURCHASE_ORDER      : "supplies"
+    PURCHASE_ORDER      ||--|{  PO_LINE             : "has lines"
+    PO_LINE             }o--o|  REQUISITION         : "sourced from"
+    PURCHASE_ORDER      ||--o{  DELIVERY_SCHEDULE   : "has schedule"
+    PO_LINE             ||--o{  DELIVERY_SCHEDULE   : "line schedule"
+    PURCHASE_ORDER      ||--o{  GOODS_RECEIPT       : "receives into"
+    PO_LINE             ||--o{  GOODS_RECEIPT       : "line receipt"
+    PURCHASE_ORDER      ||--o{  INVOICE             : "billed via"
+    PO_LINE             ||--o{  INVOICE             : "line invoice"
+    INVOICE             ||--o{  PAYMENT             : "cleared by"
+    VENDOR              ||--o{  PAYMENT             : "paid to"
+
+    %% --- Change tracking ---
+    PURCHASE_ORDER      ||--o{  CHANGE_LOG          : "PO edits logged"
+    REQUISITION         ||--o{  CHANGE_LOG          : "PR edits logged"
+    VENDOR              ||--o{  CHANGE_LOG          : "vendor edits logged"
+
+    %% --- Vendor hierarchy ---
+    REQUISITION         }o--o|  VENDOR              : "suggests vendor"
+
+    %% --- Reference lookups ---
+    VENDOR              }o--||  PAYMENT_TERMS       : "default terms"
+    VENDOR              }o--||  USER                : "onboarded by"
+    PURCHASE_ORDER      }o--||  PAYMENT_TERMS       : "order terms"
+    PURCHASE_ORDER      }o--||  BUYER_GROUP         : "placed by"
+    PURCHASE_ORDER      }o--||  DOCUMENT_TYPE       : "type"
+    PURCHASE_ORDER      }o--||  RELEASE_GROUP       : "approval tier"
+    PURCHASE_ORDER      }o--||  RELEASE_STRATEGY    : "approval strategy"
+    PURCHASE_ORDER      }o--||  USER                : "created by"
+    PO_LINE             }o--||  PLANT               : "delivers to"
+    PO_LINE             }o--||  MATERIAL_CATEGORY   : "category"
+    PO_LINE             }o--||  ITEM_TYPE           : "item type"
+    PO_LINE             }o--||  TAX_CODE            : "tax code"
+    REQUISITION         }o--||  BUYER_GROUP         : "raised by"
+    REQUISITION         }o--||  PLANT               : "for plant"
+    REQUISITION         }o--||  USER                : "created by"
+    REQUISITION         }o--||  RELEASE_STRATEGY    : "approval path"
+    GOODS_RECEIPT       }o--||  MOVEMENT_TYPE       : "movement"
+    CHANGE_LOG          }o--||  USER                : "changed by"
+    RELEASE_STRATEGY    }o--||  RELEASE_GROUP       : "belongs to"
+
+    %% --- Computed table feeds ---
+    P2P_LIFECYCLE       }o--o|  REQUISITION         : "upstream PR"
+    P2P_LIFECYCLE       }o--||  PURCHASE_ORDER      : "per PO"
+    P2P_LIFECYCLE       }o--||  VENDOR              : "vendor"
+    PROCESS_EVENTS      }o--||  PURCHASE_ORDER      : "events per PO"
+    PROCESS_EVENTS      }o--o|  USER                : "step done by"
+
+    %% --- Application tables ---
+    ACTIONS             }o--||  USER                : "assigned to"
+    ACTIONS             }o--o|  PURCHASE_ORDER      : "linked PO"
+    ACTIONS             }o--o|  VENDOR              : "linked vendor"
+    AUDIT_LOG           }o--||  USER                : "action by"
+    UPLOAD_LOG          }o--||  USER                : "uploaded by"

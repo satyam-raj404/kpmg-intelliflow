@@ -1,0 +1,178 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@theme inline {
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+  --radius-2xl: 12px;
+
+  --font-sans: "Source Sans 3", "Arial", "Helvetica Neue", sans-serif;
+  --font-heading: "Georgia", "KPMG Slab", serif;
+  --font-mono: "JetBrains Mono", "SF Mono", "Consolas", monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-dark: var(--primary-dark);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-teal: var(--teal);
+  --color-purple-brand: var(--purple-brand);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-ring-offset-background: var(--background);
+}
+
+:root {
+  --radius: 0.5rem;
+
+  --background: oklch(0.98 0.002 250);
+  --foreground: oklch(0.15 0.01 250);
+  --surface: oklch(1 0 0);
+  --surface-elevated: oklch(0.995 0.001 250);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.15 0.01 250);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.15 0.01 250);
+
+  /* KPMG Blue */
+  --primary: oklch(0.35 0.16 260);
+  --primary-foreground: oklch(1 0 0);
+  --primary-dark: oklch(0.25 0.14 262);
+
+  /* KPMG Cyan accent */
+  --accent: oklch(0.58 0.14 240);
+  --accent-foreground: oklch(1 0 0);
+
+  --teal: oklch(0.60 0.10 190);
+  --purple-brand: oklch(0.35 0.14 300);
+
+  --secondary: oklch(0.97 0.002 250);
+  --secondary-foreground: oklch(0.25 0.01 250);
+
+  --muted: oklch(0.96 0.002 250);
+  --muted-foreground: oklch(0.55 0.01 250);
+
+  --destructive: oklch(0.55 0.20 25);
+  --destructive-foreground: oklch(1 0 0);
+
+  --success: oklch(0.55 0.15 155);
+  --warning: oklch(0.72 0.14 70);
+  --danger: oklch(0.55 0.20 25);
+  --info: oklch(0.58 0.14 240);
+
+  --border: oklch(0.92 0.002 250);
+  --input: oklch(0.92 0.002 250);
+  --ring: oklch(0.58 0.14 240);
+
+  --chart-1: oklch(0.35 0.16 260);
+  --chart-2: oklch(0.58 0.14 240);
+  --chart-3: oklch(0.60 0.10 190);
+  --chart-4: oklch(0.35 0.14 300);
+  --chart-5: oklch(0.72 0.14 70);
+
+  --sidebar: oklch(0.33 0.185 264);
+  --sidebar-foreground: oklch(0.95 0.005 250);
+  --sidebar-primary: oklch(0.65 0.14 240);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.42 0.17 264);
+  --sidebar-accent-foreground: oklch(1 0 0);
+  --sidebar-border: oklch(0.29 0.17 264);
+  --sidebar-ring: oklch(0.65 0.14 240);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html, body {
+    font-family: var(--font-sans);
+    font-feature-settings: "tnum" 1, "kern" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .font-tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Recharts */
+.recharts-cartesian-axis-tick text {
+  font-size: 12px;
+  fill: var(--color-muted-foreground);
+}
+.recharts-tooltip-wrapper { outline: none !important; }
+.recharts-default-tooltip {
+  border-radius: 8px !important;
+  border: 1px solid var(--color-border) !important;
+  background: var(--color-surface) !important;
+  font-size: 13px !important;
+  box-shadow: 0 8px 24px oklch(0 0 0 / 0.08) !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: oklch(0.85 0 0); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: oklch(0.7 0 0); }
+
+/* Glassmorphism utility */
+.glass {
+  background: oklch(1 0 0 / 0.7);
+  backdrop-filter: blur(12px) saturate(1.2);
+  border: 1px solid oklch(0.92 0 0 / 0.5);
+}

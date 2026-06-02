@@ -1,0 +1,6 @@
+company_code,company_name,purchasing_org,plant,plant_name,parent_company
+1001,IntelliSource India Pvt Ltd,1000,SDPL,South Delhi Plant,
+1001,IntelliSource India Pvt Ltd,1000,BLRP,Bengaluru Plant,
+1001,IntelliSource India Pvt Ltd,2000,DELP,Delhi North Plant,
+1001,IntelliSource India Pvt Ltd,2000,HYDP,Hyderabad Plant,
+1001,IntelliSource India Pvt Ltd,3000,MNAL,Mumbai Plant,
