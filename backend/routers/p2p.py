@@ -356,7 +356,7 @@ def get_po_deletions(limit: int = Query(20, ge=1, le=100)):
         LEFT JOIN process_mining_events pme
           ON po.purchasing_document = pme.purchasing_document AND po.item = pme.item
         WHERE po.deletion_indicator = 'L'
-        ORDER BY po.document_date DESC LIMIT ?
+        ORDER BY po.created_on DESC LIMIT ?
     """, (limit,)).fetchall()
     return [dict(r) for r in rows]
 

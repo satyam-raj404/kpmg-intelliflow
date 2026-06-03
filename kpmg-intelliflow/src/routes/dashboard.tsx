@@ -9,6 +9,7 @@ import {
   Tooltip,
   BarChart,
   Bar,
+  Cell,
   ComposedChart,
   Line,
   Legend,
@@ -59,6 +60,12 @@ function ProcurementDashboard() {
         <POCountAndMaverick />
       </div>
       <div className="mt-4">
+        <POAgingBuckets />
+      </div>
+      <div className="mt-4">
+        <PODeletionTrend />
+      </div>
+      <div className="mt-4">
         <PODeletionMonitor />
       </div>
     </AppShell>
@@ -70,12 +77,13 @@ function KpiRow() {
   const p1 = useKpiValue("procurement", "TOTAL_PO_VALUE_MTD");
   const p2 = useKpiValue("procurement", "PO_COUNT_MTD");
   const p3 = useKpiValue("procurement", "AVG_PO_VALUE");
-  const p4 = useKpiValue("procurement", "OPEN_PR_AGING");
+  const p4 = useKpiValue("procurement", "OPEN_PO_AGING");
   const p5 = useKpiValue("procurement", "MAVERICK_SPEND_RATE");
   const p6 = useKpiValue("procurement", "HIGH_VALUE_PO_RATE");
   const p7 = useKpiValue("procurement", "TOTAL_PO_VALUE_YTD");
   const p8 = useKpiValue("procurement", "ACTIVE_VENDOR_COUNT_MTD");
-  const p9 = useKpiValue("procurement", "PR_TO_PO_DAYS");
+  const p9  = useKpiValue("procurement", "PR_TO_PO_DAYS");
+  const p10 = useKpiValue("procurement", "PO_DELETION_MTD");
 
   const fmt = (v: number | null | undefined, unit: string | null | undefined) => {
     if (v == null) return isLoading ? "—" : "No data";
@@ -91,16 +99,102 @@ function KpiRow() {
         <KpiCard label="Total PO Value (MTD)" value={fmt(p1?.value_numeric, p1?.unit)} sublabel="Sum of net_order_value this month" size="lg" index={0} />
         <KpiCard label="PO Count (MTD)" value={fmt(p2?.value_numeric, p2?.unit)} size="lg" sublabel="Active POs created this month" index={1} />
         <KpiCard label="Average PO Value" value={fmt(p3?.value_numeric, p3?.unit)} size="lg" sublabel="Mean net_order_value MTD" index={2} />
-        <KpiCard label="Open PR Aging" value={fmt(p4?.value_numeric, p4?.unit)} size="lg" sublabel="PRs past delivery date without PO" threshold={p4?.value_numeric ? { label: "Needs attention", tone: "warning" } : undefined} index={3} />
+        <KpiCard label="Open PO Aging" value={fmt(p4?.value_numeric, p4?.unit)} size="lg" sublabel="Overdue open PO line items · past expected delivery date" threshold={p4?.value_numeric != null && p4.value_numeric > 0 ? { label: "Overdue POs detected", tone: "danger" } : { label: "All deliveries on track", tone: "success" }} index={3} />
       </div>
-      <div className="grid grid-cols-5 gap-3 mt-3">
+      <div className="grid grid-cols-6 gap-3 mt-3">
         <KpiCard label="Maverick Spend Rate" value={fmt(p5?.value_numeric, p5?.unit)} size="md" sublabel="POs without approved PR" threshold={p5?.value_numeric != null && p5.value_numeric > 20 ? { label: "> 20% threshold", tone: "danger" } : { label: "Within target", tone: "success" }} index={4} />
         <KpiCard label="High-Value PO Rate" value={fmt(p6?.value_numeric, p6?.unit)} size="md" sublabel="POs above ₹1 Cr" index={5} />
         <KpiCard label="Total PO Value (YTD)" value={fmt(p7?.value_numeric, p7?.unit)} size="md" sublabel="Sum of active PO values this FY" index={6} />
         <KpiCard label="Active Vendors (YTD)" value={fmt(p8?.value_numeric, p8?.unit)} size="md" sublabel="Distinct vendors on POs this FY" index={7} />
         <KpiCard label="Avg PR-to-PO Time" value={fmt(p9?.value_numeric, p9?.unit)} size="md" sublabel="Avg days from PR requisition date to PO creation date" threshold={p9?.value_numeric != null && p9.value_numeric > 5 ? { label: "> 5 day target", tone: "warning" } : { label: "Within target", tone: "success" }} index={8} />
+        <KpiCard label="PO Deletions (MTD)" value={fmt(p10?.value_numeric, p10?.unit)} size="md" sublabel="Deleted line items this month · item level" threshold={p10?.value_numeric != null && p10.value_numeric > 0 ? { label: "Deletions detected", tone: "danger" } : { label: "No deletions", tone: "success" }} index={9} />
       </div>
     </>
+  );
+}
+
+function POAgingBuckets() {
+  const { data: kpiData, isLoading } = useKpi("procurement");
+  const bucketsKpi = kpiData?.kpis.find((k) => k.kpi_code === "OPEN_PO_AGING_BUCKETS");
+
+  let buckets: Array<{ bucket: string; count: number; fill: string }> = [];
+  if (bucketsKpi?.value_text) {
+    try {
+      const raw = JSON.parse(bucketsKpi.value_text) as Record<string, number>;
+      const fills = ["#f59e0b", "#f97316", "#ef4444", "#b91c1c"];
+      buckets = Object.entries(raw).map(([bucket, count], i) => ({
+        bucket,
+        count: count as number,
+        fill: fills[i] ?? fills[fills.length - 1],
+      }));
+    } catch {}
+  }
+
+  const total = buckets.reduce((s, b) => s + b.count, 0);
+
+  return (
+    <SectionCard
+      title="Open PO Aging Buckets"
+      subtitle="Count of overdue open PO line items by delay band · source: po_delivery_dump.expected_delivery_date"
+      actions={total > 0 ? <StatusPill tone="danger" dot>{total} overdue</StatusPill> : undefined}
+    >
+      <div className="h-56">
+        {isLoading ? (
+          <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Loading…</div>
+        ) : buckets.length === 0 || total === 0 ? (
+          <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+            Upload PO Delivery data to view aging
+          </div>
+        ) : (
+          <ResponsiveContainer>
+            <BarChart data={buckets} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
+              <XAxis dataKey="bucket" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
+              <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10 }} allowDecimals={false} />
+              <Tooltip formatter={(v: number) => [`${v} line items`, "Overdue"]} />
+              <Bar dataKey="count" radius={[3, 3, 0, 0]}>
+                {buckets.map((b) => (
+                  <Cell key={b.bucket} fill={b.fill} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </SectionCard>
+  );
+}
+
+function PODeletionTrend() {
+  const { data, isLoading } = useCharts("procurement");
+  const chartData = (data?.series ?? []).map((p) => ({
+    month:         p.month ?? "",
+    "Deleted Lines": (p.deleted_lines as number) ?? 0,
+  }));
+
+  return (
+    <SectionCard
+      title="PO Deletion Trend"
+      subtitle="Monthly deleted PO line items · by PO creation date · item level (purchasing_document + item)"
+    >
+      <div className="h-56">
+        {isLoading ? (
+          <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Loading…</div>
+        ) : chartData.length === 0 || chartData.every((d) => d["Deleted Lines"] === 0) ? (
+          <div className="h-full flex items-center justify-center text-sm text-muted-foreground">No deleted PO line items in this period</div>
+        ) : (
+          <ResponsiveContainer>
+            <BarChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
+              <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
+              <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10 }} allowDecimals={false} />
+              <Tooltip formatter={(v: number) => [`${v} line items deleted`, "Deletions"]} />
+              <Bar dataKey="Deleted Lines" fill={brand.colors.danger} radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </SectionCard>
   );
 }
 
@@ -115,7 +209,7 @@ function PODeletionMonitor() {
   return (
     <SectionCard
       title="PO Deletion Anomaly Monitor (All Time)"
-      subtitle={`deletion_indicator = L · ${rows.length} deleted POs total · ${formatINR(totalValue)} at risk · KPI card shows current month only`}
+      subtitle={`deletion_indicator = L · ${rows.length} deleted PO line items total · ${formatINR(totalValue)} at risk · KPI card shows current month only`}
       actions={
         rows.length > 0 ? (
           <StatusPill tone="danger" dot>Requires Review</StatusPill>

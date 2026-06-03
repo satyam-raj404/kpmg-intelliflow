@@ -15,7 +15,7 @@ DATASET_SIGNATURES: dict[str, list[str]] = {
     "invoice_dump":     ["invoice_doc", "document_type", "clearing_doc", "vendor_invoice_ref"],
     "payment_dump":     ["payment_doc", "payment_method", "cleared_invoice", "clearing_date"],
     "vendor_master":    ["vendor", "vendor_name", "account_group", "central_purchasing_block"],
-    "change_log":       ["object_class", "object_id", "change_number", "field_name", "change_indicator"],
+    "change_log":       ["object_class", "object_id", "change_number", "field_name", "change_indicator", "table_key"],
     "company_plant_master": ["company_code", "purchasing_org", "plant", "plant_name"],
 }
 

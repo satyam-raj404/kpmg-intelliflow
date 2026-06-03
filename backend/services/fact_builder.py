@@ -198,7 +198,7 @@ def build_facts(conn: sqlite3.Connection) -> None:
         LEFT JOIN po_invoice_dump inv
             ON inv.purchasing_document  = po.purchasing_document
            AND inv.item                 = po.item
-        WHERE (po.deletion_indicator IS NULL OR po.deletion_indicator = '')
+        WHERE (po.deletion_indicator IS NULL OR po.deletion_indicator NOT IN ('L', 'X'))
           AND (pr.deletion_indicator IS NULL OR pr.deletion_indicator != 'X')
         GROUP BY po.purchasing_document, po.item
     """)

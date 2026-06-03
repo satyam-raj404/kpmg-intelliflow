@@ -113,70 +113,115 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
     """)
     _upsert(conn, "procurement", "PR_TO_PO_DAYS", "Avg PR-to-PO Time (days)", p4, None, "days")
 
-    # P5 — PO Cycle Time: Creation (created_on/ERDAT) → Approval (change_log FRGZU/FRGKE = X)
-    # Spec: AVG(DATEDIFF(release_date, creation_date)) WHERE release_indicator LIKE 'X%'
+    # P5 — PO Approval Cycle Time: PO creation (EKKO-ERDAT) → release via change_log FRGZU
+    # field_name = 'FRGZU' only (FRGKE excluded — not a reliable release indicator)
+    # change_indicator IN ('E','U') — E=initial entry, U=update; both valid release events
+    # new_value LIKE 'X%' — covers single-level (X) and multi-level (XX, XXX...) release
+    # release_indicator LIKE 'X%' on po_dump — same multi-level logic
+    # Excludes deleted POs (EKKO-LOEKZ / EKPO-LOEKZ IN ('L','X'))
     p5 = _run(conn, """
         SELECT AVG(CAST(julianday(cl.change_date) - julianday(po.created_on) AS REAL))
-        FROM po_dump po #Remove Deleted POs from dump entirely
+        FROM po_dump po
         JOIN change_log cl
-          ON cl.object_id       = po.purchasing_document
-         AND cl.object_class    = 'EINKBELEG'
-         AND cl.field_name      IN ('FRGZU','FRGKE') #FRGKE is not important, could give unnecessary 
-         AND cl.change_indicator = 'U' #Could be E or U
-         AND cl.new_value        = 'X'
-        WHERE po.release_indicator = 'X' # Has to be Like X percentage, not X value
+          ON cl.object_id        = po.purchasing_document
+         AND cl.object_class     = 'EINKBELEG'
+         AND cl.field_name       = 'FRGZU'
+         AND cl.change_indicator IN ('E', 'U')
+         AND cl.new_value        LIKE 'X%'
+        WHERE po.release_indicator LIKE 'X%'
+          AND (po.deletion_indicator IS NULL OR po.deletion_indicator NOT IN ('L', 'X'))
           AND po.created_on IS NOT NULL AND po.created_on != ''
     """)
     _upsert(conn, "procurement", "PO_APPROVAL_CYCLE", "PO Approval Cycle (days)", p5, None, "days")
 
     # P6 — PO Deletion Frequency MTD
-    # Spec: COUNT(purchasing_document) WHERE deletion_indicator = 'L' AND document_date in current month
+    # Count at item level (purchasing_document + item) — deletion_indicator lives on EKPO (item), not header
+    # Uses created_on (EKKO-ERDAT) not document_date (BEDAT) — measures when PO was created, not dated
     p6 = _run(conn, f"""
-        SELECT COUNT(DISTINCT purchasing_document) # With Append of Item Number, give info that PO Count is item level
+        SELECT COUNT(DISTINCT purchasing_document || '|' || item)
         FROM po_dump
         WHERE deletion_indicator = 'L'
-          AND document_date >= {MTD}
+          AND COALESCE(NULLIF(created_on,''), document_date) >= {MTD}
     """)
-    _upsert(conn, "procurement", "PO_DELETION_MTD", "PO Deletions (MTD)", p6, None, "count")
+    _upsert(conn, "procurement", "PO_DELETION_MTD", "PO Deleted Line Items (MTD)", p6, None, "count")
 
     # P7 — PO Amendment Rate
-    # Spec: (COUNT(DISTINCT amended POs) / COUNT(DISTINCT total POs)) * 100
-    # Amendment = change_indicator='U' (Update only — excludes I=Insert/creation, D=Delete)
-    # Also excludes release/approval field changes (FRGZU, FRGKE, FRGRL, FRGGR)
-    # Meaningful amendment fields: NETWR, NETPR, MATNR, MENGE, TXZ01, ERNAM, LOEKZ
+    # Numerator: distinct PO line items (purchasing_document + item) with at least one change
+    #   to MATNR / NETPR / NETWR / MENGE; change_indicator IN ('E','U')
+    # Join: change_log → po_dump on object_id = purchasing_document + company_code via po_dump
+    # Item match: CDPOS-TABKEY rightmost 5 chars (EBELP) stripped of leading zeros vs po_dump.item
+    #   Fallback: when table_key IS NULL (not yet uploaded), all items of amended PO are counted
+    # Denominator: all active PO line items (item level to match numerator grain)
     p7_amended = _run(conn, """
-        SELECT COUNT(DISTINCT cl.object_id)
-        FROM change_log cl
-        WHERE cl.object_class     = 'EINKBELEG'
-          AND cl.change_indicator  = 'U' 
-          AND cl.field_name NOT IN ('FRGZU','FRGKE','FRGRL','FRGGR') \
+        SELECT COUNT(DISTINCT po.purchasing_document || '|' || po.item)
+        FROM po_dump po
+        JOIN change_log cl
+          ON  cl.object_id        = po.purchasing_document
+         AND  cl.object_class     = 'EINKBELEG'
+         AND  cl.change_indicator IN ('E', 'U')
+         AND  cl.field_name       IN ('MATNR', 'NETPR', 'NETWR', 'MENGE')
+         AND  (
+               cl.table_key IS NULL
+               OR cl.table_key = ''
+               OR CAST(SUBSTR(cl.table_key, -5) AS INTEGER) = CAST(po.item AS INTEGER)
+              )
+        WHERE (po.deletion_indicator IS NULL OR po.deletion_indicator NOT IN ('L', 'X'))
     """)
     p7_total = _run(conn, """
-        SELECT COUNT(DISTINCT purchasing_document) FROM po_dump
+        SELECT COUNT(DISTINCT purchasing_document || '|' || item) FROM po_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
     """)
     p7 = round((p7_amended / p7_total * 100), 2) if p7_amended and p7_total else None
     _upsert(conn, "procurement", "PO_AMENDMENT_RATE", "PO Amendment Rate (%)", p7, None, "%")
 
-    # P8 — Open PR Aging > 7 days with NO matching PO at item level
-    # Spec: COUNT(PR items) WHERE release_status='X' AND age > 7d AND no active PO for that item
-    # Age anchor: COALESCE(created_on, release_date) — PR CSV lacks created_on
-    # Uses ref_date (latest data date) to work correctly on historical datasets
+    # P8 — Open PO Aging (overdue open PO line items, bucket distribution)
+    # Open PO = delivery_completed blank + order_qty != delivered_qty + not deleted
+    # Overdue = past po_delivery_dump.expected_delivery_date (EKET-EINDT)
+    # Delay = julianday(ref_date) - julianday(expected_delivery_date)
+    # ref_date used (not 'now') so historical datasets work correctly
+    _OPEN_PO_WHERE = f"""
+        FROM po_dump po
+        JOIN po_delivery_dump pod
+          ON pod.purchasing_document = po.purchasing_document
+         AND pod.item                = po.item
+        WHERE (po.delivery_completed IS NULL OR po.delivery_completed = '')
+          AND (po.deletion_indicator IS NULL OR po.deletion_indicator NOT IN ('L', 'X'))
+          AND CAST(po.order_quantity AS REAL) !=
+              CAST(COALESCE(NULLIF(po.delivered_quantity, ''), '0') AS REAL)
+          AND pod.expected_delivery_date IS NOT NULL AND pod.expected_delivery_date != ''
+          AND julianday('{ref_date}') - julianday(pod.expected_delivery_date) > 0
+    """
+
     p8 = _run(conn, f"""
-        SELECT COUNT(DISTINCT pr.purchase_requisition || '|' || pr.item_of_requisition)
-        FROM pr_dump pr
-        WHERE pr.release_status IN ('X','XX','XXX','XXXX','XXXXX')
-          AND (pr.deletion_indicator IS NULL OR pr.deletion_indicator = '')
-          AND COALESCE(NULLIF(pr.created_on,''), pr.release_date) IS NOT NULL
-          AND julianday('{ref_date}') - julianday(COALESCE(NULLIF(pr.created_on,''), pr.release_date)) > 7
-          AND NOT EXISTS (
-              SELECT 1 FROM po_dump po
-              WHERE po.purchase_requisition = pr.purchase_requisition
-                AND po.item_of_requisition  = pr.item_of_requisition
-                AND (po.deletion_indicator IS NULL OR po.deletion_indicator NOT IN ('L','X'))
-          )
+        SELECT COUNT(DISTINCT po.purchasing_document || '|' || po.item)
+        {_OPEN_PO_WHERE}
     """)
-    _upsert(conn, "procurement", "OPEN_PR_AGING", "Open PR Lines > 7 Days", p8, None, "count")
+    _upsert(conn, "procurement", "OPEN_PO_AGING", "Open PO Line Items (Overdue)", p8, None, "count")
+
+    # Bucket distribution stored as JSON for the bar chart
+    try:
+        bucket_row = conn.execute(f"""
+            SELECT
+                COUNT(DISTINCT CASE WHEN delay BETWEEN 1  AND 30  THEN key END),
+                COUNT(DISTINCT CASE WHEN delay BETWEEN 31 AND 60  THEN key END),
+                COUNT(DISTINCT CASE WHEN delay BETWEEN 61 AND 90  THEN key END),
+                COUNT(DISTINCT CASE WHEN delay > 90               THEN key END)
+            FROM (
+                SELECT po.purchasing_document || '|' || po.item AS key,
+                       CAST(julianday('{ref_date}') - julianday(pod.expected_delivery_date) AS INTEGER) AS delay
+                {_OPEN_PO_WHERE}
+            )
+        """).fetchone()
+        buckets = {
+            "1-30d":  int(bucket_row[0] or 0),
+            "31-60d": int(bucket_row[1] or 0),
+            "61-90d": int(bucket_row[2] or 0),
+            "90+d":   int(bucket_row[3] or 0),
+        }
+        _upsert(conn, "procurement", "OPEN_PO_AGING_BUCKETS",
+                "Open PO Aging Buckets", None, json.dumps(buckets), "json")
+    except Exception:
+        pass
 
     # P9 — Total PO Value YTD
     p9 = _run(conn, f"""
@@ -228,12 +273,12 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
     # MAVERICK_SPEND_RATE — POs without approved PR (frontend procurement card)
     mav_total = _run(conn, """
         SELECT COUNT(DISTINCT purchasing_document) FROM po_dump
-        WHERE deletion_indicator IS NULL OR deletion_indicator = ''
+        WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L', 'X'))
     """)
     mav_count = _run(conn, """
         SELECT COUNT(DISTINCT purchasing_document) FROM po_dump
         WHERE (purchase_requisition IS NULL OR purchase_requisition = '')
-          AND (deletion_indicator IS NULL OR deletion_indicator = '')
+          AND (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L', 'X'))
     """)
     mav_rate = round((mav_count / mav_total * 100), 2) if mav_count and mav_total else 0.0
     _upsert(conn, "procurement", "MAVERICK_SPEND_RATE", "Maverick Spend Rate (%)", mav_rate, None, "%")
@@ -866,6 +911,18 @@ def compute_chart_data(conn: sqlite3.Connection, dashboard: str) -> list[dict]:
             """).fetchall()
             results = [{"month": r[0], "total_value": round(r[1] or 0, 2),
                         "po_count": int(r[2] or 0), "maverick_value": round(r[3] or 0, 2)} for r in rows]
+
+            # Monthly deleted PO line items (item level, by created_on)
+            del_rows = conn.execute(f"""
+                SELECT strftime('%Y-%m', COALESCE(NULLIF(created_on,''), document_date)) AS month,
+                       COUNT(DISTINCT purchasing_document || '|' || item) AS deleted_lines
+                FROM po_dump
+                WHERE deletion_indicator = 'L'
+                  AND COALESCE(NULLIF(created_on,''), document_date) >= {cutoff}
+                GROUP BY month
+            """).fetchall()
+            del_by_month = {r[0]: int(r[1]) for r in del_rows}
+            results = [{**r, "deleted_lines": del_by_month.get(r["month"], 0)} for r in results]
 
         elif dashboard == "financial":
             # Monthly payments + invoice totals

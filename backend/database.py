@@ -23,5 +23,13 @@ def init_db():
     sql = (Path(__file__).parent / "schema.sql").read_text()
     conn = get_connection()
     conn.executescript(sql)
+    # Migration: add table_key (CDPOS-TABKEY) to change_log if not yet present.
+    # Contains concatenated MANDT(3)+EBELN(10)+EBELP(5); item = rightmost 5 chars stripped of leading zeros.
+    # Existing rows get NULL; item-level join in P7 activates only when data is uploaded with this column.
+    try:
+        conn.execute("ALTER TABLE change_log ADD COLUMN table_key TEXT")
+        conn.commit()
+    except Exception:
+        pass  # column already exists
     conn.commit()
     print("[DB] Schema initialised.")
