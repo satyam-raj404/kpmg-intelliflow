@@ -176,20 +176,18 @@ def build_facts(conn: sqlite3.Connection) -> None:
                   AND i2.debit_credit_ind   = 'H')
                  THEN 1 ELSE 0 END,
 
-            -- PR → PO days: COALESCE(po.created_on, po.document_date) - COALESCE(pr.created_on, pr.release_date)
-            CASE WHEN COALESCE(NULLIF(pr.created_on,''), pr.release_date) IS NOT NULL
-                      AND COALESCE(NULLIF(po.created_on,''), po.document_date) IS NOT NULL
-                 THEN CAST(
-                     julianday(COALESCE(NULLIF(po.created_on,''), po.document_date))
-                     - julianday(COALESCE(NULLIF(pr.created_on,''), pr.release_date))
-                 AS INTEGER)
+            -- PR → PO days: PO.created_on (EKKO-ERDAT) minus PR.created_on (EBAN-ERDAT); strict, no date fallback
+            CASE WHEN pr.created_on IS NOT NULL AND pr.created_on != ''
+                      AND po.created_on IS NOT NULL AND po.created_on != ''
+                 THEN CAST(julianday(po.created_on) - julianday(pr.created_on) AS INTEGER)
                  ELSE NULL END,
 
             NULL, NULL, NULL, NULL   -- cycle times filled in second pass
 
         FROM po_dump po
         LEFT JOIN pr_dump pr
-            ON po.purchase_requisition  = pr.purchase_requisition
+            ON po.company_code          = pr.company_code
+           AND po.purchase_requisition  = pr.purchase_requisition
            AND po.item_of_requisition   = pr.item_of_requisition
         LEFT JOIN po_delivery_dump pod
             ON pod.purchasing_document  = po.purchasing_document
@@ -201,6 +199,7 @@ def build_facts(conn: sqlite3.Connection) -> None:
             ON inv.purchasing_document  = po.purchasing_document
            AND inv.item                 = po.item
         WHERE (po.deletion_indicator IS NULL OR po.deletion_indicator = '')
+          AND (pr.deletion_indicator IS NULL OR pr.deletion_indicator != 'X')
         GROUP BY po.purchasing_document, po.item
     """)
 

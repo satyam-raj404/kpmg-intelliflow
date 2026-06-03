@@ -99,29 +99,17 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
     _upsert(conn, "procurement", "HIGH_VALUE_PO_COUNT",
             f"High-Value PO Count (>₹{int(high_value_threshold):,})", p3, None, "count")
 
-    # P4 — Avg PR-to-PO Conversion Time at ITEM LEVEL
-    # Spec: AVG(DATEDIFF(PO.created_on, PR.created_on)) at item level; MIN(PO date) per PR item
-    # PR CSV lacks created_on — COALESCE with release_date as fallback
-    # PO uses COALESCE(created_on, document_date) as fallback
+    # P4 — Avg PR-to-PO Conversion Time
+    # Join: PO ↔ PR on company_code + purchase_requisition + item_of_requisition (EKPO-BNFPO)
+    # Formula: AVG(PO.created_on − PR.created_on) in days; both dates are ERDAT (SAP creation date), no fallback
+    # Excludes: deleted PRs (EBAN-LOEKZ = 'X'), negative values, rows without a matched PR or PO
     p4 = _run(conn, """
-        SELECT AVG(CAST(min_po_days AS REAL))
-        FROM (
-            SELECT pr.purchase_requisition,
-                   pr.item_of_requisition,
-                   MIN(CAST(
-                       julianday(COALESCE(NULLIF(po.created_on,''), po.document_date))
-                       - julianday(COALESCE(NULLIF(pr.created_on,''), pr.release_date))
-                   AS INTEGER)) AS min_po_days
-            FROM pr_dump pr
-            JOIN po_dump po
-              ON po.purchase_requisition = pr.purchase_requisition
-             AND po.item_of_requisition  = pr.item_of_requisition
-            WHERE (po.deletion_indicator IS NULL OR po.deletion_indicator NOT IN ('L','X'))
-              AND COALESCE(NULLIF(pr.created_on,''), pr.release_date) IS NOT NULL
-              AND COALESCE(NULLIF(po.created_on,''), po.document_date) IS NOT NULL
-            GROUP BY pr.purchase_requisition, pr.item_of_requisition
-        )
-        WHERE min_po_days >= 0
+        SELECT AVG(CAST(pr_to_po_days AS REAL))
+        FROM pr_po_grn_invoice
+        WHERE pr_to_po_days IS NOT NULL
+          AND pr_to_po_days >= 0
+          AND purchase_requisition IS NOT NULL
+          AND purchasing_document  IS NOT NULL
     """)
     _upsert(conn, "procurement", "PR_TO_PO_DAYS", "Avg PR-to-PO Time (days)", p4, None, "days")
 
