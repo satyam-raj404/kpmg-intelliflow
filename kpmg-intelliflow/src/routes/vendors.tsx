@@ -51,13 +51,19 @@ function VendorDashboard() {
 
 function KpiRow() {
   const { isLoading } = useKpi("vendor");
+  // KPI 1 — Total Active Vendors (all 5 blocks clear)
   const v1 = useKpiValue("vendor", "ACTIVE_VENDOR_COUNT");
+  // KPI 2 — Vendor Compliance Rate + Breakdown
   const v2 = useKpiValue("vendor", "VENDOR_COMPLIANCE_RATE");
+  const vBreakdown = useKpiValue("vendor", "VENDOR_BREAKDOWN");
+  // KPI 3 — OTIF Rate
   const v3 = useKpiValue("vendor", "OTIF_RATE");
+  // KPI 4 — Avg Delivery Delay
   const v4 = useKpiValue("vendor", "AVG_DELIVERY_DELAY");
-  const v5 = useKpiValue("vendor", "SHORT_DELIVERY_RATE");
-  const v7 = useKpiValue("vendor", "BLOCKED_VENDOR_COUNT");
-  const v8 = useKpiValue("vendor", "VENDOR_MASTER_CHANGES");
+  // KPI 5 — Quantity Variance Rate
+  const v5 = useKpiValue("vendor", "QTY_VARIANCE_RATE");
+  // KPI 9 — MSME Vendor Count
+  const v9 = useKpiValue("vendor", "MSME_VENDOR_COUNT");
 
   const fmt = (v: number | null | undefined, unit: string | null | undefined) => {
     if (v == null) return isLoading ? "—" : "No data";
@@ -67,19 +73,105 @@ function KpiRow() {
     return v.toFixed(0);
   };
 
+  // Parse vendor breakdown JSON for sublabel
+  let breakdown: { active?: number; blocked?: number; one_time?: number; domestic?: number; international?: number; msme?: number; total?: number } = {};
+  if (vBreakdown?.value_text) {
+    try { breakdown = JSON.parse(vBreakdown.value_text); } catch {}
+  }
+  const bdSublabel = breakdown.total
+    ? `Active ${breakdown.active ?? 0} · Blocked ${breakdown.blocked ?? 0} · Domestic ${breakdown.domestic ?? 0} · Intl ${breakdown.international ?? 0} · One-time ${breakdown.one_time ?? 0}`
+    : "All 5 block flags · purchasing, posting, payment, CC";
+
   return (
     <>
+      {/* Row 1 — Vendor Status & Delivery */}
       <div className="grid grid-cols-4 gap-3">
-        <KpiCard label="Active Vendor Count" value={fmt(v1?.value_numeric, v1?.unit)} size="lg" sublabel="Not deleted, not purchasing-blocked" index={0} />
-        <KpiCard label="Vendor Compliance Rate" value={fmt(v2?.value_numeric, v2?.unit)} size="lg" sublabel="Not blocked & not deleted ÷ total" threshold={v2?.value_numeric != null && v2.value_numeric < 90 ? { label: "Below 90%", tone: "warning" } : { label: "Good", tone: "success" }} index={1} />
-        <KpiCard label="OTIF Rate" value={fmt(v3?.value_numeric, v3?.unit)} size="lg" sublabel="On-time & in-full deliveries" threshold={v3?.value_numeric != null && v3.value_numeric < 80 ? { label: "Below 80% target", tone: "danger" } : { label: "On target", tone: "success" }} index={2} />
-        <KpiCard label="Avg Delivery Delay" value={fmt(v4?.value_numeric, v4?.unit)} size="lg" sublabel="Late deliveries only (days past expected)" index={3} />
+        <KpiCard
+          label="Total Active Vendors"
+          value={fmt(v1?.value_numeric, v1?.unit)}
+          sublabel="All 5 blocks clear: purchasing, posting (central + CC), payment, deletion"
+          size="lg"
+          index={0}
+        />
+        <KpiCard
+          label="Vendor Compliance Rate"
+          value={fmt(v2?.value_numeric, v2?.unit)}
+          sublabel={bdSublabel}
+          size="lg"
+          threshold={
+            v2?.value_numeric != null && v2.value_numeric < 95
+              ? { label: "Below 95% target", tone: "warning" }
+              : { label: "On target (> 95%)", tone: "success" }
+          }
+          index={1}
+        />
+        <KpiCard
+          label="OTIF Rate"
+          value={fmt(v3?.value_numeric, v3?.unit)}
+          sublabel="On-time GRN ÷ delivery-completed POs · GRN posting_date ≤ expected_delivery_date"
+          size="lg"
+          threshold={
+            v3?.value_numeric != null && v3.value_numeric < 90
+              ? { label: "Below 90% target", tone: "danger" }
+              : v3?.value_numeric != null
+              ? { label: "On target (> 90%)", tone: "success" }
+              : undefined
+          }
+          index={2}
+        />
+        <KpiCard
+          label="Avg Delivery Delay"
+          value={fmt(v4?.value_numeric, v4?.unit)}
+          sublabel="Late deliveries only · AVG(GRN posting_date − expected_delivery_date)"
+          size="lg"
+          threshold={
+            v4?.value_numeric != null && v4.value_numeric > 3
+              ? { label: "> 3d target", tone: "danger" }
+              : v4?.value_numeric != null
+              ? { label: "Within target (≤ 3d)", tone: "success" }
+              : undefined
+          }
+          index={3}
+        />
       </div>
+
+      {/* Row 2 — Variance, MSME, Spend */}
       <div className="grid grid-cols-4 gap-3 mt-3">
-        <KpiCard label="Short Delivery Rate" value={fmt(v5?.value_numeric, v5?.unit)} size="md" sublabel="GRN qty < 95% of scheduled qty" threshold={v5?.value_numeric != null && v5.value_numeric > 10 ? { label: "> 10% threshold", tone: "warning" } : { label: "Acceptable", tone: "success" }} index={4} />
-        <KpiCard label="Blocked Vendor Count" value={fmt(v7?.value_numeric, v7?.unit)} size="md" sublabel="central_purchasing_block or posting_block = X" threshold={v7?.value_numeric != null && v7.value_numeric > 0 ? { label: "Review required", tone: "danger" } : undefined} index={5} />
-        <KpiCard label="Vendor Master Changes" value={fmt(v8?.value_numeric, v8?.unit)} size="md" sublabel="KRED object changes this month" index={6} />
-        <KpiCard label="Top Vendor Spend" value="See chart →" size="md" sublabel="Top-10 by spend share" index={7} />
+        <KpiCard
+          label="Quantity Variance Rate"
+          value={fmt(v5?.value_numeric, v5?.unit)}
+          sublabel="Net GRN qty < PO order_qty · multiple GRNs netted for Db/Cr indicator"
+          size="md"
+          threshold={
+            v5?.value_numeric != null && v5.value_numeric > 5
+              ? { label: "> 5% target", tone: "danger" }
+              : v5?.value_numeric != null
+              ? { label: "Within target (< 5%)", tone: "success" }
+              : undefined
+          }
+          index={4}
+        />
+        <KpiCard
+          label="MSME Vendor Count"
+          value={fmt(v9?.value_numeric, v9?.unit)}
+          sublabel="msme_flag = M (Micro) or S (Small) · active vendors only"
+          size="md"
+          index={5}
+        />
+        <KpiCard
+          label="Vendor Spend Analysis"
+          value="See chart →"
+          sublabel="Top-10 vendors by PO value · spend concentration risk"
+          size="md"
+          index={6}
+        />
+        <KpiCard
+          label="Vendor Type Mix"
+          value={breakdown.total ? `${breakdown.domestic ?? 0}D · ${breakdown.international ?? 0}I · ${breakdown.one_time ?? 0}OT` : isLoading ? "—" : "No data"}
+          sublabel="Domestic · International · One-time vendors"
+          size="md"
+          index={7}
+        />
       </div>
     </>
   );
@@ -87,9 +179,11 @@ function KpiRow() {
 
 function OTIFTrend() {
   const { data, isLoading } = useCharts("vendor");
-  const chartData = (data?.series ?? []).map((p) => ({
-    month: p.month ?? "",
-    otif: (p.otif_pct as number) ?? 0,
+  const raw = data?.series as unknown as { otif?: Array<{ month: string; otif_pct: number }> };
+  const otifSeries = Array.isArray(data?.series) ? data.series : (raw?.otif ?? []);
+  const chartData = otifSeries.map((p) => ({
+    month: (p as { month?: string }).month ?? "",
+    otif: ((p as { otif_pct?: number }).otif_pct) ?? 0,
   }));
 
   return (

@@ -68,11 +68,20 @@ def _upsert(conn, dashboard, kpi_code, kpi_name, value_numeric, value_text, unit
 def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
 
     # P1 — Total PO Value MTD
+<<<<<<< Updated upstream
+=======
+    # Formula: SUM(net_order_value) WHERE creation date in current month AND deletion_indicator != 'L'
+    # Uses COALESCE(created_on, document_date) — created_on=ERDAT preferred; document_date=BEDAT fallback
+>>>>>>> Stashed changes
     p1 = _run(conn, f"""
         SELECT SUM(CAST(net_order_value AS REAL))
         FROM po_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+<<<<<<< Updated upstream
           AND document_date >= {MTD}
+=======
+          AND COALESCE(NULLIF(created_on,''), document_date) >= {MTD}
+>>>>>>> Stashed changes
     """)
     _upsert(conn, "procurement", "TOTAL_PO_VALUE_MTD", "Total PO Value (MTD)", p1, None, "INR")
 
@@ -96,6 +105,7 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
     _upsert(conn, "procurement", "HIGH_VALUE_PO_COUNT",
             f"High-Value PO Count (>₹{int(high_value_threshold):,})", p3, None, "count")
 
+<<<<<<< Updated upstream
     # P4 — Avg PR-to-PO Conversion Time (ITEM level: PR release_date → PO document_date)
     p4 = _run(conn, """
         SELECT AVG(CAST(pr_to_po_days AS REAL))
@@ -104,11 +114,37 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
           AND pr_to_po_days >= 0
           AND purchase_requisition IS NOT NULL
           AND purchasing_document  IS NOT NULL
+=======
+    # P4 — Avg PR-to-PO Conversion Time at ITEM LEVEL
+    # Spec: AVG(DATEDIFF(PO.created_on, PR.created_on)) at item level; MIN(PO date) per PR item
+    # PR CSV lacks created_on — COALESCE with release_date as fallback
+    # PO uses COALESCE(created_on, document_date) as fallback
+    p4 = _run(conn, """
+        SELECT AVG(CAST(min_po_days AS REAL))
+        FROM (
+            SELECT pr.purchase_requisition,
+                   pr.item_of_requisition,
+                   MIN(CAST(
+                       julianday(COALESCE(NULLIF(po.created_on,''), po.document_date))
+                       - julianday(COALESCE(NULLIF(pr.created_on,''), pr.release_date))
+                   AS INTEGER)) AS min_po_days
+            FROM pr_dump pr
+            JOIN po_dump po
+              ON po.purchase_requisition = pr.purchase_requisition
+             AND po.item_of_requisition  = pr.item_of_requisition
+            WHERE (po.deletion_indicator IS NULL OR po.deletion_indicator NOT IN ('L','X'))
+              AND COALESCE(NULLIF(pr.created_on,''), pr.release_date) IS NOT NULL
+              AND COALESCE(NULLIF(po.created_on,''), po.document_date) IS NOT NULL
+            GROUP BY pr.purchase_requisition, pr.item_of_requisition
+        )
+        WHERE min_po_days >= 0
+>>>>>>> Stashed changes
     """)
     _upsert(conn, "procurement", "PR_TO_PO_DAYS", "Avg PR-to-PO Time (days)", p4, None, "days")
 
     # P5 — PO Approval Cycle Time (PO document_date → release date from change_log)
     p5 = _run(conn, """
+<<<<<<< Updated upstream
         SELECT AVG(CAST(julianday(cl.change_date) - julianday(po.document_date) AS REAL))
         FROM po_dump po
         JOIN change_log cl
@@ -118,12 +154,24 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
          AND cl.change_indicator = 'U'
          AND cl.new_value    = 'X'
         WHERE po.release_indicator = 'X'
+=======
+        SELECT AVG(CAST(julianday(cl.change_date) - julianday(po.created_on) AS REAL))
+        FROM po_dump po #Remove Deleted POs from dump entirely
+        JOIN change_log cl
+          ON cl.object_id       = po.purchasing_document
+         AND cl.object_class    = 'EINKBELEG'
+         AND cl.field_name      IN ('FRGZU','FRGKE') #FRGKE is not important, could give unnecessary 
+         AND cl.change_indicator = 'U' #Could be E or U
+         AND cl.new_value        = 'X'
+        WHERE po.release_indicator = 'X' # Has to be Like X percentage, not X value
+          AND po.created_on IS NOT NULL AND po.created_on != ''
+>>>>>>> Stashed changes
     """)
     _upsert(conn, "procurement", "PO_APPROVAL_CYCLE", "PO Approval Cycle (days)", p5, None, "days")
 
     # P6 — PO Deletion Rate MTD
     p6 = _run(conn, f"""
-        SELECT COUNT(DISTINCT purchasing_document)
+        SELECT COUNT(DISTINCT purchasing_document) # With Append of Item Number, give info that PO Count is item level
         FROM po_dump
         WHERE deletion_indicator = 'L'
           AND document_date >= {MTD}
@@ -135,9 +183,15 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
     p7_amended = _run(conn, """
         SELECT COUNT(DISTINCT cl.object_id)
         FROM change_log cl
+<<<<<<< Updated upstream
         WHERE cl.object_class    = 'EINKBELEG'
           AND cl.change_indicator = 'U'
           AND cl.field_name NOT IN ('FRGZU','FRGKE')  -- exclude release approvals
+=======
+        WHERE cl.object_class     = 'EINKBELEG'
+          AND cl.change_indicator  = 'U' # Should be E or U
+          AND cl.field_name IN ('FRGZU','FRGKE','FRGRL','FRGGR') #Should be in Material, Net Order Price, Value & Quantity Both of these tables have to be joined basis 3 parameters 1) Company Code, 2) Purchasing Document Number, 3) Item Number (Table Key column in Chang Log, value will be concatenated (Company Code, PO Code, Item Code), will be needed to split)
+>>>>>>> Stashed changes
     """)
     p7_total = _run(conn, """
         SELECT COUNT(DISTINCT purchasing_document) FROM po_dump
@@ -147,14 +201,25 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
     _upsert(conn, "procurement", "PO_AMENDMENT_RATE", "PO Amendment Rate (%)", p7, None, "%")
 
     # P8 — Open PR Aging > 7 days with NO matching PO at item level
+<<<<<<< Updated upstream
     # Uses ref_date (latest data date) not actual 'now' — prevents all-zero on historical data
+=======
+    # Spec: COUNT(PR items) WHERE release_status='X' AND age > 7d AND no active PO for that item
+    # Age anchor: COALESCE(created_on, release_date) — PR CSV lacks created_on
+    # Uses ref_date (latest data date) to work correctly on historical datasets
+>>>>>>> Stashed changes
     p8 = _run(conn, f"""
         SELECT COUNT(DISTINCT pr.purchase_requisition || '|' || pr.item_of_requisition)
         FROM pr_dump pr
         WHERE pr.release_status IN ('X','XX','XXX','XXXX','XXXXX')
           AND (pr.deletion_indicator IS NULL OR pr.deletion_indicator = '')
+<<<<<<< Updated upstream
           AND pr.release_date IS NOT NULL
           AND julianday('{ref_date}') - julianday(pr.release_date) > 7
+=======
+          AND COALESCE(NULLIF(pr.created_on,''), pr.release_date) IS NOT NULL
+          AND julianday('{ref_date}') - julianday(COALESCE(NULLIF(pr.created_on,''), pr.release_date)) > 7
+>>>>>>> Stashed changes
           AND NOT EXISTS (
               SELECT 1 FROM po_dump po
               WHERE po.purchase_requisition = pr.purchase_requisition
@@ -182,8 +247,19 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
 
     # ── Frontend-expected aliases ─────────────────────────────────────────────
 
+<<<<<<< Updated upstream
     # PO_COUNT_MTD — total PO lines created this month (frontend uses this code)
     _upsert(conn, "procurement", "PO_COUNT_MTD", "PO Count (MTD)", p2, None, "count")
+=======
+    # PO_COUNT_MTD — distinct POs with creation date in current month
+    po_count_mtd = _run(conn, f"""
+        SELECT COUNT(DISTINCT purchasing_document)
+        FROM po_dump
+        WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+          AND COALESCE(NULLIF(created_on,''), document_date) >= {MTD}
+    """)
+    _upsert(conn, "procurement", "PO_COUNT_MTD", "PO Count (MTD)", po_count_mtd, None, "count")
+>>>>>>> Stashed changes
 
     # AVG_PO_VALUE — average net_order_value MTD
     avg_po = _run(conn, f"""
@@ -230,52 +306,57 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
 
 def _financial(conn, FY, MTD):
 
-    # F1 — Total Spend YTD: sum of RE + KR invoices, D/C adjusted
-    #       RE = PO invoices, KR = non-PO invoices; RN = cancellations (excluded)
+    # F1 — Total Spend YTD
+    # Spec: SUM of PO invoices (RE) + Non-PO invoices (KR) minus Cancellations (RN)
+    # RN amounts are stored as negative in the DB — include them naturally (no sign flip needed)
+    # No amount>0 filter — credit memos within RE/KR must also be included
     f1 = _run(conn, f"""
-        SELECT SUM(
-            CASE WHEN document_type IN ('RE','KR')
-                 THEN CAST(amount_local_ccy AS REAL)
-                 ELSE 0 END
-        )
+        SELECT SUM(CAST(amount_local_ccy AS REAL))
         FROM invoice_dump
-        WHERE document_type IN ('RE','KR')
-          AND CAST(amount_local_ccy AS REAL) > 0
+        WHERE document_type IN ('RE','KR','RN')
           AND posting_date >= {FY}
     """)
     _upsert(conn, "financial", "TOTAL_SPEND_YTD", "Total Spend YTD (Invoices)", f1, None, "INR")
 
     # F2 — Invoice Cancellation Rate
-    f2_cancelled = _run(conn, f"""
-        SELECT COUNT(*) FROM invoice_dump
-        WHERE document_type = 'RN'
-           OR CAST(amount_local_ccy AS REAL) < 0
+    # Spec: Cancelled (RN) / Total (RE+KR+RN) * 100
+    # Only RN type = true cancellations; denominator = all invoice transactions
+    f2_cancelled = _run(conn, """
+        SELECT COUNT(*) FROM invoice_dump WHERE document_type = 'RN'
     """)
-    f2_total = _run(conn, "SELECT COUNT(*) FROM invoice_dump")
+    f2_total = _run(conn, """
+        SELECT COUNT(*) FROM invoice_dump WHERE document_type IN ('RE','KR','RN')
+    """)
     f2 = round((f2_cancelled / f2_total * 100), 2) if f2_cancelled and f2_total else 0.0
     _upsert(conn, "financial", "INVOICE_CANCELLATION_RATE", "Invoice Cancellation Rate (%)", f2, None, "%")
 
     # F3 — 3-Way Match Success Rate
-    #       Match: net GRN qty ≈ Invoice qty (within 5%)
+    # Spec: PO line qty == SUM(net GRN qty) — GRN debit_credit_ind already netted in fact table
+    # grn_quantity in pr_po_grn_invoice = S receipts - H returns (net)
+    # Match = ABS(grn_quantity - po_quantity) / po_quantity <= 5%
     f3 = _run(conn, """
         SELECT COUNT(CASE
-            WHEN ABS(COALESCE(f.grn_quantity,0) - COALESCE(f.invoice_quantity,0))
-                 / NULLIF(ABS(COALESCE(f.invoice_quantity,0)), 0) <= 0.05
+            WHEN ABS(COALESCE(f.grn_quantity, 0) - CAST(f.po_quantity AS REAL))
+                 / NULLIF(ABS(CAST(f.po_quantity AS REAL)), 0) <= 0.05
             THEN 1 END) * 100.0
-            / NULLIF(COUNT(CASE WHEN f.invoice_quantity IS NOT NULL THEN 1 END), 0)
+            / NULLIF(COUNT(CASE WHEN f.po_quantity IS NOT NULL AND f.po_quantity > 0 THEN 1 END), 0)
         FROM pr_po_grn_invoice f
-        WHERE f.invoice_quantity IS NOT NULL
-          AND f.grn_quantity    IS NOT NULL
+        WHERE f.purchasing_document IS NOT NULL
+          AND f.po_quantity IS NOT NULL
+          AND f.grn_quantity IS NOT NULL
     """)
     _upsert(conn, "financial", "THREE_WAY_MATCH_RATE", "3-Way Match Success Rate (%)", f3, None, "%")
 
-    # F4 — Invoice Processing Cycle Time: vendor_invoice_date → clearing_date
+    # F4 — Invoice Processing Cycle Time: vendor_invoice_date → payment clearing_date
+    # Spec: AVG(DATEDIFF(Payment_Dump.clearing_date, Invoice_Dump.vendor_invoice_date))
+    # Join: payment_dump.cleared_invoice = invoice_dump.invoice_doc
+    # Note: invoice_dump.clearing_doc ≠ payment_dump.payment_doc (different numbering ranges)
     f4 = _run(conn, """
         SELECT AVG(julianday(p.clearing_date) - julianday(i.vendor_invoice_date))
         FROM invoice_dump i
-        JOIN payment_dump p ON i.clearing_doc = p.payment_doc
+        JOIN payment_dump p ON p.cleared_invoice = i.invoice_doc
         WHERE i.vendor_invoice_date IS NOT NULL
-          AND p.clearing_date       IS NOT NULL
+          AND p.clearing_date IS NOT NULL
     """)
     _upsert(conn, "financial", "INVOICE_PROCESSING_DAYS", "Invoice Processing Time (days)", f4, None, "days")
 
@@ -364,14 +445,15 @@ def _financial(conn, FY, MTD):
 
 def _leadership(conn, FY, MTD, high_value_threshold):
 
-    # L1 — Total Procurement Value YTD (committed PO value)
+    # L1 — Total Procurement Value YTD (committed PO value — NOT invoice spend)
+    # Uses distinct kpi_code TOTAL_PROCUREMENT_YTD to avoid conflict with financial.TOTAL_SPEND_YTD
     l1 = _run(conn, f"""
         SELECT SUM(CAST(net_order_value AS REAL))
         FROM po_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
           AND document_date >= {FY}
     """)
-    _upsert(conn, "leadership", "TOTAL_SPEND_YTD", "Total Procurement Value (YTD)", l1, None, "INR")
+    _upsert(conn, "leadership", "TOTAL_PROCUREMENT_YTD", "Total Procurement Value (YTD)", l1, None, "INR")
 
     # L2 — Maverick PO Rate
     l2 = _run(conn, """
@@ -513,45 +595,69 @@ def _vendor(conn, FY, MTD):
     """)
     _upsert(conn, "vendor", "ACTIVE_VENDOR_COUNT", "Active Vendor Count", v1, None, "count")
 
-    # V2 — Vendor Type Breakdown (JSON: active, blocked, one_time, domestic, international, msme)
+    # V2 — Vendor Breakdown (JSON: active, blocked/non-active, one_time, domestic, international, msme, total)
+    # All 5 block flags checked for active status
     try:
         rows = conn.execute("""
             SELECT
-                SUM(CASE WHEN (central_purchasing_block IS NULL OR central_purchasing_block='')
-                           AND (deletion_flag_central IS NULL OR deletion_flag_central='')
-                           AND (payment_block IS NULL OR payment_block='') THEN 1 ELSE 0 END),
+                SUM(CASE WHEN (central_purchasing_block IS NULL OR central_purchasing_block NOT IN ('X'))
+                           AND (central_posting_block   IS NULL OR central_posting_block   NOT IN ('X'))
+                           AND (deletion_flag_central   IS NULL OR deletion_flag_central   NOT IN ('X'))
+                           AND (payment_block           IS NULL OR payment_block           NOT IN ('*'))
+                           AND (posting_block_cc        IS NULL OR posting_block_cc        NOT IN ('X'))
+                         THEN 1 ELSE 0 END)  AS active,
                 SUM(CASE WHEN central_purchasing_block='X' OR payment_block='*'
-                              OR central_posting_block='X' THEN 1 ELSE 0 END),
-                SUM(CASE WHEN vendor_type='ONE_TIME'      THEN 1 ELSE 0 END),
-                SUM(CASE WHEN vendor_type='DOMESTIC'      THEN 1 ELSE 0 END),
-                SUM(CASE WHEN vendor_type='INTERNATIONAL' THEN 1 ELSE 0 END),
-                SUM(CASE WHEN msme_flag IN ('M','S')      THEN 1 ELSE 0 END),
-                COUNT(*)
+                              OR central_posting_block='X' OR posting_block_cc='X'
+                              OR deletion_flag_central='X'
+                         THEN 1 ELSE 0 END)  AS blocked,
+                SUM(CASE WHEN UPPER(COALESCE(vendor_type,'')) = 'ONE_TIME'      THEN 1 ELSE 0 END) AS one_time,
+                SUM(CASE WHEN UPPER(COALESCE(vendor_type,'')) = 'DOMESTIC'      THEN 1 ELSE 0 END) AS domestic,
+                SUM(CASE WHEN UPPER(COALESCE(vendor_type,'')) = 'INTERNATIONAL' THEN 1 ELSE 0 END) AS international,
+                SUM(CASE WHEN msme_flag IN ('M','S')          THEN 1 ELSE 0 END) AS msme,
+                COUNT(*) AS total
             FROM vendor_master
         """).fetchone()
         breakdown = {
-            "active": int(rows[0] or 0),    "blocked": int(rows[1] or 0),
-            "one_time": int(rows[2] or 0),  "domestic": int(rows[3] or 0),
-            "international": int(rows[4] or 0), "msme": int(rows[5] or 0),
-            "total": int(rows[6] or 0),
+            "active":        int(rows[0] or 0),
+            "blocked":       int(rows[1] or 0),
+            "one_time":      int(rows[2] or 0),
+            "domestic":      int(rows[3] or 0),
+            "international": int(rows[4] or 0),
+            "msme":          int(rows[5] or 0),
+            "total":         int(rows[6] or 0),
         }
         _upsert(conn, "vendor", "VENDOR_BREAKDOWN", "Vendor Type Breakdown",
                 None, json.dumps(breakdown), "json")
     except Exception:
         pass
 
-    # V3 — OTIF Rate: GRN posting_date ≤ expected_delivery_date AND net GRN qty ≥ 95% of scheduled
-    v3 = _run(conn, """
-        SELECT COUNT(CASE
-            WHEN grn.posting_date <= pod.expected_delivery_date
-             AND CAST(grn.quantity AS REAL) >= CAST(pod.scheduled_quantity AS REAL) * 0.95
-            THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0)
-        FROM po_delivery_dump pod
+    # V3 — OTIF Rate
+    # Spec: COUNT(POs where first GRN posting_date ≤ expected_delivery_date)
+    #       / COUNT(POs where delivery_completed='X')
+    # Numerator: PO lines with at least one on-time GRN receipt
+    # Denominator: fully delivered PO lines (delivery_completed='X')
+    # Numerator: fully-delivered PO lines where first GRN receipt was on or before expected date
+    # Denominator: all fully-delivered PO lines (delivery_completed='X')
+    # Both use delivery_completed='X' to keep numerator ≤ denominator (rate stays 0-100%)
+    v3_num = _run(conn, """
+        SELECT COUNT(DISTINCT po.purchasing_document || '|' || po.item)
+        FROM po_dump po
+        JOIN po_delivery_dump pod
+          ON pod.purchasing_document = po.purchasing_document
+         AND pod.item               = po.item
         JOIN grn_dump grn
-          ON grn.purchasing_document = pod.purchasing_document
-         AND grn.item               = pod.item
-        WHERE grn.debit_credit_ind = 'S'
+          ON grn.purchasing_document = po.purchasing_document
+         AND grn.item               = po.item
+         AND grn.debit_credit_ind   = 'S'
+        WHERE po.delivery_completed = 'X'
+          AND grn.posting_date <= pod.expected_delivery_date
     """)
+    v3_den = _run(conn, """
+        SELECT COUNT(DISTINCT purchasing_document || '|' || item)
+        FROM po_dump
+        WHERE delivery_completed = 'X'
+    """)
+    v3 = round((v3_num / v3_den * 100), 2) if v3_num and v3_den else None
     _upsert(conn, "vendor", "OTIF_RATE", "OTIF Rate (%)", v3, None, "%")
 
     # V4 — Average Delivery Delay (late deliveries only)
@@ -566,15 +672,18 @@ def _vendor(conn, FY, MTD):
     """)
     _upsert(conn, "vendor", "AVG_DELIVERY_DELAY", "Avg Delivery Delay (days, late only)", v4, None, "days")
 
-    # V5 — Quantity Variance Rate: net GRN qty < 95% of PO order_quantity
-    #       Uses SUM of GRN (S) minus returns (H) per PO line vs PO quantity
+    # V5 — Quantity Variance Rate
+    # Spec: COUNT(PO lines where net GRN qty < PO order_qty) / COUNT(all GRN lines) × 100
+    # Multiple GRNs per PO → use net qty (S receipts - H returns) already in fact table
+    # No tolerance threshold — any shortfall (net GRN < PO qty) counts as variance
     v5 = _run(conn, """
         SELECT COUNT(CASE
-            WHEN COALESCE(f.grn_quantity, 0) < CAST(f.po_quantity AS REAL) * 0.95
-            THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0)
+            WHEN COALESCE(f.grn_quantity, 0) < CAST(f.po_quantity AS REAL)
+            THEN 1 END) * 100.0
+            / NULLIF(COUNT(CASE WHEN f.grn_quantity IS NOT NULL THEN 1 END), 0)
         FROM pr_po_grn_invoice f
         WHERE f.purchasing_document IS NOT NULL
-          AND f.po_quantity IS NOT NULL
+          AND f.po_quantity IS NOT NULL AND f.po_quantity > 0
     """)
     _upsert(conn, "vendor", "QTY_VARIANCE_RATE", "Quantity Variance Rate (%)", v5, None, "%")
 
@@ -613,8 +722,12 @@ def _vendor(conn, FY, MTD):
     """)
     _upsert(conn, "vendor", "BLOCKED_VENDOR_COUNT", "Blocked Vendor Count", v7, None, "count")
 
-    # V8 — MSME Vendor Count
-    v8 = _run(conn, "SELECT COUNT(*) FROM vendor_master WHERE msme_flag IN ('M','S')")
+    # V9 — MSME Vendor Count (Micro/Small enterprises — msme_flag IN ('M','S'))
+    v8 = _run(conn, """
+        SELECT COUNT(*) FROM vendor_master
+        WHERE msme_flag IN ('M','S')
+          AND (deletion_flag_central IS NULL OR deletion_flag_central = '')
+    """)
     _upsert(conn, "vendor", "MSME_VENDOR_COUNT", "MSME Vendor Count", v8, None, "count")
 
     # V9 — Vendor Compliance Rate (all 5 blocks clear ÷ total)

@@ -176,10 +176,13 @@ def build_facts(conn: sqlite3.Connection) -> None:
                   AND i2.debit_credit_ind   = 'H')
                  THEN 1 ELSE 0 END,
 
-            -- PR → PO days (item level: from PR release_date to PO document_date)
-            CASE WHEN pr.release_date IS NOT NULL
-                      AND po.document_date IS NOT NULL
-                 THEN CAST(julianday(po.document_date) - julianday(pr.release_date) AS INTEGER)
+            -- PR → PO days: COALESCE(po.created_on, po.document_date) - COALESCE(pr.created_on, pr.release_date)
+            CASE WHEN COALESCE(NULLIF(pr.created_on,''), pr.release_date) IS NOT NULL
+                      AND COALESCE(NULLIF(po.created_on,''), po.document_date) IS NOT NULL
+                 THEN CAST(
+                     julianday(COALESCE(NULLIF(po.created_on,''), po.document_date))
+                     - julianday(COALESCE(NULLIF(pr.created_on,''), pr.release_date))
+                 AS INTEGER)
                  ELSE NULL END,
 
             NULL, NULL, NULL, NULL   -- cycle times filled in second pass

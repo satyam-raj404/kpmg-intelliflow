@@ -162,7 +162,7 @@ function LeadershipDashboard() {
 
 function KpiRow() {
   const { isLoading } = useKpi("leadership");
-  const l1  = useKpiValue("leadership", "TOTAL_SPEND_YTD");
+  const l1  = useKpiValue("leadership", "TOTAL_PROCUREMENT_YTD");
   const l2  = useKpiValue("leadership", "MAVERICK_BUY_RATE");
   const l3  = useKpiValue("leadership", "E2E_CYCLE_TIME");
   const l4  = useKpiValue("leadership", "VENDOR_CONCENTRATION");

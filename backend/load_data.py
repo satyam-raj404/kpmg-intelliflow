@@ -48,6 +48,9 @@ def load_vendor_master(conn, rows: list[dict]):
             _v(r, "company_code"),
             _v(r, "payment_terms"),
             _v(r, "payment_block"),
+            _v(r, "posting_block_cc"),   # company-code level posting block
+            _v(r, "msme_flag"),           # M=Micro, S=Small, blank=non-MSME
+            _v(r, "vendor_type"),         # DOMESTIC / INTERNATIONAL / ONE_TIME
             BATCH,
         ))
     conn.executemany("""
@@ -55,8 +58,9 @@ def load_vendor_master(conn, rows: list[dict]):
         (vendor, vendor_name, country, city, postal_code, region,
          account_group, tax_number_pan, tax_number_gstin,
          central_purchasing_block, central_posting_block, deletion_flag_central,
-         company_code, payment_terms, payment_block, upload_batch_id)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         company_code, payment_terms, payment_block,
+         posting_block_cc, msme_flag, vendor_type, upload_batch_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     """, data)
     print(f"  [vendor_master] {len(data)} rows")
 
@@ -109,6 +113,9 @@ def load_po_dump(conn, rows: list[dict]):
             _v(r, "vendor"),
             _v(r, "vendor_name"),
             _v(r, "document_date"),
+            _v(r, "created_on"),       # EKKO-ERDAT (PO creation date)
+            _v(r, "created_by"),       # EKKO-ERNAM
+            _v(r, "company_code"),
             _v(r, "plant"),
             _v(r, "material_group"),
             _v(r, "material_description"),
@@ -117,9 +124,12 @@ def load_po_dump(conn, rows: list[dict]):
             _v(r, "net_order_price"),
             _v(r, "net_order_value"),
             _v(r, "purchase_requisition"),
+            _v(r, "item_of_requisition"),  # FK to pr_dump — required for PR-PO join
             _v(r, "release_indicator"),
             _v(r, "release_strategy"),
             _v(r, "delivery_completed"),
+            _v(r, "deletion_indicator"),
+            _v(r, "capex_opex_flag", "OPEX"),
             BATCH,
         ))
     conn.executemany("""
@@ -127,13 +137,15 @@ def load_po_dump(conn, rows: list[dict]):
         (purchasing_document, item,
          purchasing_doc_type, purchasing_org, purchasing_group,
          vendor, vendor_name,
-         document_date, plant,
+         document_date, created_on, created_by, company_code, plant,
          material_group, material_description,
          order_quantity, unit_of_measure,
          net_order_price, net_order_value,
-         purchase_requisition, release_indicator, release_strategy,
-         delivery_completed, upload_batch_id)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         purchase_requisition, item_of_requisition,
+         release_indicator, release_strategy,
+         delivery_completed, deletion_indicator,
+         capex_opex_flag, upload_batch_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     """, data)
     print(f"  [po_dump] {len(data)} rows")
 

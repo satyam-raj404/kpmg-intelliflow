@@ -93,10 +93,69 @@ function KpiRow() {
         <KpiCard label="Open PR Aging" value={fmt(p4?.value_numeric, p4?.unit)} size="lg" sublabel="PRs past delivery date without PO" threshold={p4?.value_numeric ? { label: "Needs attention", tone: "warning" } : undefined} index={3} />
       </div>
       <div className="grid grid-cols-4 gap-3 mt-3">
+<<<<<<< Updated upstream
         <KpiCard label="Maverick Spend Rate" value={fmt(p5?.value_numeric, p5?.unit)} size="md" sublabel="POs without approved PR" threshold={p5?.value_numeric != null && p5.value_numeric > 20 ? { label: "> 20% threshold", tone: "danger" } : { label: "Within target", tone: "success" }} index={4} />
         <KpiCard label="High-Value PO Rate" value={fmt(p6?.value_numeric, p6?.unit)} size="md" sublabel="POs above ₹1 Cr" index={5} />
         <KpiCard label="Total PO Value (YTD)" value={fmt(p7?.value_numeric, p7?.unit)} size="md" sublabel="Sum of active PO values this FY" index={6} />
         <KpiCard label="Active Vendors (YTD)" value={fmt(p8?.value_numeric, p8?.unit)} size="md" sublabel="Distinct vendors on POs this FY" index={7} />
+=======
+        <KpiCard
+          label="Avg PR→PO Time"
+          value={fmt(p4?.value_numeric, p4?.unit)}
+          sublabel="AVG days from PR created_on to first PO created_on · item level"
+          size="md"
+          threshold={
+            p4?.value_numeric != null && p4.value_numeric > 5
+              ? { label: "> 5d target", tone: "danger" }
+              : p4?.value_numeric != null
+              ? { label: "Within target (≤ 5d)", tone: "success" }
+              : undefined
+          }
+          index={4}
+        />
+        <KpiCard
+          label="PO Cycle Time"
+          value={fmt(p5?.value_numeric, p5?.unit)}
+          sublabel="AVG days from PO created_on to approval (change_log FRGZU=X)"
+          size="md"
+          threshold={
+            p5?.value_numeric != null && p5.value_numeric > 3
+              ? { label: "> 3d target", tone: "warning" }
+              : p5?.value_numeric != null
+              ? { label: "Within target (≤ 3d)", tone: "success" }
+              : undefined
+          }
+          index={5}
+        />
+        <KpiCard
+          label="PO Deletions (MTD)"
+          value={fmt(p6?.value_numeric, p6?.unit)}
+          sublabel="deletion_indicator = L · current month only · see table below for all-time"
+          size="md"
+          threshold={
+            p6?.value_numeric != null && p6.value_numeric > 5
+              ? { label: "> 5 target", tone: "danger" }
+              : p6?.value_numeric != null
+              ? { label: "Within target (≤ 5)", tone: "success" }
+              : undefined
+          }
+          index={6}
+        />
+        <KpiCard
+          label="PO Amendment Rate"
+          value={fmt(p7?.value_numeric, p7?.unit)}
+          sublabel="% POs with post-creation changes · excludes release approvals"
+          size="md"
+          threshold={
+            p7?.value_numeric != null && p7.value_numeric > 15
+              ? { label: "> 15% target", tone: "danger" }
+              : p7?.value_numeric != null
+              ? { label: "Within target (< 15%)", tone: "success" }
+              : undefined
+          }
+          index={7}
+        />
+>>>>>>> Stashed changes
       </div>
     </>
   );
@@ -112,8 +171,8 @@ function PODeletionMonitor() {
 
   return (
     <SectionCard
-      title="PO Deletion Anomaly Monitor"
-      subtitle={`deletion_indicator = L · ${rows.length} deleted POs · ${formatINR(totalValue)} at risk`}
+      title="PO Deletion Anomaly Monitor (All Time)"
+      subtitle={`deletion_indicator = L · ${rows.length} deleted POs total · ${formatINR(totalValue)} at risk · KPI card shows current month only`}
       actions={
         rows.length > 0 ? (
           <StatusPill tone="danger" dot>Requires Review</StatusPill>
