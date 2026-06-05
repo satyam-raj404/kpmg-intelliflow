@@ -61,13 +61,13 @@ function VendorDashboard() {
         <CompanyFilter value={company} onChange={setCompany} />
       </div>
       <KpiRow company={company} />
-      <VendorHealthStats />
+      <VendorHealthStats company={company} />
       <div className="grid grid-cols-2 gap-4 mt-4">
         <VendorDeliveryChart company={company} />
         <ComplianceDonut />
       </div>
       <div className="grid grid-cols-2 gap-4 mt-4">
-        <TopVendors />
+        <TopVendors company={company} />
         <VendorTypeChart />
       </div>
     </AppShell>
@@ -75,13 +75,13 @@ function VendorDashboard() {
 }
 
 function KpiRow({ company }: { company: string }) {
-  const { isLoading } = useKpi("vendor");
-  const v1 = useKpiValue("vendor", "ACTIVE_VENDOR_COUNT");
-  const v2 = useKpiValue("vendor", "VENDOR_COMPLIANCE_RATE");
-  const v3 = useKpiValue("vendor", "VENDOR_DELIVERY_DAYS", company);
-  const v4 = useKpiValue("vendor", "AVG_DELIVERY_DELAY");
-  const v7 = useKpiValue("vendor", "BLOCKED_VENDOR_COUNT");
-  const v8 = useKpiValue("vendor", "VENDOR_MASTER_CHANGES");
+  const { isLoading } = useKpi("vendor", company);
+  const v1 = useKpiValue("vendor", "ACTIVE_VENDOR_COUNT",    company);
+  const v2 = useKpiValue("vendor", "VENDOR_COMPLIANCE_RATE", company);
+  const v3 = useKpiValue("vendor", "VENDOR_DELIVERY_DAYS",   company);
+  const v4 = useKpiValue("vendor", "AVG_DELIVERY_DELAY",     company);
+  const v7 = useKpiValue("vendor", "BLOCKED_VENDOR_COUNT",   company);
+  const v8 = useKpiValue("vendor", "VENDOR_MASTER_CHANGES",  company);
 
   const fmt = (v: number | null | undefined, unit: string | null | undefined) => {
     if (v == null) return isLoading ? "—" : "No data";
@@ -108,8 +108,8 @@ function KpiRow({ company }: { company: string }) {
   );
 }
 
-function VendorHealthStats() {
-  const { data: kpiData, isLoading } = useKpi("vendor");
+function VendorHealthStats({ company }: { company: string }) {
+  const { data: kpiData, isLoading } = useKpi("vendor", company);
   const v2 = kpiData?.kpis.find((k) => k.kpi_code === "VENDOR_BREAKDOWN");
 
   const h = (() => {
@@ -204,8 +204,8 @@ function VendorDeliveryChart({ company }: { company: string }) {
   );
 }
 
-function TopVendors() {
-  const { data: kpiData, isLoading } = useKpi("vendor");
+function TopVendors({ company }: { company: string }) {
+  const { data: kpiData, isLoading } = useKpi("vendor", company);
   const v6 = kpiData?.kpis.find((k) => k.kpi_code === "TOP_VENDOR_SPEND");
 
   let vendors: Array<{ vendor: string; name: string; spend: number; share_pct: number }> = [];

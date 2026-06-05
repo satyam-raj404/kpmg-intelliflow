@@ -48,6 +48,9 @@ def load_vendor_master(conn, rows: list[dict]):
             _v(r, "company_code"),
             _v(r, "payment_terms"),
             _v(r, "payment_block"),
+            _v(r, "posting_block_cc"),
+            _v(r, "msme_flag"),
+            _v(r, "vendor_type"),
             BATCH,
         ))
     conn.executemany("""
@@ -55,8 +58,9 @@ def load_vendor_master(conn, rows: list[dict]):
         (vendor, vendor_name, country, city, postal_code, region,
          account_group, tax_number_pan, tax_number_gstin,
          central_purchasing_block, central_posting_block, deletion_flag_central,
-         company_code, payment_terms, payment_block, upload_batch_id)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         company_code, payment_terms, payment_block,
+         posting_block_cc, msme_flag, vendor_type, upload_batch_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT (vendor, company_code) DO UPDATE SET
             vendor_name               = excluded.vendor_name,
             country                   = excluded.country,
@@ -71,6 +75,9 @@ def load_vendor_master(conn, rows: list[dict]):
             deletion_flag_central     = excluded.deletion_flag_central,
             payment_terms             = excluded.payment_terms,
             payment_block             = excluded.payment_block,
+            posting_block_cc          = excluded.posting_block_cc,
+            msme_flag                 = excluded.msme_flag,
+            vendor_type               = excluded.vendor_type,
             upload_batch_id           = excluded.upload_batch_id
     """, data)
     print(f"  [vendor_master] {len(data)} rows")

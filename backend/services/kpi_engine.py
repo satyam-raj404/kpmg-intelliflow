@@ -1062,6 +1062,30 @@ def _leadership(conn, FY, MTD, high_value_threshold, cc_cfg: str = "", company_c
     except Exception:
         pass
 
+    # CAPEX vs OPEX split (uses module-level CAPEX_FLAG / OPEX_FLAG / NOT_DELETED)
+    try:
+        capex_v = _run(conn, f"""
+            SELECT SUM(CAST(net_order_value AS REAL)) FROM po_dump
+            WHERE {NOT_DELETED} AND document_date >= {FY}
+              AND {CAPEX_FLAG} AND {_cc_bare}
+        """) or 0
+        opex_v = _run(conn, f"""
+            SELECT SUM(CAST(net_order_value AS REAL)) FROM po_dump
+            WHERE {NOT_DELETED} AND document_date >= {FY}
+              AND {OPEX_FLAG} AND {_cc_bare}
+        """) or 0
+        total_v = (capex_v or 0) + (opex_v or 0)
+        split = {
+            "capex": round(capex_v or 0, 2),
+            "opex":  round(opex_v  or 0, 2),
+            "capex_pct": round((capex_v or 0) / total_v * 100, 1) if total_v else 0,
+            "opex_pct":  round((opex_v  or 0) / total_v * 100, 1) if total_v else 0,
+        }
+        _upsert(conn, "leadership", "CAPEX_OPEX_SPLIT", "CAPEX vs OPEX Split",
+                None, json.dumps(split), "json", company_code=company_code)
+    except Exception:
+        pass
+
 
 # ── VENDOR ────────────────────────────────────────────────────────────────────
 

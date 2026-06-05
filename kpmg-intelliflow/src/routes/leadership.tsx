@@ -23,7 +23,7 @@ import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 import { formatINR } from "@/lib/format";
 import { brand } from "@/lib/brand";
-import { useKpi, useKpiValue, useCharts } from "@/hooks/useKpi";
+import { useKpi, useKpiValue, useKpiCompanies, useCharts } from "@/hooks/useKpi";
 import { apiFetch } from "@/api/client";
 
 export const Route = createFileRoute("/leadership")({
@@ -136,24 +136,52 @@ function HighValueThresholdPanel() {
   );
 }
 
+// ── Company Filter ─────────────────────────────────────────────────────────
+
+function CompanyFilter({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { data } = useKpiCompanies("leadership");
+  const companies = data?.companies ?? [];
+  if (companies.length <= 1) return null;
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span className="text-muted-foreground font-medium">Company:</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="border border-border rounded-md px-2 py-1 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+      >
+        <option value="ALL">All Companies</option>
+        {companies.filter((c) => c !== "ALL").map((c) => (
+          <option key={c} value={c}>{c}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 // ── Main Dashboard ─────────────────────────────────────────────────────────
 
 function LeadershipDashboard() {
+  const [company, setCompany] = useState("ALL");
+
   return (
     <AppShell>
-      <PageHeader
-        title="Leadership Dashboard"
-        subtitle="Strategic portfolio view · Scannable in 30 seconds"
-        actions={<HighValueThresholdPanel />}
-      />
-      <KpiRow />
+      <div className="flex items-center justify-between">
+        <PageHeader
+          title="Leadership Dashboard"
+          subtitle="Strategic portfolio view · Scannable in 30 seconds"
+          actions={<HighValueThresholdPanel />}
+        />
+        <CompanyFilter value={company} onChange={setCompany} />
+      </div>
+      <KpiRow company={company} />
       <div className="grid grid-cols-2 gap-4 mt-4">
         <SpendTrend />
-        <CapexOpexBreakdown />
+        <CapexOpexBreakdown company={company} />
       </div>
       <div className="grid grid-cols-2 gap-4 mt-4">
-        <RiskIndicators />
-        <SummaryCountsPanel />
+        <RiskIndicators company={company} />
+        <SummaryCountsPanel company={company} />
       </div>
       <div className="grid grid-cols-2 gap-4 mt-4">
         <InvoiceByVendor />
@@ -172,16 +200,16 @@ function LeadershipDashboard() {
 
 // ── KPI Row ─────────────────────────────────────────────────────────────────
 
-function KpiRow() {
-  const { isLoading } = useKpi("leadership");
-  const l1  = useKpiValue("leadership", "TOTAL_SPEND_YTD");
-  const l2  = useKpiValue("leadership", "MAVERICK_BUY_RATE");
-  const l3  = useKpiValue("leadership", "E2E_CYCLE_TIME");
-  const l4  = useKpiValue("leadership", "VENDOR_CONCENTRATION");
-  const l5  = useKpiValue("leadership", "NEGOTIATION_SAVINGS");
-  const l6  = useKpiValue("leadership", "SUPPLY_RISK_SCORE");
-  const l7  = useKpiValue("leadership", "SOD_CONFLICT_COUNT");
-  const l8  = useKpiValue("leadership", "HIGH_VALUE_PO_COUNT");
+function KpiRow({ company }: { company: string }) {
+  const { isLoading } = useKpi("leadership", company);
+  const l1  = useKpiValue("leadership", "TOTAL_SPEND_YTD",       company);
+  const l2  = useKpiValue("leadership", "MAVERICK_BUY_RATE",     company);
+  const l3  = useKpiValue("leadership", "E2E_CYCLE_TIME",        company);
+  const l4  = useKpiValue("leadership", "VENDOR_CONCENTRATION",  company);
+  const l5  = useKpiValue("leadership", "NEGOTIATION_SAVINGS",   company);
+  const l6  = useKpiValue("leadership", "SUPPLY_RISK_SCORE",     company);
+  const l7  = useKpiValue("leadership", "SOD_CONFLICT_COUNT",    company);
+  const l8  = useKpiValue("leadership", "HIGH_VALUE_PO_COUNT",   company);
 
   const fmt = (v: number | null | undefined, unit: string | null | undefined) => {
     if (v == null) return isLoading ? "—" : "No data";
@@ -331,8 +359,8 @@ function SpendTrend() {
 
 // ── CAPEX vs OPEX Breakdown ────────────────────────────────────────────────
 
-function CapexOpexBreakdown() {
-  const { data: kpiData, isLoading } = useKpi("leadership");
+function CapexOpexBreakdown({ company }: { company: string }) {
+  const { data: kpiData, isLoading } = useKpi("leadership", company);
   const coKpi = kpiData?.kpis.find((k) => k.kpi_code === "CAPEX_OPEX_SPLIT");
 
   let split: { capex: number; opex: number; capex_pct: number; opex_pct: number } | null = null;
@@ -387,8 +415,8 @@ function CapexOpexBreakdown() {
 
 // ── Risk Indicators ────────────────────────────────────────────────────────
 
-function RiskIndicators() {
-  const { data: kpiData, isLoading } = useKpi("leadership");
+function RiskIndicators({ company }: { company: string }) {
+  const { data: kpiData, isLoading } = useKpi("leadership", company);
 
   const barData = [
     { name: "Vendor Concentration", value: kpiData?.kpis.find(k => k.kpi_code === "VENDOR_CONCENTRATION")?.value_numeric ?? 0 },
@@ -602,8 +630,8 @@ function InvoiceVsPayment() {
 
 // ── Summary Counts Panel ───────────────────────────────────────────────────
 
-function SummaryCountsPanel() {
-  const { data: kpiData, isLoading } = useKpi("leadership");
+function SummaryCountsPanel({ company }: { company: string }) {
+  const { data: kpiData, isLoading } = useKpi("leadership", company);
   const countKpi = kpiData?.kpis.find((k) => k.kpi_code === "SUMMARY_COUNTS");
 
   let counts: Record<string, number> = {};
