@@ -9,6 +9,7 @@ import {
   Tooltip,
   BarChart,
   Bar,
+  Cell,
   ComposedChart,
   Line,
 } from "recharts";
@@ -154,6 +155,17 @@ function LeadershipDashboard() {
         <RiskIndicators />
         <SummaryCountsPanel />
       </div>
+      <div className="grid grid-cols-2 gap-4 mt-4">
+        <InvoiceByVendor />
+        <InvoiceByVendorType />
+      </div>
+      <div className="grid grid-cols-2 gap-4 mt-4">
+        <PrAging />
+        <PrQuantityByProduct />
+      </div>
+      <div className="grid grid-cols-2 gap-4 mt-4">
+        <InvoiceVsPayment />
+      </div>
     </AppShell>
   );
 }
@@ -275,8 +287,9 @@ function KpiRow() {
 
 function SpendTrend() {
   const { data, isLoading } = useCharts("leadership");
-  const chartData = (data?.series ?? []).map((p) => ({
-    month:  p.month ?? "",
+  const raw = data?.series as unknown as { type?: string; monthly?: Array<Record<string, unknown>> };
+  const chartData = (raw?.monthly ?? []).map((p: Record<string, unknown>) => ({
+    month:  (p.month as string) ?? "",
     spend:  ((p.spend as number)  ?? 0) / 1_00_00_000,
     capex:  ((p.capex as number)  ?? 0) / 1_00_00_000,
     opex:   ((p.opex  as number)  ?? 0) / 1_00_00_000,
@@ -416,6 +429,177 @@ function RiskIndicators() {
   );
 }
 
+// ── Invoice by Vendor ──────────────────────────────────────────────────────
+
+function InvoiceByVendor() {
+  const { data, isLoading } = useCharts("leadership");
+  const raw = data?.series as unknown as { type?: string; invoice_by_vendor?: Array<{ vendor: string; vendor_name: string; total_amount: number; invoice_count: number }> };
+  const vendorData = raw?.invoice_by_vendor ?? [];
+
+  return (
+    <SectionCard title="Invoice Summary by Vendor" subtitle="Top 10 vendors by invoice amount">
+      <div className="h-64">
+        {isLoading ? (
+          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Loading…</div>
+        ) : vendorData.length === 0 ? (
+          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Upload invoice data to view</div>
+        ) : (
+          <ResponsiveContainer>
+            <BarChart data={vendorData} layout="vertical" margin={{ top: 8, right: 48, left: 80, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false} />
+              <XAxis type="number" tickLine={false} axisLine={false} tickFormatter={(v) => `₹${(v / 1_00_00_000).toFixed(0)}Cr`} tick={{ fontSize: 10 }} />
+              <YAxis type="category" dataKey="vendor_name" tickLine={false} axisLine={false} width={76} tick={{ fontSize: 9 }} />
+              <Tooltip formatter={(v: number) => [`₹${(v / 1_00_00_000).toFixed(2)} Cr`]} />
+              <Bar dataKey="total_amount" fill={brand.colors.accent} radius={[0, 3, 3, 0]} name="Invoice Amount" />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </SectionCard>
+  );
+}
+
+// ── Invoice by Vendor Type ─────────────────────────────────────────────────
+
+function InvoiceByVendorType() {
+  const { data, isLoading } = useCharts("leadership");
+  const raw = data?.series as unknown as { type?: string; invoice_by_vendor_type?: Array<{ vendor_type: string; total_amount: number; invoice_count: number }> };
+  const typeData = raw?.invoice_by_vendor_type ?? [];
+
+  const COLORS = [brand.colors.primary, brand.colors.success, brand.colors.warning, brand.colors.danger, brand.colors.accent];
+
+  return (
+    <SectionCard title="Invoice Summary by Vendor Type" subtitle="DOMESTIC / INTERNATIONAL / ONE-TIME">
+      <div className="h-64">
+        {isLoading ? (
+          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Loading…</div>
+        ) : typeData.length === 0 ? (
+          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Upload invoice & vendor data to view</div>
+        ) : (
+          <div className="flex flex-col gap-2 mt-2 px-1">
+            {typeData.map((t, i) => {
+              const total = typeData.reduce((s, x) => s + x.total_amount, 0);
+              const pct = total > 0 ? ((t.total_amount / total) * 100) : 0;
+              return (
+                <div key={t.vendor_type} className="bg-secondary/40 rounded-lg p-3">
+                  <div className="flex justify-between items-center mb-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                      <span className="text-[12px] font-medium">{t.vendor_type}</span>
+                    </div>
+                    <span className="text-[12px] font-tabular text-muted-foreground">{pct.toFixed(1)}%</span>
+                  </div>
+                  <div className="text-[18px] font-semibold font-tabular">₹{(t.total_amount / 1_00_00_000).toFixed(2)}Cr</div>
+                  <div className="text-[10px] text-muted-foreground">{t.invoice_count} invoices</div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </SectionCard>
+  );
+}
+
+// ── PR Aging ───────────────────────────────────────────────────────────────
+
+function PrAging() {
+  const { data, isLoading } = useCharts("leadership");
+  const raw = data?.series as unknown as { type?: string; pr_aging?: Array<{ bucket: string; value: number }> };
+  const aging = raw?.pr_aging ?? [];
+
+  return (
+    <SectionCard title="Aging of Open PR Lines" subtitle="Days since PR release without PO conversion">
+      <div className="h-64">
+        {isLoading ? (
+          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Loading…</div>
+        ) : aging.length === 0 || aging.every((a) => a.value === 0) ? (
+          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">No open PRs without PO</div>
+        ) : (
+          <ResponsiveContainer>
+            <BarChart data={aging} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
+              <XAxis dataKey="bucket" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
+              <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
+              <Tooltip formatter={(v: number) => [`${v.toFixed(0)} PR lines`]} />
+              <Bar dataKey="value" radius={[3, 3, 0, 0]}>
+                {aging.map((_, i) => (
+                  <rect key={i} fill={i === 3 ? brand.colors.danger : i === 2 ? brand.colors.warning : brand.colors.success} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </SectionCard>
+  );
+}
+
+// ── PR Quantity by Product ─────────────────────────────────────────────────
+
+function PrQuantityByProduct() {
+  const { data, isLoading } = useCharts("leadership");
+  const raw = data?.series as unknown as { type?: string; pr_qty_by_material?: Array<{ material_group: string; total_qty: number; pr_lines: number }> };
+  const qtyData = raw?.pr_qty_by_material ?? [];
+
+  return (
+    <SectionCard title="PR Quantity by Product (Material Group)" subtitle="Top material groups by order quantity">
+      <div className="h-64">
+        {isLoading ? (
+          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Loading…</div>
+        ) : qtyData.length === 0 ? (
+          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Upload PR data to view</div>
+        ) : (
+          <ResponsiveContainer>
+            <BarChart data={qtyData} layout="vertical" margin={{ top: 8, right: 32, left: 56, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false} />
+              <XAxis type="number" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
+              <YAxis type="category" dataKey="material_group" tickLine={false} axisLine={false} width={52} tick={{ fontSize: 10 }} />
+              <Tooltip formatter={(v: number, _n, p) => [`${v.toFixed(0)} (${p.payload.pr_lines} PR lines)`, "Qty"]} />
+              <Bar dataKey="total_qty" fill={brand.colors.success} radius={[0, 3, 3, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </SectionCard>
+  );
+}
+
+// ── Invoice vs Payment ────────────────────────────────────────────────────
+
+function InvoiceVsPayment() {
+  const { data, isLoading } = useCharts("leadership");
+  const raw = data?.series as unknown as { type?: string; invoice_vs_payment?: Array<{ month: string; invoice_amount: number; payment_amount: number }> };
+  const chartData = (raw?.invoice_vs_payment ?? []).map((p) => ({
+    month: p.month,
+    invoice: Math.round(p.invoice_amount / 1_00_00_000 * 100) / 100,
+    payment: Math.round(p.payment_amount / 1_00_00_000 * 100) / 100,
+  }));
+
+  return (
+    <SectionCard title="Invoice vs Payment Trend" subtitle="Monthly comparison — ₹ Cr">
+      <div className="h-64">
+        {isLoading ? (
+          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Loading…</div>
+        ) : chartData.length === 0 ? (
+          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Upload invoice & payment data to view</div>
+        ) : (
+          <ResponsiveContainer>
+            <ComposedChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
+              <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
+              <YAxis tickLine={false} axisLine={false} tickFormatter={(v) => `₹${v.toFixed(0)}Cr`} tick={{ fontSize: 10 }} />
+              <Tooltip formatter={(v: number, name: string) => [`₹${v.toFixed(2)} Cr`, name]} />
+              <Bar dataKey="invoice" name="Invoiced" fill={brand.colors.primary} radius={[2, 2, 0, 0]} opacity={0.8} />
+              <Bar dataKey="payment" name="Paid" fill={brand.colors.success} radius={[2, 2, 0, 0]} opacity={0.8} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </SectionCard>
+  );
+}
+
 // ── Summary Counts Panel ───────────────────────────────────────────────────
 
 function SummaryCountsPanel() {
@@ -428,12 +612,16 @@ function SummaryCountsPanel() {
   }
 
   const items = [
-    { label: "Approved PRs",     key: "approved_pr",   tone: "success" as const },
-    { label: "Approved POs",     key: "approved_po",   tone: "success" as const },
-    { label: "GRN Lines",        key: "grn_lines",     tone: "info"    as const },
-    { label: "Invoice Lines",    key: "invoice_lines", tone: "info"    as const },
-    { label: "Payments",         key: "payments",      tone: "success" as const },
-    { label: "POs Without PR",   key: "po_without_pr", tone: "danger"  as const },
+    { label: "Approved PRs",       key: "approved_pr",      tone: "success" as const },
+    { label: "Approved POs",       key: "approved_po",      tone: "success" as const },
+    { label: "GRN Lines",          key: "grn_lines",        tone: "info"    as const },
+    { label: "Invoice Lines",      key: "invoice_lines",    tone: "info"    as const },
+    { label: "Payments",           key: "payments",         tone: "success" as const },
+    { label: "POs Without PR",     key: "po_without_pr",    tone: "danger"  as const },
+    { label: "One-Time Vendors",   key: "one_time_vendors",  tone: "warning" as const },
+    { label: "POs Without Contract", key: "po_no_contract",  tone: "warning" as const },
+    { label: "Duplicate Invoices", key: "duplicate_invoices", tone: "danger" as const },
+    { label: "SOD Conflicts",      key: "sod_conflicts",     tone: "danger" as const },
   ];
 
   return (
@@ -443,7 +631,7 @@ function SummaryCountsPanel() {
       ) : Object.keys(counts).length === 0 ? (
         <div className="h-40 flex items-center justify-center text-muted-foreground text-sm">Upload P2P data to view counts</div>
       ) : (
-        <div className="grid grid-cols-3 gap-3 mt-1">
+        <div className="grid grid-cols-4 gap-3 mt-1">
           {items.map((item) => (
             <div key={item.key} className="bg-secondary/40 rounded-lg p-3">
               <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">{item.label}</div>

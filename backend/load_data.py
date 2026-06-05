@@ -51,12 +51,27 @@ def load_vendor_master(conn, rows: list[dict]):
             BATCH,
         ))
     conn.executemany("""
-        INSERT OR REPLACE INTO vendor_master
+        INSERT INTO vendor_master
         (vendor, vendor_name, country, city, postal_code, region,
          account_group, tax_number_pan, tax_number_gstin,
          central_purchasing_block, central_posting_block, deletion_flag_central,
          company_code, payment_terms, payment_block, upload_batch_id)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        ON CONFLICT (vendor, company_code) DO UPDATE SET
+            vendor_name               = excluded.vendor_name,
+            country                   = excluded.country,
+            city                      = excluded.city,
+            postal_code               = excluded.postal_code,
+            region                    = excluded.region,
+            account_group             = excluded.account_group,
+            tax_number_pan            = excluded.tax_number_pan,
+            tax_number_gstin          = excluded.tax_number_gstin,
+            central_purchasing_block  = excluded.central_purchasing_block,
+            central_posting_block     = excluded.central_posting_block,
+            deletion_flag_central     = excluded.deletion_flag_central,
+            payment_terms             = excluded.payment_terms,
+            payment_block             = excluded.payment_block,
+            upload_batch_id           = excluded.upload_batch_id
     """, data)
     print(f"  [vendor_master] {len(data)} rows")
 
@@ -66,6 +81,7 @@ def load_pr_dump(conn, rows: list[dict]):
     data = []
     for r in rows:
         data.append((
+            _v(r, "company_code", "1001"),
             _v(r, "purchase_requisition"),
             _v(r, "item_of_requisition"),
             _v(r, "purchasing_doc_type"),
@@ -82,16 +98,20 @@ def load_pr_dump(conn, rows: list[dict]):
             _v(r, "release_date"),
             _v(r, "requisitioner"),
             _v(r, "tracking_number"),
+            _v(r, "created_on"),
+            _v(r, "deletion_indicator", ""),
+            _v(r, "account_assignment_category", ""),
             BATCH,
         ))
     conn.executemany("""
         INSERT INTO pr_dump
-        (purchase_requisition, item_of_requisition, purchasing_doc_type, vendor,
+        (company_code, purchase_requisition, item_of_requisition, purchasing_doc_type, vendor,
          material_group, material_description, plant, purchasing_group,
          order_quantity, unit_of_measure, valuation_price,
          delivery_date, release_status, release_date,
-         requisitioner, tracking_number, upload_batch_id)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         requisitioner, tracking_number, created_on, deletion_indicator,
+         account_assignment_category, upload_batch_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     """, data)
     print(f"  [pr_dump] {len(data)} rows")
 
@@ -101,6 +121,7 @@ def load_po_dump(conn, rows: list[dict]):
     data = []
     for r in rows:
         data.append((
+            _v(r, "company_code", "1001"),
             _v(r, "purchasing_document"),
             _v(r, "item"),
             _v(r, "purchasing_doc_type"),
@@ -109,31 +130,45 @@ def load_po_dump(conn, rows: list[dict]):
             _v(r, "vendor"),
             _v(r, "vendor_name"),
             _v(r, "document_date"),
+            _v(r, "created_on"),
             _v(r, "plant"),
             _v(r, "material_group"),
+            _v(r, "material_type"),
             _v(r, "material_description"),
             _v(r, "order_quantity"),
             _v(r, "unit_of_measure"),
             _v(r, "net_order_price"),
             _v(r, "net_order_value"),
+            _v(r, "delivery_date"),
             _v(r, "purchase_requisition"),
+            _v(r, "item_of_requisition"),
+            _v(r, "deletion_indicator", ""),
             _v(r, "release_indicator"),
             _v(r, "release_strategy"),
+            _v(r, "contract_number"),
+            _v(r, "capex_opex_flag", "OPEX"),
             _v(r, "delivery_completed"),
+            _v(r, "tax_code"),
+            _v(r, "account_assignment_category", ""),
+            _v(r, "item_category", "0"),
+            _v(r, "gr_based_iv", ""),
             BATCH,
         ))
     conn.executemany("""
         INSERT INTO po_dump
-        (purchasing_document, item,
+        (company_code, purchasing_document, item,
          purchasing_doc_type, purchasing_org, purchasing_group,
          vendor, vendor_name,
-         document_date, plant,
-         material_group, material_description,
+         document_date, created_on, plant,
+         material_group, material_type, material_description,
          order_quantity, unit_of_measure,
          net_order_price, net_order_value,
-         purchase_requisition, release_indicator, release_strategy,
-         delivery_completed, upload_batch_id)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         delivery_date, purchase_requisition, item_of_requisition,
+         deletion_indicator, release_indicator, release_strategy,
+         contract_number, capex_opex_flag, delivery_completed,
+         tax_code, account_assignment_category, item_category, gr_based_iv,
+         upload_batch_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     """, data)
     print(f"  [po_dump] {len(data)} rows")
 
@@ -179,6 +214,10 @@ def load_grn(conn, rows: list[dict]):
             _v(r, "debit_credit_ind"),
             _v(r, "posting_date"),
             _v(r, "entry_date"),
+            _v(r, "plant"),
+            _v(r, "storage_location"),
+            _v(r, "company_code", "1001"),
+            _v(r, "vendor"),
             _v(r, "quantity"),
             _v(r, "amount_local_ccy"),
             _v(r, "reference_doc"),
@@ -190,8 +229,9 @@ def load_grn(conn, rows: list[dict]):
          material_document, material_doc_item,
          po_history_category, movement_type, debit_credit_ind,
          posting_date, entry_date,
+         plant, storage_location, company_code, vendor,
          quantity, amount_local_ccy, reference_doc, upload_batch_id)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     """, data)
     print(f"  [grn_dump] {len(data)} rows")
 
@@ -234,11 +274,17 @@ def load_invoice(conn, rows: list[dict]):
         data.append((
             _v(r, "invoice_doc"),
             _v(r, "invoice_year"),
+            _v(r, "company_code", "1001"),
             _v(r, "vendor"),
             _v(r, "document_type"),
+            _v(r, "debit_credit_ind", "S"),
+            _v(r, "reverse_invoice"),
+            _v(r, "reversal_reason"),
             _v(r, "vendor_invoice_ref"),
             _v(r, "vendor_invoice_date"),
             _v(r, "posting_date"),
+            _v(r, "baseline_date"),
+            _v(r, "days_1", "30"),
             _v(r, "due_date"),
             _v(r, "amount_local_ccy"),
             _v(r, "tax_amount", "0"),
@@ -251,13 +297,14 @@ def load_invoice(conn, rows: list[dict]):
     conn.executemany("""
         INSERT INTO invoice_dump
         (invoice_doc, invoice_year,
-         vendor, document_type,
+         company_code, vendor, document_type,
+         debit_credit_ind, reverse_invoice, reversal_reason,
          vendor_invoice_ref, vendor_invoice_date,
-         posting_date, due_date,
+         posting_date, baseline_date, days_1, due_date,
          amount_local_ccy, tax_amount,
          payment_terms, payment_block,
          po_reference, clearing_doc, upload_batch_id)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     """, data)
     print(f"  [invoice_dump] {len(data)} rows")
 
@@ -269,8 +316,10 @@ def load_payment(conn, rows: list[dict]):
         data.append((
             _v(r, "payment_doc"),
             _v(r, "payment_year"),
+            _v(r, "company_code", "1001"),
             _v(r, "vendor"),
             _v(r, "document_type"),
+            _v(r, "debit_credit_ind", "S"),
             _v(r, "posting_date"),
             _v(r, "clearing_date"),
             _v(r, "payment_method"),
@@ -284,13 +333,13 @@ def load_payment(conn, rows: list[dict]):
     conn.executemany("""
         INSERT INTO payment_dump
         (payment_doc, payment_year,
-         vendor, document_type,
+         company_code, vendor, document_type, debit_credit_ind,
          posting_date, clearing_date,
          payment_method,
          amount_local_ccy, discount_taken,
          cleared_invoice, bank_reference, house_bank,
          upload_batch_id)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     """, data)
     print(f"  [payment_dump] {len(data)} rows")
 
@@ -353,9 +402,10 @@ def main():
     # Seed license usage (static — no CSV for this)
     conn.execute("DELETE FROM license_usage")
     conn.executemany("""
-        INSERT OR IGNORE INTO license_usage
+        INSERT INTO license_usage
         (tool_name, total_licenses, active_users, annual_cost_inr, renewal_date, material_group)
         VALUES (?,?,?,?,?,?)
+        ON CONFLICT (tool_name) DO NOTHING
     """, [
         ("Microsoft 365",   500, 423, 25_000_000, "2027-03-31", "SOFTWARE"),
         ("Salesforce",      200,  87, 18_000_000, "2026-11-30", "SAAS"),

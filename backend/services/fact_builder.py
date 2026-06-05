@@ -1,8 +1,8 @@
 """Step 4 — Rebuild pr_po_grn_invoice fact table with composite keys."""
-import sqlite3
+from typing import Any
 
 
-def build_entity_hierarchy(conn: sqlite3.Connection) -> None:
+def build_entity_hierarchy(conn: Any) -> None:
     """Rebuild entity_hierarchy from company_plant_master.
     Creates rollup: parent_company → company_code → purchasing_org → plant.
     """
@@ -38,10 +38,11 @@ def build_entity_hierarchy(conn: sqlite3.Connection) -> None:
         if parent not in seen:
             seen.add(parent)
             conn.execute("""
-                INSERT OR IGNORE INTO entity_hierarchy
+                INSERT INTO entity_hierarchy
                     (entity_key, company_code, company_name, purchasing_org, plant,
                      plant_name, parent_company, entity_level)
                 VALUES (?, ?, ?, 'ALL', 'ALL', ?, ?, 1)
+                ON CONFLICT (entity_key) DO NOTHING
             """, (
                 f"ENTITY|{parent}",
                 row[1],
@@ -53,7 +54,7 @@ def build_entity_hierarchy(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
-def build_facts(conn: sqlite3.Connection) -> None:
+def build_facts(conn: Any) -> None:
     conn.execute("DELETE FROM pr_po_grn_invoice")
 
     # ── Main insert: PO lines joined to PR, GRN, Invoice, Delivery ────────────
@@ -79,45 +80,45 @@ def build_facts(conn: sqlite3.Connection) -> None:
         )
         SELECT
             -- Composite line keys
-            CASE WHEN pr.purchase_requisition IS NOT NULL
-                 THEN 'PR|' || pr.purchase_requisition || '|' || pr.item_of_requisition
+            CASE WHEN MIN(pr.purchase_requisition) IS NOT NULL
+                 THEN 'PR|' || MIN(pr.purchase_requisition) || '|' || MIN(pr.item_of_requisition)
                  ELSE NULL END,
             'PO|' || po.purchasing_document || '|' || po.item,
-            COALESCE(po.company_code, '1001') || '|' ||
-                COALESCE(po.purchasing_org, '')  || '|' ||
-                COALESCE(po.plant, ''),
+            COALESCE(MIN(po.company_code), '1001') || '|' ||
+                COALESCE(MIN(po.purchasing_org), '')  || '|' ||
+                COALESCE(MIN(po.plant), ''),
 
-            pr.purchase_requisition,
-            pr.item_of_requisition,
+            MIN(pr.purchase_requisition),
+            MIN(pr.item_of_requisition),
             po.purchasing_document,
             po.item,
-            po.vendor,
-            po.vendor_name,
-            COALESCE(po.material_group,       pr.material_group),
-            COALESCE(po.material_description, pr.material_description),
-            COALESCE(po.plant,                pr.plant),
-            COALESCE(po.purchasing_group,     pr.purchasing_group),
-            po.purchasing_org,
-            COALESCE(po.company_code, '1001'),
-            po.purchasing_doc_type,
-            COALESCE(po.capex_opex_flag, 'OPEX'),
+            MIN(po.vendor),
+            MIN(po.vendor_name),
+            COALESCE(MIN(po.material_group),       MIN(pr.material_group)),
+            COALESCE(MIN(po.material_description), MIN(pr.material_description)),
+            COALESCE(MIN(po.plant),                MIN(pr.plant)),
+            COALESCE(MIN(po.purchasing_group),     MIN(pr.purchasing_group)),
+            MIN(po.purchasing_org),
+            COALESCE(MIN(po.company_code), '1001'),
+            MIN(po.purchasing_doc_type),
+            COALESCE(MIN(po.capex_opex_flag), 'OPEX'),
 
-            -- PR amounts (item level)
-            CAST(pr.order_quantity  AS REAL),
-            CAST(pr.valuation_price AS REAL),
-            pr.delivery_date,
-            pr.release_date,
-            pr.requisitioner,
+            -- PR amounts (item level — at most 1 PR per PO line)
+            CAST(MIN(pr.order_quantity)  AS REAL),
+            CAST(MIN(pr.valuation_price) AS REAL),
+            MIN(pr.delivery_date),
+            MIN(pr.release_date),
+            MIN(pr.requisitioner),
 
             -- PO amounts
-            CAST(po.order_quantity   AS REAL),
-            CAST(po.net_order_price  AS REAL),
-            CAST(po.net_order_value  AS REAL),
-            po.document_date,
-            pod.expected_delivery_date,
-            po.deletion_indicator,
-            po.delivery_completed,
-            po.release_indicator,
+            CAST(MIN(po.order_quantity)   AS REAL),
+            CAST(MIN(po.net_order_price)  AS REAL),
+            CAST(MIN(po.net_order_value)  AS REAL),
+            MIN(po.document_date),
+            MIN(pod.expected_delivery_date),
+            MIN(po.deletion_indicator),
+            MIN(po.delivery_completed),
+            MIN(po.release_indicator),
 
             -- GRN: net quantity (receipts - returns)
             SUM(CASE WHEN grn.debit_credit_ind = 'S'
@@ -156,9 +157,9 @@ def build_facts(conn: sqlite3.Connection) -> None:
                AND pi_ref.debit_credit_ind   = 'S'),
 
             -- Maverick flag: 1 if no upstream PR
-            CASE WHEN po.purchase_requisition IS NULL
-                      OR po.purchase_requisition = ''
-                 THEN 1 ELSE 0 END,
+            MAX(CASE WHEN po.purchase_requisition IS NULL
+                          OR po.purchase_requisition = ''
+                     THEN 1 ELSE 0 END),
 
             -- Has GRN return
             CASE WHEN EXISTS (
@@ -177,9 +178,9 @@ def build_facts(conn: sqlite3.Connection) -> None:
                  THEN 1 ELSE 0 END,
 
             -- PR → PO days (item level: from PR release_date to PO document_date)
-            CASE WHEN pr.release_date IS NOT NULL
-                      AND po.document_date IS NOT NULL
-                 THEN CAST(julianday(po.document_date) - julianday(pr.release_date) AS INTEGER)
+            CASE WHEN MIN(pr.release_date) IS NOT NULL
+                      AND MIN(po.document_date) IS NOT NULL
+                 THEN (MIN(po.document_date)::DATE - MIN(pr.release_date)::DATE)
                  ELSE NULL END,
 
             NULL, NULL, NULL, NULL   -- cycle times filled in second pass
@@ -241,18 +242,18 @@ def build_facts(conn: sqlite3.Connection) -> None:
         UPDATE pr_po_grn_invoice SET
             po_to_grn_days = CASE
                 WHEN po_document_date IS NOT NULL AND grn_posting_date IS NOT NULL
-                THEN CAST(julianday(grn_posting_date) - julianday(po_document_date) AS INTEGER)
+                THEN (grn_posting_date::DATE - po_document_date::DATE)
                 ELSE NULL END,
 
             grn_to_invoice_days = CASE
                 WHEN grn_posting_date IS NOT NULL AND invoice_posting_date IS NOT NULL
-                THEN CAST(julianday(invoice_posting_date) - julianday(grn_posting_date) AS INTEGER)
+                THEN (invoice_posting_date::DATE - grn_posting_date::DATE)
                 ELSE NULL END,
 
             invoice_to_payment_days = CASE
                 WHEN invoice_due_date IS NOT NULL
                 THEN (
-                    SELECT CAST(julianday(MIN(pay.posting_date)) - julianday(invoice_due_date) AS INTEGER)
+                    SELECT (MIN(pay.posting_date)::DATE - invoice_due_date::DATE)
                     FROM po_invoice_dump pi
                     JOIN invoice_dump id ON pi.invoice_doc = id.invoice_doc
                                        AND pi.invoice_year = id.invoice_year
@@ -266,7 +267,7 @@ def build_facts(conn: sqlite3.Connection) -> None:
             total_cycle_days = CASE
                 WHEN pr_release_date IS NOT NULL
                 THEN (
-                    SELECT CAST(julianday(MIN(pay.posting_date)) - julianday(pr_po_grn_invoice.pr_release_date) AS INTEGER)
+                    SELECT (MIN(pay.posting_date)::DATE - pr_po_grn_invoice.pr_release_date::DATE)
                     FROM po_invoice_dump pi
                     JOIN invoice_dump id ON pi.invoice_doc = id.invoice_doc
                                        AND pi.invoice_year = id.invoice_year
@@ -276,7 +277,7 @@ def build_facts(conn: sqlite3.Connection) -> None:
                 )
                 ELSE CASE
                     WHEN po_document_date IS NOT NULL AND grn_posting_date IS NOT NULL
-                    THEN CAST(julianday(grn_posting_date) - julianday(po_document_date) AS INTEGER)
+                    THEN (grn_posting_date::DATE - po_document_date::DATE)
                     ELSE NULL END
                 END
         WHERE purchasing_document IS NOT NULL

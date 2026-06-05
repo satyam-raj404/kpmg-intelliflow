@@ -11,8 +11,14 @@ export interface KpiResult {
 
 export interface DashboardKpis {
   dashboard: string;
+  company_code: string;
   computed_at: string | null;
   kpis: KpiResult[];
+}
+
+export interface CompaniesResponse {
+  dashboard: string;
+  companies: string[];
 }
 
 export interface ChartPoint {

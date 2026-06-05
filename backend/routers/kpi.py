@@ -1,5 +1,5 @@
 """KPI router — dashboard KPIs, charts, and kpi_config management."""
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from database import get_connection
@@ -12,18 +12,31 @@ VALID_DASHBOARDS = {"procurement", "financial", "leadership", "vendor", "utiliza
 
 # ── Dashboard KPIs ─────────────────────────────────────────────────────────────
 
-@router.get("/kpi/{dashboard}")
-def get_kpis(dashboard: str):
+@router.get("/kpi/{dashboard}/companies")
+def get_kpi_companies(dashboard: str):
+    """Return distinct company_codes available for a dashboard."""
     if dashboard not in VALID_DASHBOARDS:
         raise HTTPException(404, f"Dashboard '{dashboard}' not found.")
     conn = get_connection()
     rows = conn.execute(
-        "SELECT * FROM kpi_results WHERE dashboard = ? ORDER BY kpi_code",
+        "SELECT DISTINCT company_code FROM kpi_results WHERE dashboard = ? ORDER BY company_code",
         (dashboard,),
+    ).fetchall()
+    return {"dashboard": dashboard, "companies": [r[0] for r in rows]}
+
+
+@router.get("/kpi/{dashboard}")
+def get_kpis(dashboard: str, company_code: str = Query(default="ALL")):
+    if dashboard not in VALID_DASHBOARDS:
+        raise HTTPException(404, f"Dashboard '{dashboard}' not found.")
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM kpi_results WHERE dashboard = ? AND company_code = ? ORDER BY kpi_code",
+        (dashboard, company_code),
     ).fetchall()
     kpis = [dict(r) for r in rows]
     computed_at = kpis[0]["computed_at"] if kpis else None
-    return {"dashboard": dashboard, "computed_at": computed_at, "kpis": kpis}
+    return {"dashboard": dashboard, "company_code": company_code, "computed_at": computed_at, "kpis": kpis}
 
 
 @router.get("/charts/{dashboard}")
@@ -60,7 +73,7 @@ def update_kpi_config(key: str, body: ConfigUpdate):
         raise HTTPException(404, f"Config key '{key}' not found.")
 
     conn.execute(
-        "UPDATE kpi_config SET config_value = ?, updated_at = datetime('now') WHERE config_key = ?",
+        "UPDATE kpi_config SET config_value = ?, updated_at = NOW()::TEXT WHERE config_key = ?",
         (body.value, key),
     )
     conn.commit()

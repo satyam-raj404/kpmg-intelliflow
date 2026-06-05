@@ -1,6 +1,5 @@
 """Step 3 — Upsert staging tables."""
-import sqlite3
-from typing import Optional
+from typing import Any, Optional
 
 import pandas as pd
 
@@ -27,15 +26,20 @@ COMPUTED_LINE_KEYS: dict[str, tuple[str, str, list[str]]] = {
 }
 
 
-def _table_columns(conn: sqlite3.Connection, table: str) -> list[str]:
-    rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
-    return [r[1] for r in rows]
+def _table_columns(conn: Any, table: str) -> list[str]:
+    rows = conn.execute(
+        "SELECT column_name FROM information_schema.columns "
+        "WHERE table_schema = 'public' AND table_name = ? "
+        "ORDER BY ordinal_position",
+        (table,)
+    ).fetchall()
+    return [r[0] for r in rows]
 
 
 def load(
     df: pd.DataFrame,
     dataset_type: str,
-    conn: sqlite3.Connection,
+    conn: Any,
     batch_id: str,
 ) -> int:
     """Upsert df into staging table. Returns rows inserted."""

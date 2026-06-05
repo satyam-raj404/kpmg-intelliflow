@@ -223,7 +223,7 @@ def get_stage_summary(
     # Monthly stage funnel (last 12 months)
     monthly_funnel = conn.execute(f"""
         SELECT
-            strftime('%Y-%m', f.po_document_date) AS month,
+            LEFT(f.po_document_date, 7) AS month,
             COUNT(*) AS po,
             COUNT(CASE WHEN f.grn_posting_date IS NOT NULL THEN 1 END) AS grn,
             COUNT(CASE WHEN f.invoice_posting_date IS NOT NULL THEN 1 END) AS inv
@@ -235,7 +235,7 @@ def get_stage_summary(
 
     # Simplified: just use the base counts without complex filter re-injection
     monthly_funnel = conn.execute(f"""
-        SELECT strftime('%Y-%m', po_document_date) AS month,
+        SELECT LEFT(po_document_date, 7) AS month,
                COUNT(*) AS po_count,
                COUNT(CASE WHEN grn_posting_date IS NOT NULL THEN 1 END) AS grn_count,
                COUNT(CASE WHEN invoice_posting_date IS NOT NULL THEN 1 END) AS inv_count
