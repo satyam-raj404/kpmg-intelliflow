@@ -84,6 +84,10 @@ function KpiRow() {
   const p8 = useKpiValue("procurement", "ACTIVE_VENDOR_COUNT_MTD");
   const p9  = useKpiValue("procurement", "PR_TO_PO_DAYS");
   const p10 = useKpiValue("procurement", "PO_DELETION_MTD");
+  const p11total    = useKpiValue("procurement", "APPROVED_PR_TOTAL");
+  const p11approved = useKpiValue("procurement", "APPROVED_PR_APPROVED");
+  const p12total    = useKpiValue("procurement", "APPROVED_PO_TOTAL");
+  const p12approved = useKpiValue("procurement", "APPROVED_PO_APPROVED");
 
   const fmt = (v: number | null | undefined, unit: string | null | undefined) => {
     if (v == null) return isLoading ? "—" : "No data";
@@ -93,6 +97,14 @@ function KpiRow() {
     return v.toFixed(0);
   };
 
+  const prFraction = p11approved?.value_numeric != null && p11total?.value_numeric != null
+    ? `${Math.round(p11approved.value_numeric)} / ${Math.round(p11total.value_numeric)}`
+    : isLoading ? "—" : "No data";
+
+  const poFraction = p12approved?.value_numeric != null && p12total?.value_numeric != null
+    ? `${Math.round(p12approved.value_numeric)} / ${Math.round(p12total.value_numeric)}`
+    : isLoading ? "—" : "No data";
+
   return (
     <>
       <div className="grid grid-cols-4 gap-3">
@@ -101,13 +113,15 @@ function KpiRow() {
         <KpiCard label="Average PO Value" value={fmt(p3?.value_numeric, p3?.unit)} size="lg" sublabel="Mean net_order_value MTD" index={2} />
         <KpiCard label="Open PO Aging" value={fmt(p4?.value_numeric, p4?.unit)} size="lg" sublabel="Overdue open PO line items · past expected delivery date" threshold={p4?.value_numeric != null && p4.value_numeric > 0 ? { label: "Overdue POs detected", tone: "danger" } : { label: "All deliveries on track", tone: "success" }} index={3} />
       </div>
-      <div className="grid grid-cols-6 gap-3 mt-3">
+      <div className="grid grid-cols-8 gap-3 mt-3">
         <KpiCard label="Maverick Spend Rate" value={fmt(p5?.value_numeric, p5?.unit)} size="md" sublabel="POs without approved PR" threshold={p5?.value_numeric != null && p5.value_numeric > 20 ? { label: "> 20% threshold", tone: "danger" } : { label: "Within target", tone: "success" }} index={4} />
         <KpiCard label="High-Value PO Rate" value={fmt(p6?.value_numeric, p6?.unit)} size="md" sublabel="POs above ₹1 Cr" index={5} />
         <KpiCard label="Total PO Value (YTD)" value={fmt(p7?.value_numeric, p7?.unit)} size="md" sublabel="Sum of active PO values this FY" index={6} />
         <KpiCard label="Active Vendors (YTD)" value={fmt(p8?.value_numeric, p8?.unit)} size="md" sublabel="Distinct vendors on POs this FY" index={7} />
         <KpiCard label="Avg PR-to-PO Time" value={fmt(p9?.value_numeric, p9?.unit)} size="md" sublabel="Avg days from PR requisition date to PO creation date" threshold={p9?.value_numeric != null && p9.value_numeric > 5 ? { label: "> 5 day target", tone: "warning" } : { label: "Within target", tone: "success" }} index={8} />
         <KpiCard label="PO Deletions (MTD)" value={fmt(p10?.value_numeric, p10?.unit)} size="md" sublabel="Deleted line items this month · item level" threshold={p10?.value_numeric != null && p10.value_numeric > 0 ? { label: "Deletions detected", tone: "danger" } : { label: "No deletions", tone: "success" }} index={9} />
+        <KpiCard label="Approved PR Count" value={prFraction} size="md" sublabel="Approved / Total non-deleted PRs · EBAN-FRGZU LIKE 'X%'" threshold={p11approved?.value_numeric != null && p11approved.value_numeric > 0 ? { label: "PRs released", tone: "success" } : { label: "No approvals yet", tone: "info" }} index={10} />
+        <KpiCard label="Approved PO Count" value={poFraction} size="md" sublabel="Approved / Total non-deleted POs · EKKO-FRGKE LIKE 'X%'" threshold={p12approved?.value_numeric != null && p12approved.value_numeric > 0 ? { label: "POs released", tone: "success" } : { label: "No approvals yet", tone: "info" }} index={11} />
       </div>
     </>
   );

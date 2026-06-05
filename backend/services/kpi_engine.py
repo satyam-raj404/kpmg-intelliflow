@@ -224,21 +224,57 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
         pass
 
     # P9 — Total PO Value YTD
+    # SUM at line item level (each po_dump row = one EKPO line; net_order_value = EKPO-NETWR)
+    # Uses created_on (EKKO-ERDAT) with document_date (BEDAT) fallback — consistent with P1/P6
     p9 = _run(conn, f"""
         SELECT SUM(CAST(net_order_value AS REAL))
         FROM po_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
-          AND document_date >= {FY}
+          AND COALESCE(NULLIF(created_on,''), document_date) >= {FY}
     """)
     _upsert(conn, "procurement", "TOTAL_PO_VALUE_YTD", "Total PO Value (YTD)", p9, None, "INR")
 
     # P10 — PO Line Count YTD
+    # COUNT at item level: DISTINCT purchasing_document + item (EKKO-EBELN + EKPO-EBELP)
+    # Uses created_on (EKKO-ERDAT) with document_date (BEDAT) fallback — consistent with P1/P6/P9
     p10 = _run(conn, f"""
-        SELECT COUNT(*) FROM po_dump
+        SELECT COUNT(DISTINCT purchasing_document || '|' || item) FROM po_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
-          AND document_date >= {FY}
+          AND COALESCE(NULLIF(created_on,''), document_date) >= {FY}
     """)
     _upsert(conn, "procurement", "PO_LINE_COUNT_YTD", "PO Line Count (YTD)", p10, None, "count")
+
+    # P11 — Approved PR Count vs Total Active PR Count
+    # Total: DISTINCT purchase_requisition WHERE deletion_indicator != 'X' (EBAN-LOEKZ)
+    # Approved: above + release_status LIKE 'X%' (EBAN-FRGZU, any single or multi-level release)
+    # Header level — approval is a document-level event, not line-item level
+    pr_total = _run(conn, """
+        SELECT COUNT(DISTINCT purchase_requisition) FROM pr_dump
+        WHERE (deletion_indicator IS NULL OR deletion_indicator = '')
+    """)
+    pr_approved = _run(conn, """
+        SELECT COUNT(DISTINCT purchase_requisition) FROM pr_dump
+        WHERE (deletion_indicator IS NULL OR deletion_indicator = '')
+          AND release_status LIKE 'X%'
+    """)
+    _upsert(conn, "procurement", "APPROVED_PR_TOTAL",    "Total Active PRs", pr_total,    None, "count")
+    _upsert(conn, "procurement", "APPROVED_PR_APPROVED", "Approved PRs",     pr_approved, None, "count")
+
+    # P12 — Approved PO Count vs Total Active PO Count
+    # Total: DISTINCT purchasing_document WHERE deletion_indicator NOT IN ('L','X') (EKPO-LOEKZ)
+    # Approved: above + release_indicator LIKE 'X%' (EKKO-FRGKE, any single or multi-level release)
+    # Header level — approval is a document-level event, not line-item level
+    po_total_hdr = _run(conn, """
+        SELECT COUNT(DISTINCT purchasing_document) FROM po_dump
+        WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+    """)
+    po_approved_hdr = _run(conn, """
+        SELECT COUNT(DISTINCT purchasing_document) FROM po_dump
+        WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+          AND release_indicator LIKE 'X%'
+    """)
+    _upsert(conn, "procurement", "APPROVED_PO_TOTAL",    "Total Active POs", po_total_hdr,    None, "count")
+    _upsert(conn, "procurement", "APPROVED_PO_APPROVED", "Approved POs",     po_approved_hdr, None, "count")
 
     # ── Frontend-expected aliases ─────────────────────────────────────────────
 
