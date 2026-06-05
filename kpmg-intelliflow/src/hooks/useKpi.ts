@@ -7,9 +7,9 @@ export type Dashboard = "procurement" | "financial" | "leadership" | "vendor" | 
 
 const VALID_DASHBOARDS: Dashboard[] = ["procurement", "financial", "leadership", "vendor", "utilization"];
 
-export function useKpi(dashboard: Dashboard, companyCode?: string) {
+/** Call ONCE per page — opens a single SSE connection and invalidates KPI cache on refresh events. */
+export function useKpiStream() {
   const queryClient = useQueryClient();
-
   useEffect(() => {
     const es = new EventSource("/api/stream");
     es.addEventListener("message", (e) => {
@@ -26,7 +26,9 @@ export function useKpi(dashboard: Dashboard, companyCode?: string) {
     });
     return () => es.close();
   }, [queryClient]);
+}
 
+export function useKpi(dashboard: Dashboard, companyCode?: string) {
   return useQuery<DashboardKpis>({
     queryKey: ["kpi", dashboard, companyCode ?? ""],
     queryFn: () => fetchKpis(dashboard, companyCode),

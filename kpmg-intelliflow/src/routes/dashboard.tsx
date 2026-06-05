@@ -25,7 +25,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { formatINR, formatDateShort } from "@/lib/format";
 import { brand } from "@/lib/brand";
 import { apiFetch } from "@/api/client";
-import { useKpi, useKpiValue, useCharts, useCompanies } from "@/hooks/useKpi";
+import { useKpi, useKpiValue, useCharts, useCompanies, useKpiStream } from "@/hooks/useKpi";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,6 +58,7 @@ interface DeletedPO {
 }
 
 function ProcurementDashboard() {
+  useKpiStream();
   const [companyCode, setCompanyCode] = useState("");
   const { data: companiesData } = useCompanies();
   const companies = companiesData?.companies ?? [];
