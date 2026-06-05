@@ -609,7 +609,15 @@ def _financial(conn, FY, MTD, cc_cfg: str = "", company_code: str = "ALL"):
 
 # ── LEADERSHIP ────────────────────────────────────────────────────────────────
 
-def _leadership(conn, FY, MTD, high_value_threshold):
+def _leadership(conn, FY, MTD, high_value_threshold, cc_cfg: str = "", company_code: str = "ALL"):
+    _cc_codes = [c.strip() for c in cc_cfg.split(',') if c.strip()]
+    _cc_list  = ','.join(f"'{c}'" for c in _cc_codes) if _cc_codes else None
+    _cc_po   = f"po.company_code IN ({_cc_list})"   if _cc_list else "1=1"
+    _cc_inv  = f"i.company_code IN ({_cc_list})"    if _cc_list else "1=1"
+    _cc_grn  = f"grn.company_code IN ({_cc_list})"  if _cc_list else "1=1"
+    _cc_bare = f"company_code IN ({_cc_list})"       if _cc_list else "1=1"
+    _cc_fact = f"company_code IN ({_cc_list})"       if _cc_list else "1=1"
+    _cc_f    = f"f.company_code IN ({_cc_list})"     if _cc_list else "1=1"
 
     # L1 — Total Procurement Value + Count YTD
     #   Date filter on created_on (creation_date in SAP); deletion <> 'L' only (not X)
@@ -628,6 +636,7 @@ def _leadership(conn, FY, MTD, high_value_threshold):
             WHERE (deletion_indicator IS NULL OR deletion_indicator <> 'L')
               AND created_on >= {FY}
               AND created_on <= CURRENT_DATE::TEXT
+              AND {_cc_bare}
         """).fetchone()
         l1_value       = round(float(l1_row[0] or 0), 2)
         l1_total       = int(l1_row[1] or 0)
@@ -639,12 +648,12 @@ def _leadership(conn, FY, MTD, high_value_threshold):
             "released_count":    l1_released,
             "non_released_count": l1_nonreleased,
         })
-        _upsert(conn, "leadership", "TOTAL_SPEND_YTD",    "Total Procurement Value (YTD)", l1_value, l1_json, "INR")
-        _upsert(conn, "leadership", "TOTAL_PO_COUNT_YTD", "Total PO Count (YTD)",          l1_total, l1_json, "count")
+        _upsert(conn, "leadership", "TOTAL_SPEND_YTD",    "Total Procurement Value (YTD)", l1_value, l1_json, "INR",   company_code=company_code)
+        _upsert(conn, "leadership", "TOTAL_PO_COUNT_YTD", "Total PO Count (YTD)",          l1_total, l1_json, "count", company_code=company_code)
     except Exception:
         l1_value = None
-        _upsert(conn, "leadership", "TOTAL_SPEND_YTD",    "Total Procurement Value (YTD)", None, None, "INR")
-        _upsert(conn, "leadership", "TOTAL_PO_COUNT_YTD", "Total PO Count (YTD)",          None, None, "count")
+        _upsert(conn, "leadership", "TOTAL_SPEND_YTD",    "Total Procurement Value (YTD)", None, None, "INR",   company_code=company_code)
+        _upsert(conn, "leadership", "TOTAL_PO_COUNT_YTD", "Total PO Count (YTD)",          None, None, "count", company_code=company_code)
 
     # L_GRN — GRN Count + Value YTD
     #   movement_type = '101' (goods receipt against PO); debit_credit_ind applied to value
@@ -658,12 +667,13 @@ def _leadership(conn, FY, MTD, high_value_threshold):
             FROM grn_dump
             WHERE movement_type = '101'
               AND posting_date >= {FY}
+              AND {_cc_bare}
         """).fetchone()
         grn_count = int(grn_row[0] or 0)
         grn_value = round(float(grn_row[1] or 0), 2)
         grn_json  = json.dumps({"count": grn_count, "value": grn_value})
-        _upsert(conn, "leadership", "GRN_COUNT_YTD", "GRN Count (YTD)",  grn_count, grn_json, "count")
-        _upsert(conn, "leadership", "GRN_VALUE_YTD", "GRN Value (YTD)",  grn_value, grn_json, "INR")
+        _upsert(conn, "leadership", "GRN_COUNT_YTD", "GRN Count (YTD)",  grn_count, grn_json, "count", company_code=company_code)
+        _upsert(conn, "leadership", "GRN_VALUE_YTD", "GRN Value (YTD)",  grn_value, grn_json, "INR",   company_code=company_code)
     except Exception:
         pass
 
@@ -686,12 +696,13 @@ def _leadership(conn, FY, MTD, high_value_threshold):
               AND posting_date >= {FY}
               AND invoice_doc NOT IN (SELECT doc FROM cancelled)
               AND (reverse_invoice IS NULL OR reverse_invoice = '')
+              AND {_cc_bare}
         """).fetchone()
         inv_count = int(inv_row[0] or 0)
         inv_value = round(float(inv_row[1] or 0), 2)
         inv_json  = json.dumps({"count": inv_count, "value": inv_value})
-        _upsert(conn, "leadership", "INVOICE_COUNT_YTD", "Invoice Count (YTD)", inv_count, inv_json, "count")
-        _upsert(conn, "leadership", "INVOICE_VALUE_YTD", "Invoice Value (YTD)", inv_value, inv_json, "INR")
+        _upsert(conn, "leadership", "INVOICE_COUNT_YTD", "Invoice Count (YTD)", inv_count, inv_json, "count", company_code=company_code)
+        _upsert(conn, "leadership", "INVOICE_VALUE_YTD", "Invoice Value (YTD)", inv_value, inv_json, "INR",   company_code=company_code)
     except Exception:
         pass
 
@@ -712,6 +723,7 @@ def _leadership(conn, FY, MTD, high_value_threshold):
                   SELECT DISTINCT reverse_invoice FROM invoice_dump
                   WHERE reverse_invoice IS NOT NULL AND reverse_invoice != ''
               )
+              AND {_cc_inv}
             GROUP BY i.company_code, v.vendor_type
             ORDER BY i.company_code, total_amount DESC
         """).fetchall()
@@ -719,42 +731,46 @@ def _leadership(conn, FY, MTD, high_value_threshold):
                           "invoice_count": int(r[2]), "total_amount": round(r[3] or 0, 2)}
                          for r in inv_type_rows]
         _upsert(conn, "leadership", "INVOICE_BY_VENDOR_TYPE", "Invoice Summary by Vendor Type",
-                None, json.dumps(inv_type_list), "json")
+                None, json.dumps(inv_type_list), "json", company_code=company_code)
     except Exception:
         pass
 
     # L2 — Maverick PO Rate
-    l2 = _run(conn, """
+    l2 = _run(conn, f"""
         SELECT COUNT(CASE WHEN is_maverick = 1 THEN 1 END) * 100.0
                / NULLIF(COUNT(*), 0)
         FROM pr_po_grn_invoice
         WHERE purchasing_document IS NOT NULL
+          AND {_cc_fact}
     """)
-    _upsert(conn, "leadership", "MAVERICK_BUY_RATE", "Maverick PO Rate (%)", l2, None, "%")
+    _upsert(conn, "leadership", "MAVERICK_BUY_RATE", "Maverick PO Rate (%)", l2, None, "%", company_code=company_code)
 
     # L3 — End-to-End P2P Cycle Time
-    l3 = _run(conn, """
+    l3 = _run(conn, f"""
         SELECT AVG(CAST(total_cycle_days AS REAL))
         FROM pr_po_grn_invoice
         WHERE total_cycle_days IS NOT NULL AND total_cycle_days > 0
+          AND {_cc_fact}
     """)
-    _upsert(conn, "leadership", "E2E_CYCLE_TIME", "End-to-End P2P Cycle (days)", l3, None, "days")
+    _upsert(conn, "leadership", "E2E_CYCLE_TIME", "End-to-End P2P Cycle (days)", l3, None, "days", company_code=company_code)
 
     # L4 — Vendor Concentration Risk (Top-3 vendors' share of total spend)
     #   deletion_indicator <> 'L' only; JSON stores top-10 vendor breakdown for chart
     try:
-        l4_total = conn.execute("""
+        l4_total = conn.execute(f"""
             SELECT SUM(CAST(net_order_value AS REAL)) FROM po_dump
             WHERE (deletion_indicator IS NULL OR deletion_indicator <> 'L')
+              AND {_cc_bare}
         """).fetchone()
         total_v = float(l4_total[0] or 0)
-        l4_rows = conn.execute("""
+        l4_rows = conn.execute(f"""
             SELECT po.vendor,
                    COALESCE(MIN(vm.vendor_name), MIN(po.vendor_name), po.vendor) AS name,
                    SUM(CAST(po.net_order_value AS REAL)) AS spend
             FROM po_dump po
             LEFT JOIN vendor_master vm ON po.vendor = vm.vendor
             WHERE (po.deletion_indicator IS NULL OR po.deletion_indicator <> 'L')
+              AND {_cc_po}
             GROUP BY po.vendor
             ORDER BY spend DESC
             LIMIT 10
@@ -765,15 +781,15 @@ def _leadership(conn, FY, MTD, high_value_threshold):
         top3_spend = sum(v["spend"] for v in vendors_list[:3])
         l4 = round(top3_spend / total_v * 100, 2) if total_v else None
         _upsert(conn, "leadership", "VENDOR_CONCENTRATION", "Top-3 Vendor Spend Concentration (%)",
-                l4, json.dumps({"concentration_pct": l4, "vendors": vendors_list}), "%")
+                l4, json.dumps({"concentration_pct": l4, "vendors": vendors_list}), "%", company_code=company_code)
     except Exception:
         l4 = None
-        _upsert(conn, "leadership", "VENDOR_CONCENTRATION", "Top-3 Vendor Spend Concentration (%)", None, None, "%")
+        _upsert(conn, "leadership", "VENDOR_CONCENTRATION", "Top-3 Vendor Spend Concentration (%)", None, None, "%", company_code=company_code)
 
     # L4b — Single Source Procurement: same company + material_description, COUNT(DISTINCT vendor) = 1
     #   Indicates supply dependency / risk; value_text = JSON top-20 items list for chart
     try:
-        ss_total_row = conn.execute("""
+        ss_total_row = conn.execute(f"""
             SELECT COUNT(*), SUM(total_value)
             FROM (
                 SELECT company_code, material_description,
@@ -781,13 +797,14 @@ def _leadership(conn, FY, MTD, high_value_threshold):
                 FROM po_dump
                 WHERE (deletion_indicator IS NULL OR deletion_indicator <> 'L')
                   AND material_description IS NOT NULL AND material_description != ''
+                  AND {_cc_bare}
                 GROUP BY company_code, material_description
                 HAVING COUNT(DISTINCT vendor) = 1
             )
         """).fetchone()
         ss_count = int(ss_total_row[0] or 0)
         ss_value = round(float(ss_total_row[1] or 0), 2)
-        ss_items = conn.execute("""
+        ss_items = conn.execute(f"""
             WITH ss AS (
                 SELECT po.company_code, po.material_description,
                        MIN(po.vendor) AS vendor_code,
@@ -795,6 +812,7 @@ def _leadership(conn, FY, MTD, high_value_threshold):
                 FROM po_dump po
                 WHERE (po.deletion_indicator IS NULL OR po.deletion_indicator <> 'L')
                   AND po.material_description IS NOT NULL AND po.material_description != ''
+                  AND {_cc_po}
                 GROUP BY po.company_code, po.material_description
                 HAVING COUNT(DISTINCT po.vendor) = 1
             )
@@ -809,22 +827,23 @@ def _leadership(conn, FY, MTD, high_value_threshold):
         ss_list = [{"company": r[0], "material": r[1], "vendor": r[2],
                     "vendor_name": r[3], "value": float(r[4] or 0)} for r in ss_items]
         _upsert(conn, "leadership", "SINGLE_SOURCE_COUNT", "Single Source Procurement Count",
-                ss_count, json.dumps({"count": ss_count, "value": ss_value, "items": ss_list}), "count")
+                ss_count, json.dumps({"count": ss_count, "value": ss_value, "items": ss_list}), "count", company_code=company_code)
         _upsert(conn, "leadership", "SINGLE_SOURCE_VALUE", "Single Source Procurement Value",
-                ss_value, None, "INR")
+                ss_value, None, "INR", company_code=company_code)
     except Exception:
         pass
 
     # L5 — Negotiation Savings YTD: (PR valuation_price - PO net_order_price) × qty, where positive
-    l5 = _run(conn, """
+    l5 = _run(conn, f"""
         SELECT SUM((CAST(f.pr_value AS REAL) - CAST(f.po_net_price AS REAL))
                    * CAST(f.po_quantity AS REAL))
         FROM pr_po_grn_invoice f
         WHERE f.pr_value    IS NOT NULL
           AND f.po_net_price IS NOT NULL
           AND (CAST(f.pr_value AS REAL) - CAST(f.po_net_price AS REAL)) > 0
+          AND {_cc_f}
     """)
-    _upsert(conn, "leadership", "NEGOTIATION_SAVINGS", "Negotiation Savings YTD", l5, None, "INR")
+    _upsert(conn, "leadership", "NEGOTIATION_SAVINGS", "Negotiation Savings YTD", l5, None, "INR", company_code=company_code)
 
     # L6 — Strategic Risk Index: 0.4×vendor_conc + 0.3×maverick + 0.3×anomaly_rate (0-100)
     try:
@@ -836,12 +855,12 @@ def _leadership(conn, FY, MTD, high_value_threshold):
         l6 = round(0.4 * conc_pct + 0.3 * mav_pct + 0.3 * anom_pct, 1)
     except Exception:
         l6 = None
-    _upsert(conn, "leadership", "SUPPLY_RISK_SCORE", "Supply Chain Risk Score", l6, None, "score")
+    _upsert(conn, "leadership", "SUPPLY_RISK_SCORE", "Supply Chain Risk Score", l6, None, "score", company_code=company_code)
 
     # L7 — SOD Conflicts (4 scenarios)
     # S7a — PO Creation vs PO Release
     #   PO created_by matches change_log.username who released (FRGZU='X')
-    s7a = _run(conn, """
+    s7a = _run(conn, f"""
         SELECT COUNT(DISTINCT po.purchasing_document)
         FROM po_dump po
         JOIN change_log cl
@@ -853,12 +872,12 @@ def _leadership(conn, FY, MTD, high_value_threshold):
           AND cl.new_value         = 'X'
           AND cl.username          = po.created_by
           AND (po.deletion_indicator IS NULL OR po.deletion_indicator = '')
+          AND {_cc_po}
     """)
-    _upsert(conn, "leadership", "SOD_PO_CREATE_RELEASE", "SOD: PO Create vs Release", s7a, None, "count")
+    _upsert(conn, "leadership", "SOD_PO_CREATE_RELEASE", "SOD: PO Create vs Release", s7a, None, "count", company_code=company_code)
 
     # S7b — PO Creation vs GRN
-    #   PO created_by matches GRN created_by (same person ordering AND receiving)
-    s7b = _run(conn, """
+    s7b = _run(conn, f"""
         SELECT COUNT(DISTINCT po.purchasing_document || '|' || po.item)
         FROM po_dump po
         JOIN grn_dump grn
@@ -867,12 +886,12 @@ def _leadership(conn, FY, MTD, high_value_threshold):
         WHERE po.created_by = grn.created_by
           AND (po.deletion_indicator IS NULL OR po.deletion_indicator = '')
           AND grn.debit_credit_ind = 'S'
+          AND {_cc_po}
     """)
-    _upsert(conn, "leadership", "SOD_PO_GRN", "SOD: PO vs GRN", s7b, None, "count")
+    _upsert(conn, "leadership", "SOD_PO_GRN", "SOD: PO vs GRN", s7b, None, "count", company_code=company_code)
 
     # S7c — GRN vs Invoice
-    #   GRN created_by matches Invoice (po_invoice_dump) created_by
-    s7c = _run(conn, """
+    s7c = _run(conn, f"""
         SELECT COUNT(DISTINCT grn.material_document)
         FROM grn_dump grn
         JOIN po_invoice_dump inv
@@ -881,12 +900,12 @@ def _leadership(conn, FY, MTD, high_value_threshold):
         WHERE grn.created_by = inv.created_by
           AND grn.debit_credit_ind  = 'S'
           AND inv.debit_credit_ind  = 'S'
+          AND {_cc_grn}
     """)
-    _upsert(conn, "leadership", "SOD_GRN_INVOICE", "SOD: GRN vs Invoice", s7c, None, "count")
+    _upsert(conn, "leadership", "SOD_GRN_INVOICE", "SOD: GRN vs Invoice", s7c, None, "count", company_code=company_code)
 
     # S7d — Invoice vs Payment
-    #   Invoice created_by matches Payment created_by
-    s7d = _run(conn, """
+    s7d = _run(conn, f"""
         SELECT COUNT(DISTINCT i.invoice_doc)
         FROM invoice_dump i
         JOIN payment_dump p
@@ -901,35 +920,37 @@ def _leadership(conn, FY, MTD, high_value_threshold):
               WHERE reverse_invoice IS NOT NULL AND reverse_invoice != ''
           )
           AND p.debit_credit_ind = 'S'
+          AND {_cc_inv}
     """)
-    _upsert(conn, "leadership", "SOD_INVOICE_PAYMENT", "SOD: Invoice vs Payment", s7d, None, "count")
+    _upsert(conn, "leadership", "SOD_INVOICE_PAYMENT", "SOD: Invoice vs Payment", s7d, None, "count", company_code=company_code)
 
     # Combined SOD count
     s7_total = (s7a or 0) + (s7b or 0) + (s7c or 0) + (s7d or 0)
-    _upsert(conn, "leadership", "SOD_CONFLICT_COUNT", "SOD Conflict Count (All)", s7_total, None, "count")
+    _upsert(conn, "leadership", "SOD_CONFLICT_COUNT", "SOD Conflict Count (All)", s7_total, None, "count", company_code=company_code)
 
     # L8 — PO to GRN Conversion Rate
-    l8_total = _run(conn, """
+    l8_total = _run(conn, f"""
         SELECT COUNT(DISTINCT purchasing_document || '|' || item)
         FROM pr_po_grn_invoice
-        WHERE purchasing_document IS NOT NULL
+        WHERE purchasing_document IS NOT NULL AND {_cc_fact}
     """)
-    l8_with_grn = _run(conn, """
+    l8_with_grn = _run(conn, f"""
         SELECT COUNT(DISTINCT purchasing_document || '|' || item)
         FROM pr_po_grn_invoice
-        WHERE purchasing_document IS NOT NULL AND grn_posting_date IS NOT NULL
+        WHERE purchasing_document IS NOT NULL AND grn_posting_date IS NOT NULL AND {_cc_fact}
     """)
     l8 = round((l8_with_grn / l8_total * 100), 2) if l8_with_grn and l8_total else None
-    _upsert(conn, "leadership", "PO_GRN_CONVERSION_RATE", "PO→GRN Conversion Rate (%)", l8, None, "%")
+    _upsert(conn, "leadership", "PO_GRN_CONVERSION_RATE", "PO→GRN Conversion Rate (%)", l8, None, "%", company_code=company_code)
 
     # L9 — Duplicate Invoice Count: same company, vendor_invoice_ref, amount, vendor, posting_date
     #        Remove cancelled invoices (reverse_invoice); count excess system docs beyond the first
-    l9 = _run(conn, """
+    l9 = _run(conn, f"""
         SELECT SUM(cnt - 1) FROM (
             SELECT COUNT(DISTINCT invoice_doc) AS cnt
             FROM invoice_dump
             WHERE document_type IN ('RE','KR')
               AND (reverse_invoice IS NULL OR reverse_invoice = '')
+              AND {_cc_bare}
               AND invoice_doc NOT IN (
                   SELECT DISTINCT reverse_invoice FROM invoice_dump
                   WHERE reverse_invoice IS NOT NULL AND reverse_invoice != ''
@@ -940,15 +961,16 @@ def _leadership(conn, FY, MTD, high_value_threshold):
             HAVING COUNT(DISTINCT invoice_doc) > 1
         )
     """)
-    _upsert(conn, "leadership", "DUPLICATE_INVOICE_COUNT", "Duplicate Invoice Count", l9, None, "count")
+    _upsert(conn, "leadership", "DUPLICATE_INVOICE_COUNT", "Duplicate Invoice Count", l9, None, "count", company_code=company_code)
 
     # L9b — Duplicate PO Count: same company, material_group, vendor, net_order_value, qty, date
     #        Remove deleted POs; count excess documents beyond the first
-    l9b = _run(conn, """
+    l9b = _run(conn, f"""
         SELECT SUM(cnt - 1) FROM (
             SELECT COUNT(DISTINCT purchasing_document) AS cnt
             FROM po_dump
             WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+              AND {_cc_bare}
             GROUP BY company_code, material_group, vendor,
                      CAST(net_order_value AS REAL),
                      CAST(order_quantity AS REAL),
@@ -956,7 +978,7 @@ def _leadership(conn, FY, MTD, high_value_threshold):
             HAVING COUNT(DISTINCT purchasing_document) > 1
         )
     """)
-    _upsert(conn, "leadership", "DUPLICATE_PO_COUNT", "Duplicate PO Count", l9b, None, "count")
+    _upsert(conn, "leadership", "DUPLICATE_PO_COUNT", "Duplicate PO Count", l9b, None, "count", company_code=company_code)
 
     # L10 — High-Value PO Count (uses user-configurable threshold)
     l10 = _run(conn, f"""
@@ -964,9 +986,10 @@ def _leadership(conn, FY, MTD, high_value_threshold):
         FROM po_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
           AND CAST(net_order_value AS REAL) > {high_value_threshold}
+          AND {_cc_bare}
     """)
     _upsert(conn, "leadership", "HIGH_VALUE_PO_COUNT",
-            f"High-Value PO Count (>₹{int(high_value_threshold):,})", l10, None, "count")
+            f"High-Value PO Count (>₹{int(high_value_threshold):,})", l10, None, "count", company_code=company_code)
 
     # L11a — PR Amount YTD
     l11a = _run(conn, f"""
@@ -974,8 +997,9 @@ def _leadership(conn, FY, MTD, high_value_threshold):
         FROM pr_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator = '')
           AND release_date >= {FY}
+          AND {_cc_bare}
     """)
-    _upsert(conn, "leadership", "PR_AMOUNT_YTD", "PR Amount (YTD)", l11a, None, "INR")
+    _upsert(conn, "leadership", "PR_AMOUNT_YTD", "PR Amount (YTD)", l11a, None, "INR", company_code=company_code)
 
     # L11b — PR Line Count YTD
     l11b = _run(conn, f"""
@@ -983,8 +1007,9 @@ def _leadership(conn, FY, MTD, high_value_threshold):
         FROM pr_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator = '')
           AND release_date >= {FY}
+          AND {_cc_bare}
     """)
-    _upsert(conn, "leadership", "PR_LINE_COUNT_YTD", "PR Line Count (YTD)", l11b, None, "count")
+    _upsert(conn, "leadership", "PR_LINE_COUNT_YTD", "PR Line Count (YTD)", l11b, None, "count", company_code=company_code)
 
     # L11c — PO Line Count YTD
     l11c = _run(conn, f"""
@@ -992,34 +1017,37 @@ def _leadership(conn, FY, MTD, high_value_threshold):
         FROM po_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
           AND document_date >= {FY}
+          AND {_cc_bare}
     """)
-    _upsert(conn, "leadership", "PO_LINE_COUNT_YTD", "PO Line Count (YTD)", l11c, None, "count")
+    _upsert(conn, "leadership", "PO_LINE_COUNT_YTD", "PO Line Count (YTD)", l11c, None, "count", company_code=company_code)
 
     # L11d — One-Time Vendor Count
-    l11d = _run(conn, """
+    l11d = _run(conn, f"""
         SELECT COUNT(*) FROM vendor_master
         WHERE UPPER(vendor_type) = 'ONE_TIME'
+          AND {_cc_bare}
     """)
-    _upsert(conn, "leadership", "ONE_TIME_VENDOR_COUNT", "One-Time Vendor Count", l11d, None, "count")
+    _upsert(conn, "leadership", "ONE_TIME_VENDOR_COUNT", "One-Time Vendor Count", l11d, None, "count", company_code=company_code)
 
     # L11e — PO Lines without Contract (no contract_number in PO)
-    l11e = _run(conn, """
+    l11e = _run(conn, f"""
         SELECT COUNT(*) FROM po_dump
         WHERE (contract_number IS NULL OR contract_number = '')
           AND (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+          AND {_cc_bare}
     """)
-    _upsert(conn, "leadership", "PO_NO_CONTRACT_COUNT", "PO Lines without Contract", l11e, None, "count")
+    _upsert(conn, "leadership", "PO_NO_CONTRACT_COUNT", "PO Lines without Contract", l11e, None, "count", company_code=company_code)
 
     # L12 — Summary counts (JSON) — expanded
     try:
-        pr_count     = _run(conn, "SELECT COUNT(DISTINCT purchase_requisition || '|' || item_of_requisition) FROM pr_dump WHERE release_status IN ('X','XX','XXX','XXXX','XXXXX')") or 0
-        approved_po  = _run(conn, "SELECT COUNT(DISTINCT purchasing_document || '|' || item) FROM po_dump WHERE release_indicator = 'X' AND (deletion_indicator IS NULL OR deletion_indicator = '')") or 0
-        grn_count    = _run(conn, "SELECT COUNT(*) FROM grn_dump WHERE debit_credit_ind = 'S'") or 0
-        inv_count    = _run(conn, "SELECT COUNT(*) FROM invoice_dump WHERE document_type IN ('RE','KR') AND CAST(amount_local_ccy AS REAL) > 0") or 0
-        pay_count    = _run(conn, "SELECT COUNT(*) FROM payment_dump") or 0
-        po_no_pr     = _run(conn, "SELECT COUNT(DISTINCT purchasing_document) FROM po_dump WHERE (purchase_requisition IS NULL OR purchase_requisition = '') AND (deletion_indicator IS NULL OR deletion_indicator = '')") or 0
-        one_time_v   = _run(conn, "SELECT COUNT(*) FROM vendor_master WHERE UPPER(vendor_type) = 'ONE_TIME'") or 0
-        po_no_contract = _run(conn, "SELECT COUNT(*) FROM po_dump WHERE (contract_number IS NULL OR contract_number = '') AND (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))") or 0
+        pr_count     = _run(conn, f"SELECT COUNT(DISTINCT purchase_requisition || '|' || item_of_requisition) FROM pr_dump WHERE release_status IN ('X','XX','XXX','XXXX','XXXXX') AND {_cc_bare}") or 0
+        approved_po  = _run(conn, f"SELECT COUNT(DISTINCT purchasing_document || '|' || item) FROM po_dump WHERE release_indicator = 'X' AND (deletion_indicator IS NULL OR deletion_indicator = '') AND {_cc_bare}") or 0
+        grn_count    = _run(conn, f"SELECT COUNT(*) FROM grn_dump WHERE debit_credit_ind = 'S' AND {_cc_bare}") or 0
+        inv_count    = _run(conn, f"SELECT COUNT(*) FROM invoice_dump WHERE document_type IN ('RE','KR') AND CAST(amount_local_ccy AS REAL) > 0 AND {_cc_bare}") or 0
+        pay_count    = _run(conn, f"SELECT COUNT(*) FROM payment_dump WHERE {_cc_bare}") or 0
+        po_no_pr     = _run(conn, f"SELECT COUNT(DISTINCT purchasing_document) FROM po_dump WHERE (purchase_requisition IS NULL OR purchase_requisition = '') AND (deletion_indicator IS NULL OR deletion_indicator = '') AND {_cc_bare}") or 0
+        one_time_v   = _run(conn, f"SELECT COUNT(*) FROM vendor_master WHERE UPPER(vendor_type) = 'ONE_TIME' AND {_cc_bare}") or 0
+        po_no_contract = _run(conn, f"SELECT COUNT(*) FROM po_dump WHERE (contract_number IS NULL OR contract_number = '') AND (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X')) AND {_cc_bare}") or 0
         dupl_inv     = l9 or 0
         sod_count    = s7_total or 0
         counts = {
@@ -1030,7 +1058,7 @@ def _leadership(conn, FY, MTD, high_value_threshold):
             "duplicate_invoices": int(dupl_inv), "sod_conflicts": int(sod_count),
         }
         _upsert(conn, "leadership", "SUMMARY_COUNTS", "P2P Summary Counts",
-                None, json.dumps(counts), "json")
+                None, json.dumps(counts), "json", company_code=company_code)
     except Exception:
         pass
 
@@ -1039,15 +1067,18 @@ def _leadership(conn, FY, MTD, high_value_threshold):
 
 def _vendor(conn, FY, MTD, cc_cfg: str = "", company_code: str = "ALL"):
     _cc_codes = [c.strip() for c in cc_cfg.split(',') if c.strip()]
-    _cc_sql   = ("po.company_code IN (" + ','.join(f"'{c}'" for c in _cc_codes) + ")"
-                 if _cc_codes else "1=1")
+    _cc_list  = ','.join(f"'{c}'" for c in _cc_codes) if _cc_codes else None
+    _cc_sql   = f"po.company_code IN ({_cc_list})"  if _cc_list else "1=1"
+    _cc_vm    = f"company_code IN ({_cc_list})"     if _cc_list else "1=1"
+    _cc_bare  = f"company_code IN ({_cc_list})"     if _cc_list else "1=1"
+    _cc_grn   = f"grn.company_code IN ({_cc_list})" if _cc_list else "1=1"
 
     # V1 — Active Vendor Count: all 5 blocks must be clear (blank/null = unblocked)
     #   Purchasing blocks: central_purchasing_block <> 'X', posting_block_cc <> 'X'
     #   Posting blocks:    central_posting_block <> 'X'
     #   Deletion:          deletion_flag_central <> 'X'
     #   Payment block:     payment_block <> '*'  (SAP uses '*' not 'X' for payment block)
-    v1 = _run(conn, """
+    v1 = _run(conn, f"""
         SELECT COUNT(DISTINCT vendor)
         FROM vendor_master
         WHERE (central_purchasing_block IS NULL OR central_purchasing_block <> 'X')
@@ -1055,15 +1086,16 @@ def _vendor(conn, FY, MTD, cc_cfg: str = "", company_code: str = "ALL"):
           AND (deletion_flag_central    IS NULL OR deletion_flag_central    <> 'X')
           AND (payment_block            IS NULL OR payment_block            <> '*')
           AND (posting_block_cc         IS NULL OR posting_block_cc         <> 'X')
+          AND {_cc_vm}
     """)
-    _upsert(conn, "vendor", "ACTIVE_VENDOR_COUNT", "Active Vendor Count", v1, None, "count")
+    _upsert(conn, "vendor", "ACTIVE_VENDOR_COUNT", "Active Vendor Count", v1, None, "count", company_code=company_code)
 
     # V2 — Vendor Health Breakdown
     #   Compliance rate = vendors with all 3 operational blocks clear / total * 100
     #   3 blocks: central_purchasing_block <> 'X', payment_block <> '*', posting_block_cc <> 'X'
     #   JSON stores full breakdown: active, non_active, one_time, domestic, international, msme
     try:
-        v2_row = conn.execute("""
+        v2_row = conn.execute(f"""
             SELECT
                 COUNT(CASE WHEN (central_purchasing_block IS NULL OR central_purchasing_block <> 'X')
                              AND (payment_block            IS NULL OR payment_block            <> '*')
@@ -1079,6 +1111,7 @@ def _vendor(conn, FY, MTD, cc_cfg: str = "", company_code: str = "ALL"):
                 COUNT(CASE WHEN msme_flag IN ('M','S')               THEN 1 END),
                 COUNT(*)
             FROM vendor_master
+            WHERE {_cc_vm}
         """).fetchone()
         v2_active = int(v2_row[0] or 0)
         v2_total  = int(v2_row[6] or 0)
@@ -1094,7 +1127,7 @@ def _vendor(conn, FY, MTD, cc_cfg: str = "", company_code: str = "ALL"):
             "compliance_rate": v2_rate,
         }
         _upsert(conn, "vendor", "VENDOR_BREAKDOWN", "Vendor Health Breakdown",
-                v2_rate, json.dumps(v2_health), "%")
+                v2_rate, json.dumps(v2_health), "%", company_code=company_code)
     except Exception:
         pass
 
@@ -1153,7 +1186,7 @@ def _vendor(conn, FY, MTD, cc_cfg: str = "", company_code: str = "ALL"):
         pass
 
     # V4 — Average Delivery Delay (late deliveries only)
-    v4 = _run(conn, """
+    v4 = _run(conn, f"""
         SELECT AVG((grn.posting_date::DATE - pod.expected_delivery_date::DATE)::FLOAT)
         FROM po_delivery_dump pod
         JOIN grn_dump grn
@@ -1161,23 +1194,26 @@ def _vendor(conn, FY, MTD, cc_cfg: str = "", company_code: str = "ALL"):
          AND grn.item               = pod.item
         WHERE grn.debit_credit_ind  = 'S'
           AND grn.posting_date      > pod.expected_delivery_date
+          AND {_cc_grn}
     """)
-    _upsert(conn, "vendor", "AVG_DELIVERY_DELAY", "Avg Delivery Delay (days, late only)", v4, None, "days")
+    _upsert(conn, "vendor", "AVG_DELIVERY_DELAY", "Avg Delivery Delay (days, late only)", v4, None, "days", company_code=company_code)
 
 
     # V6 — Top-10 vendors by spend share (JSON)
     try:
-        total_v = _run(conn, """
+        total_v = _run(conn, f"""
             SELECT SUM(CAST(net_order_value AS REAL)) FROM po_dump
-            WHERE deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X')
+            WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+              AND {_cc_bare}
         """) or 1
-        rows = conn.execute("""
+        rows = conn.execute(f"""
             SELECT po.vendor,
                    COALESCE(MIN(vm.vendor_name), MIN(po.vendor_name), po.vendor) AS name,
                    SUM(CAST(po.net_order_value AS REAL)) AS spend
             FROM po_dump po
             LEFT JOIN vendor_master vm ON po.vendor = vm.vendor
-            WHERE po.deletion_indicator IS NULL OR po.deletion_indicator NOT IN ('L','X')
+            WHERE (po.deletion_indicator IS NULL OR po.deletion_indicator NOT IN ('L','X'))
+              AND {_cc_sql}
             GROUP BY po.vendor
             ORDER BY spend DESC
             LIMIT 10
@@ -1186,36 +1222,38 @@ def _vendor(conn, FY, MTD, cc_cfg: str = "", company_code: str = "ALL"):
                   "spend": round(r[2], 2),
                   "share_pct": round(r[2] / total_v * 100, 2)} for r in rows]
         _upsert(conn, "vendor", "TOP_VENDOR_SPEND", "Top-10 Vendor Spend Share",
-                None, json.dumps(top10), "json")
+                None, json.dumps(top10), "json", company_code=company_code)
     except Exception:
         pass
 
     # V7 — Blocked Vendor Count
-    v7 = _run(conn, """
+    v7 = _run(conn, f"""
         SELECT COUNT(DISTINCT vendor) FROM vendor_master
-        WHERE central_purchasing_block = 'X'
-           OR central_posting_block    = 'X'
-           OR payment_block            = '*'
-           OR posting_block_cc         = 'X'
+        WHERE (central_purchasing_block = 'X'
+            OR central_posting_block    = 'X'
+            OR payment_block            = '*'
+            OR posting_block_cc         = 'X')
+          AND {_cc_vm}
     """)
-    _upsert(conn, "vendor", "BLOCKED_VENDOR_COUNT", "Blocked Vendor Count", v7, None, "count")
+    _upsert(conn, "vendor", "BLOCKED_VENDOR_COUNT", "Blocked Vendor Count", v7, None, "count", company_code=company_code)
 
     # V8 — MSME Vendor Count
-    v8 = _run(conn, "SELECT COUNT(*) FROM vendor_master WHERE msme_flag IN ('M','S')")
-    _upsert(conn, "vendor", "MSME_VENDOR_COUNT", "MSME Vendor Count", v8, None, "count")
+    v8 = _run(conn, f"SELECT COUNT(*) FROM vendor_master WHERE msme_flag IN ('M','S') AND {_cc_vm}")
+    _upsert(conn, "vendor", "MSME_VENDOR_COUNT", "MSME Vendor Count", v8, None, "count", company_code=company_code)
 
     # V9 — Vendor Compliance Rate (all 5 blocks clear ÷ total)
-    v9_clear = _run(conn, """
+    v9_clear = _run(conn, f"""
         SELECT COUNT(*) FROM vendor_master
         WHERE (central_purchasing_block IS NULL OR central_purchasing_block = '')
           AND (central_posting_block    IS NULL OR central_posting_block    = '')
           AND (deletion_flag_central    IS NULL OR deletion_flag_central    = '')
           AND (payment_block            IS NULL OR payment_block            = '')
           AND (posting_block_cc         IS NULL OR posting_block_cc         = '')
+          AND {_cc_vm}
     """)
-    v9_total = _run(conn, "SELECT COUNT(*) FROM vendor_master")
+    v9_total = _run(conn, f"SELECT COUNT(*) FROM vendor_master WHERE {_cc_vm}")
     v9 = round((v9_clear / v9_total * 100), 2) if v9_clear and v9_total else None
-    _upsert(conn, "vendor", "VENDOR_COMPLIANCE_RATE", "Vendor Compliance Rate (%)", v9, None, "%")
+    _upsert(conn, "vendor", "VENDOR_COMPLIANCE_RATE", "Vendor Compliance Rate (%)", v9, None, "%", company_code=company_code)
 
     # V10 — Vendor Master Changes MTD
     v10 = _run(conn, f"""
@@ -1224,7 +1262,7 @@ def _vendor(conn, FY, MTD, cc_cfg: str = "", company_code: str = "ALL"):
         WHERE object_class = 'KRED'
           AND change_date >= {MTD}
     """)
-    _upsert(conn, "vendor", "VENDOR_MASTER_CHANGES", "Vendor Master Changes (MTD)", v10, None, "count")
+    _upsert(conn, "vendor", "VENDOR_MASTER_CHANGES", "Vendor Master Changes (MTD)", v10, None, "count", company_code=company_code)
 
 
 # ── UTILIZATION (CAPEX / OPEX) ────────────────────────────────────────────────
@@ -1633,7 +1671,15 @@ def compute_all(conn: Any) -> None:
         _financial(conn, FY, MTD, cc_cfg=cc, company_code=cc)
     _financial(conn, FY, MTD, cc_cfg=overall_cc_cfg, company_code="ALL")
 
-    _leadership(conn, FY, MTD, high_val)
+    # Leadership KPIs: run once per distinct company in po_dump, then once for ALL
+    _cc_rows_leadership = conn.execute(
+        "SELECT DISTINCT company_code FROM po_dump "
+        "WHERE company_code IS NOT NULL AND company_code != ''"
+    ).fetchall()
+    for (cc,) in _cc_rows_leadership:
+        _leadership(conn, FY, MTD, high_val, cc_cfg=cc, company_code=cc)
+    _leadership(conn, FY, MTD, high_val, cc_cfg=overall_cc_cfg, company_code="ALL")
+
     _vendor(conn, FY, MTD)
 
     # Vendor delivery days per company (V3 in _vendor uses cc_cfg/company_code params)
