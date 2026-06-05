@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -15,7 +16,7 @@ import {
   Legend,
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
-import { Trash2, AlertTriangle } from "lucide-react";
+import { Trash2, AlertTriangle, Building2, ChevronDown, X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
 import { KpiCard } from "@/components/KpiCard";
@@ -24,7 +25,13 @@ import { StatusPill } from "@/components/StatusPill";
 import { formatINR, formatDateShort } from "@/lib/format";
 import { brand } from "@/lib/brand";
 import { apiFetch } from "@/api/client";
-import { useKpi, useKpiValue, useCharts } from "@/hooks/useKpi";
+import { useKpi, useKpiValue, useCharts, useCompanies } from "@/hooks/useKpi";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -51,43 +58,112 @@ interface DeletedPO {
 }
 
 function ProcurementDashboard() {
+  const [companyCode, setCompanyCode] = useState("");
+  const { data: companiesData } = useCompanies();
+  const companies = companiesData?.companies ?? [];
+
   return (
     <AppShell>
       <PageHeader title="Procurement Dashboard" subtitle="Real-time visibility into PO activity, breaches, and operational priorities" />
-      <KpiRow />
+      <CompanyFilter companies={companies} value={companyCode} onChange={setCompanyCode} />
+      <KpiRow companyCode={companyCode} />
       <div className="grid grid-cols-2 gap-4 mt-4">
-        <POValueTrend />
-        <POCountAndMaverick />
+        <POValueTrend companyCode={companyCode} />
+        <POCountAndMaverick companyCode={companyCode} />
       </div>
       <div className="mt-4">
-        <POAgingBuckets />
+        <POAgingBuckets companyCode={companyCode} />
       </div>
       <div className="mt-4">
-        <PODeletionTrend />
+        <PODeletionTrend companyCode={companyCode} />
       </div>
       <div className="mt-4">
-        <PODeletionMonitor />
+        <PODeletionMonitor companyCode={companyCode} />
       </div>
     </AppShell>
   );
 }
 
-function KpiRow() {
-  const { isLoading } = useKpi("procurement");
-  const p1 = useKpiValue("procurement", "TOTAL_PO_VALUE_MTD");
-  const p2 = useKpiValue("procurement", "PO_COUNT_MTD");
-  const p3 = useKpiValue("procurement", "AVG_PO_VALUE");
-  const p4 = useKpiValue("procurement", "OPEN_PO_AGING");
-  const p5 = useKpiValue("procurement", "MAVERICK_SPEND_RATE");
-  const p6 = useKpiValue("procurement", "HIGH_VALUE_PO_RATE");
-  const p7 = useKpiValue("procurement", "TOTAL_PO_VALUE_YTD");
-  const p8 = useKpiValue("procurement", "ACTIVE_VENDOR_COUNT_MTD");
-  const p9  = useKpiValue("procurement", "PR_TO_PO_DAYS");
-  const p10 = useKpiValue("procurement", "PO_DELETION_MTD");
-  const p11total    = useKpiValue("procurement", "APPROVED_PR_TOTAL");
-  const p11approved = useKpiValue("procurement", "APPROVED_PR_APPROVED");
-  const p12total    = useKpiValue("procurement", "APPROVED_PO_TOTAL");
-  const p12approved = useKpiValue("procurement", "APPROVED_PO_APPROVED");
+interface Company { company_code: string; company_name: string; }
+
+function CompanyFilter({
+  companies,
+  value,
+  onChange,
+}: {
+  companies: Company[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const selected = companies.find((c) => c.company_code === value);
+  const label = selected
+    ? `${selected.company_code} — ${selected.company_name}`
+    : "All Companies";
+
+  return (
+    <div className="flex items-center gap-2 mb-4 p-3 rounded-lg border border-border bg-surface/50">
+      <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+      <span className="text-[13px] text-muted-foreground font-medium">Entity:</span>
+      <DropdownMenu>
+        <DropdownMenuTrigger className="h-7 px-2.5 rounded-md border border-border bg-background text-[13px] flex items-center gap-1.5 hover:border-accent/40 hover:bg-secondary/50 transition-all duration-200 min-w-[180px]">
+          <span className={value ? "font-medium text-foreground" : "text-muted-foreground"}>{label}</span>
+          <ChevronDown className="h-3 w-3 text-muted-foreground ml-auto" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="min-w-[240px]">
+          <DropdownMenuItem onClick={() => onChange("")} className={!value ? "bg-secondary font-medium" : ""}>
+            All Companies
+            {!value && <span className="ml-auto text-accent text-[10px]">●</span>}
+          </DropdownMenuItem>
+          {companies.map((c) => (
+            <DropdownMenuItem
+              key={c.company_code}
+              onClick={() => onChange(c.company_code)}
+              className={value === c.company_code ? "bg-secondary font-medium" : ""}
+            >
+              <span className="font-mono text-[11px] text-muted-foreground mr-2">{c.company_code}</span>
+              {c.company_name}
+              {value === c.company_code && <span className="ml-auto text-accent text-[10px]">●</span>}
+            </DropdownMenuItem>
+          ))}
+          {companies.length === 0 && (
+            <DropdownMenuItem disabled className="text-muted-foreground text-[12px]">
+              Upload PO data to see companies
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {value && (
+        <button
+          onClick={() => onChange("")}
+          className="h-5 w-5 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          title="Clear filter"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
+      {value && (
+        <StatusPill tone="info" dot>Filtered</StatusPill>
+      )}
+    </div>
+  );
+}
+
+function KpiRow({ companyCode }: { companyCode?: string }) {
+  const { isLoading } = useKpi("procurement", companyCode);
+  const p1 = useKpiValue("procurement", "TOTAL_PO_VALUE_MTD", companyCode);
+  const p2 = useKpiValue("procurement", "PO_COUNT_MTD", companyCode);
+  const p3 = useKpiValue("procurement", "AVG_PO_VALUE", companyCode);
+  const p4 = useKpiValue("procurement", "OPEN_PO_AGING", companyCode);
+  const p5 = useKpiValue("procurement", "MAVERICK_SPEND_RATE", companyCode);
+  const p6 = useKpiValue("procurement", "HIGH_VALUE_PO_RATE", companyCode);
+  const p7 = useKpiValue("procurement", "TOTAL_PO_VALUE_YTD", companyCode);
+  const p8 = useKpiValue("procurement", "ACTIVE_VENDOR_COUNT_MTD", companyCode);
+  const p9  = useKpiValue("procurement", "PR_TO_PO_DAYS", companyCode);
+  const p10 = useKpiValue("procurement", "PO_DELETION_MTD", companyCode);
+  const p11total    = useKpiValue("procurement", "APPROVED_PR_TOTAL", companyCode);
+  const p11approved = useKpiValue("procurement", "APPROVED_PR_APPROVED", companyCode);
+  const p12total    = useKpiValue("procurement", "APPROVED_PO_TOTAL", companyCode);
+  const p12approved = useKpiValue("procurement", "APPROVED_PO_APPROVED", companyCode);
 
   const fmt = (v: number | null | undefined, unit: string | null | undefined) => {
     if (v == null) return isLoading ? "—" : "No data";
@@ -127,8 +203,8 @@ function KpiRow() {
   );
 }
 
-function POAgingBuckets() {
-  const { data: kpiData, isLoading } = useKpi("procurement");
+function POAgingBuckets({ companyCode }: { companyCode?: string }) {
+  const { data: kpiData, isLoading } = useKpi("procurement", companyCode);
   const bucketsKpi = kpiData?.kpis.find((k) => k.kpi_code === "OPEN_PO_AGING_BUCKETS");
 
   let buckets: Array<{ bucket: string; count: number; fill: string }> = [];
@@ -179,8 +255,8 @@ function POAgingBuckets() {
   );
 }
 
-function PODeletionTrend() {
-  const { data, isLoading } = useCharts("procurement");
+function PODeletionTrend({ companyCode }: { companyCode?: string }) {
+  const { data, isLoading } = useCharts("procurement", companyCode);
   const chartData = (data?.series ?? []).map((p) => ({
     month:         p.month ?? "",
     "Deleted Lines": (p.deleted_lines as number) ?? 0,
@@ -212,10 +288,12 @@ function PODeletionTrend() {
   );
 }
 
-function PODeletionMonitor() {
+function PODeletionMonitor({ companyCode }: { companyCode?: string }) {
   const { data: rows = [], isLoading } = useQuery<DeletedPO[]>({
-    queryKey: ["po-deletions"],
-    queryFn: () => apiFetch<DeletedPO[]>("/p2p/po-deletions?limit=20"),
+    queryKey: ["po-deletions", companyCode ?? ""],
+    queryFn: () => apiFetch<DeletedPO[]>(
+      `/p2p/po-deletions?limit=20${companyCode ? `&company_code=${encodeURIComponent(companyCode)}` : ""}`
+    ),
   });
 
   const totalValue = rows.reduce((s, r) => s + parseFloat(r.net_order_value || "0"), 0);
@@ -326,8 +404,8 @@ function PODeletionMonitor() {
   );
 }
 
-function POValueTrend() {
-  const { data, isLoading } = useCharts("procurement");
+function POValueTrend({ companyCode }: { companyCode?: string }) {
+  const { data, isLoading } = useCharts("procurement", companyCode);
   const chartData = (data?.series ?? []).map((p) => ({
     period: p.month ?? "",
     spend: ((p.total_value as number) ?? 0) / 1_00_00_000,
@@ -362,8 +440,8 @@ function POValueTrend() {
   );
 }
 
-function POCountAndMaverick() {
-  const { data, isLoading } = useCharts("procurement");
+function POCountAndMaverick({ companyCode }: { companyCode?: string }) {
+  const { data, isLoading } = useCharts("procurement", companyCode);
   const chartData = (data?.series ?? []).map((p) => ({
     month:          p.month ?? "",
     "PO Count":     (p.po_count as number) ?? 0,

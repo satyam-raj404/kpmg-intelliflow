@@ -63,6 +63,14 @@ def _upsert(conn, dashboard, kpi_code, kpi_name, value_numeric, value_text, unit
     """, (dashboard, kpi_code, kpi_name, value_numeric, value_text, unit, trend))
 
 
+def _cc(company_code: str, alias: str = "") -> str:
+    """SQL AND clause for company_code filter, empty string when no filter."""
+    if not company_code:
+        return ""
+    col = f"{alias}.company_code" if alias else "company_code"
+    return f"AND {col} = '{company_code}'"
+
+
 # ── PROCUREMENT ───────────────────────────────────────────────────────────────
 
 def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
@@ -326,6 +334,226 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
           AND document_date >= {FY}
     """)
     _upsert(conn, "procurement", "ACTIVE_VENDOR_COUNT_MTD", "Active Vendors (YTD)", active_v, None, "count")
+
+
+# ── PROCUREMENT LIVE (per-company, returns list instead of upserting) ─────────
+
+def compute_procurement_live(conn: sqlite3.Connection, company_code: str) -> list[dict]:
+    """Run procurement KPIs filtered to one company_code. Returns list of kpi_result dicts."""
+    ref_date = _get_ref_date(conn)
+    FY, MTD = _build_periods(ref_date)
+    high_value_threshold = float(_get_config(conn, 'HIGH_VALUE_PO_THRESHOLD', '10000000'))
+    cc = _cc(company_code)
+    cc_po = _cc(company_code, 'po')
+    now = datetime.utcnow().isoformat()
+    results: list[dict] = []
+
+    def _put(kpi_code, kpi_name, value_numeric, value_text, unit):
+        results.append({
+            "dashboard": "procurement", "kpi_code": kpi_code, "kpi_name": kpi_name,
+            "value_numeric": value_numeric, "value_text": value_text,
+            "unit": unit, "trend": None, "computed_at": now,
+        })
+
+    p1 = _run(conn, f"""
+        SELECT SUM(CAST(net_order_value AS REAL)) FROM po_dump
+        WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+          AND COALESCE(NULLIF(created_on,''), document_date) >= {MTD}
+          {cc}
+    """)
+    _put("TOTAL_PO_VALUE_MTD", "Total PO Value (MTD)", p1, None, "INR")
+
+    p2 = _run(conn, f"""
+        SELECT COUNT(DISTINCT purchasing_document) FROM po_dump
+        WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+          AND (delivery_completed IS NULL OR delivery_completed = '')
+          {cc}
+    """)
+    _put("ACTIVE_PO_COUNT", "Active PO Count", p2, None, "count")
+
+    p3 = _run(conn, f"""
+        SELECT COUNT(DISTINCT purchasing_document) FROM po_dump
+        WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+          AND CAST(net_order_value AS REAL) > {high_value_threshold}
+          {cc}
+    """)
+    _put("HIGH_VALUE_PO_COUNT", f"High-Value PO Count (>₹{int(high_value_threshold):,})", p3, None, "count")
+
+    p4 = _run(conn, f"""
+        SELECT AVG(CAST(pr_to_po_days AS REAL)) FROM pr_po_grn_invoice
+        WHERE pr_to_po_days IS NOT NULL AND pr_to_po_days >= 0
+          AND purchase_requisition IS NOT NULL AND purchasing_document IS NOT NULL
+          {cc}
+    """)
+    _put("PR_TO_PO_DAYS", "Avg PR-to-PO Time (days)", p4, None, "days")
+
+    p5 = _run(conn, f"""
+        SELECT AVG(CAST(julianday(cl.change_date) - julianday(po.created_on) AS REAL))
+        FROM po_dump po
+        JOIN change_log cl
+          ON cl.object_id = po.purchasing_document AND cl.object_class = 'EINKBELEG'
+         AND cl.field_name = 'FRGZU' AND cl.change_indicator IN ('E','U')
+         AND cl.new_value LIKE 'X%'
+        WHERE po.release_indicator LIKE 'X%'
+          AND (po.deletion_indicator IS NULL OR po.deletion_indicator NOT IN ('L','X'))
+          AND po.created_on IS NOT NULL AND po.created_on != ''
+          {cc_po}
+    """)
+    _put("PO_APPROVAL_CYCLE", "PO Approval Cycle (days)", p5, None, "days")
+
+    p6 = _run(conn, f"""
+        SELECT COUNT(DISTINCT purchasing_document || '|' || item) FROM po_dump
+        WHERE deletion_indicator = 'L'
+          AND COALESCE(NULLIF(created_on,''), document_date) >= {MTD}
+          {cc}
+    """)
+    _put("PO_DELETION_MTD", "PO Deleted Line Items (MTD)", p6, None, "count")
+
+    p7_amended = _run(conn, f"""
+        SELECT COUNT(DISTINCT po.purchasing_document || '|' || po.item)
+        FROM po_dump po
+        JOIN change_log cl
+          ON cl.object_id = po.purchasing_document AND cl.object_class = 'EINKBELEG'
+         AND cl.change_indicator IN ('E','U')
+         AND cl.field_name IN ('MATNR','NETPR','NETWR','MENGE')
+         AND (cl.table_key IS NULL OR cl.table_key = ''
+              OR CAST(SUBSTR(cl.table_key,-5) AS INTEGER) = CAST(po.item AS INTEGER))
+        WHERE (po.deletion_indicator IS NULL OR po.deletion_indicator NOT IN ('L','X'))
+          {cc_po}
+    """)
+    p7_total = _run(conn, f"""
+        SELECT COUNT(DISTINCT purchasing_document || '|' || item) FROM po_dump
+        WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+          {cc}
+    """)
+    p7 = round((p7_amended / p7_total * 100), 2) if p7_amended and p7_total else None
+    _put("PO_AMENDMENT_RATE", "PO Amendment Rate (%)", p7, None, "%")
+
+    _OPEN_PO_WHERE = f"""
+        FROM po_dump po
+        JOIN po_delivery_dump pod ON pod.purchasing_document = po.purchasing_document AND pod.item = po.item
+        WHERE (po.delivery_completed IS NULL OR po.delivery_completed = '')
+          AND (po.deletion_indicator IS NULL OR po.deletion_indicator NOT IN ('L','X'))
+          AND CAST(po.order_quantity AS REAL) !=
+              CAST(COALESCE(NULLIF(po.delivered_quantity,''),'0') AS REAL)
+          AND pod.expected_delivery_date IS NOT NULL AND pod.expected_delivery_date != ''
+          AND julianday('{ref_date}') - julianday(pod.expected_delivery_date) > 0
+          {cc_po}
+    """
+    p8 = _run(conn, f"SELECT COUNT(DISTINCT po.purchasing_document || '|' || po.item) {_OPEN_PO_WHERE}")
+    _put("OPEN_PO_AGING", "Open PO Line Items (Overdue)", p8, None, "count")
+
+    try:
+        bucket_row = conn.execute(f"""
+            SELECT
+                COUNT(DISTINCT CASE WHEN delay BETWEEN 1  AND 30  THEN key END),
+                COUNT(DISTINCT CASE WHEN delay BETWEEN 31 AND 60  THEN key END),
+                COUNT(DISTINCT CASE WHEN delay BETWEEN 61 AND 90  THEN key END),
+                COUNT(DISTINCT CASE WHEN delay > 90               THEN key END)
+            FROM (
+                SELECT po.purchasing_document || '|' || po.item AS key,
+                       CAST(julianday('{ref_date}') - julianday(pod.expected_delivery_date) AS INTEGER) AS delay
+                {_OPEN_PO_WHERE}
+            )
+        """).fetchone()
+        buckets = {"1-30d": int(bucket_row[0] or 0), "31-60d": int(bucket_row[1] or 0),
+                   "61-90d": int(bucket_row[2] or 0), "90+d": int(bucket_row[3] or 0)}
+        _put("OPEN_PO_AGING_BUCKETS", "Open PO Aging Buckets", None, json.dumps(buckets), "json")
+    except Exception:
+        pass
+
+    p9 = _run(conn, f"""
+        SELECT SUM(CAST(net_order_value AS REAL)) FROM po_dump
+        WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+          AND COALESCE(NULLIF(created_on,''), document_date) >= {FY}
+          {cc}
+    """)
+    _put("TOTAL_PO_VALUE_YTD", "Total PO Value (YTD)", p9, None, "INR")
+
+    p10 = _run(conn, f"""
+        SELECT COUNT(DISTINCT purchasing_document || '|' || item) FROM po_dump
+        WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+          AND COALESCE(NULLIF(created_on,''), document_date) >= {FY}
+          {cc}
+    """)
+    _put("PO_LINE_COUNT_YTD", "PO Line Count (YTD)", p10, None, "count")
+
+    pr_total = _run(conn, f"""
+        SELECT COUNT(DISTINCT purchase_requisition) FROM pr_dump
+        WHERE (deletion_indicator IS NULL OR deletion_indicator = '')
+          {cc}
+    """)
+    pr_approved = _run(conn, f"""
+        SELECT COUNT(DISTINCT purchase_requisition) FROM pr_dump
+        WHERE (deletion_indicator IS NULL OR deletion_indicator = '')
+          AND release_status LIKE 'X%'
+          {cc}
+    """)
+    _put("APPROVED_PR_TOTAL",    "Total Active PRs", pr_total,    None, "count")
+    _put("APPROVED_PR_APPROVED", "Approved PRs",     pr_approved, None, "count")
+
+    po_total_hdr = _run(conn, f"""
+        SELECT COUNT(DISTINCT purchasing_document) FROM po_dump
+        WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+          {cc}
+    """)
+    po_approved_hdr = _run(conn, f"""
+        SELECT COUNT(DISTINCT purchasing_document) FROM po_dump
+        WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+          AND release_indicator LIKE 'X%'
+          {cc}
+    """)
+    _put("APPROVED_PO_TOTAL",    "Total Active POs", po_total_hdr,    None, "count")
+    _put("APPROVED_PO_APPROVED", "Approved POs",     po_approved_hdr, None, "count")
+
+    po_count_mtd = _run(conn, f"""
+        SELECT COUNT(DISTINCT purchasing_document) FROM po_dump
+        WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+          AND COALESCE(NULLIF(created_on,''), document_date) >= {MTD}
+          {cc}
+    """)
+    _put("PO_COUNT_MTD", "PO Count (MTD)", po_count_mtd, None, "count")
+
+    avg_po = _run(conn, f"""
+        SELECT AVG(CAST(net_order_value AS REAL)) FROM po_dump
+        WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+          AND document_date >= {MTD}
+          {cc}
+    """)
+    _put("AVG_PO_VALUE", "Average PO Value (MTD)", avg_po, None, "INR")
+
+    hv_total = _run(conn, f"""
+        SELECT COUNT(DISTINCT purchasing_document) FROM po_dump
+        WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+          AND document_date >= {FY}
+          {cc}
+    """)
+    hv_rate = round((p3 / hv_total * 100), 2) if p3 and hv_total else None
+    _put("HIGH_VALUE_PO_RATE", f"High-Value PO Rate (>₹{int(high_value_threshold):,})", hv_rate, None, "%")
+
+    mav_total = _run(conn, f"""
+        SELECT COUNT(DISTINCT purchasing_document) FROM po_dump
+        WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+          {cc}
+    """)
+    mav_count = _run(conn, f"""
+        SELECT COUNT(DISTINCT purchasing_document) FROM po_dump
+        WHERE (purchase_requisition IS NULL OR purchase_requisition = '')
+          AND (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+          {cc}
+    """)
+    mav_rate = round((mav_count / mav_total * 100), 2) if mav_count and mav_total else 0.0
+    _put("MAVERICK_SPEND_RATE", "Maverick Spend Rate (%)", mav_rate, None, "%")
+
+    active_v = _run(conn, f"""
+        SELECT COUNT(DISTINCT vendor) FROM po_dump
+        WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+          AND document_date >= {FY}
+          {cc}
+    """)
+    _put("ACTIVE_VENDOR_COUNT_MTD", "Active Vendors (YTD)", active_v, None, "count")
+
+    return results
 
 
 # ── FINANCIAL ─────────────────────────────────────────────────────────────────
@@ -923,7 +1151,7 @@ def _utilization(conn, FY, MTD):
 
 # ── CHART DATA ────────────────────────────────────────────────────────────────
 
-def compute_chart_data(conn: sqlite3.Connection, dashboard: str) -> list[dict]:
+def compute_chart_data(conn: sqlite3.Connection, dashboard: str, company_code: str = "") -> list[dict]:
     results = []
     try:
         ref_date = _get_ref_date(conn)
@@ -931,6 +1159,7 @@ def compute_chart_data(conn: sqlite3.Connection, dashboard: str) -> list[dict]:
         ref_d = date.fromisoformat(ref_date)
         twelve_ago = (ref_d.replace(day=1) - timedelta(days=335)).strftime("%Y-%m-%d")
         cutoff = f"'{twelve_ago}'"
+        cc = _cc(company_code)
 
         if dashboard == "procurement":
             # Monthly PO value + count
@@ -943,6 +1172,7 @@ def compute_chart_data(conn: sqlite3.Connection, dashboard: str) -> list[dict]:
                 FROM po_dump
                 WHERE document_date >= {cutoff}
                   AND (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+                  {cc}
                 GROUP BY month ORDER BY month
             """).fetchall()
             results = [{"month": r[0], "total_value": round(r[1] or 0, 2),
@@ -955,6 +1185,7 @@ def compute_chart_data(conn: sqlite3.Connection, dashboard: str) -> list[dict]:
                 FROM po_dump
                 WHERE deletion_indicator = 'L'
                   AND COALESCE(NULLIF(created_on,''), document_date) >= {cutoff}
+                  {cc}
                 GROUP BY month
             """).fetchall()
             del_by_month = {r[0]: int(r[1]) for r in del_rows}

@@ -345,9 +345,11 @@ def get_events(
 # ── /p2p/po-deletions ─────────────────────────────────────────────────────────
 
 @router.get("/p2p/po-deletions")
-def get_po_deletions(limit: int = Query(20, ge=1, le=100)):
+def get_po_deletions(limit: int = Query(20, ge=1, le=100), company_code: str = Query("")):
     conn = get_connection()
-    rows = conn.execute("""
+    cc_clause = "AND po.company_code = ?" if company_code else ""
+    params = (company_code, limit) if company_code else (limit,)
+    rows = conn.execute(f"""
         SELECT po.purchasing_document, po.item, po.vendor, po.vendor_name,
                po.material_description, po.material_group, po.net_order_value,
                po.document_date, po.created_by, po.deletion_indicator,
@@ -356,8 +358,9 @@ def get_po_deletions(limit: int = Query(20, ge=1, le=100)):
         LEFT JOIN process_mining_events pme
           ON po.purchasing_document = pme.purchasing_document AND po.item = pme.item
         WHERE po.deletion_indicator = 'L'
+          {cc_clause}
         ORDER BY po.created_on DESC LIMIT ?
-    """, (limit,)).fetchall()
+    """, params).fetchall()
     return [dict(r) for r in rows]
 
 

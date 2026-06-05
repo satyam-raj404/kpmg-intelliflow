@@ -1,13 +1,13 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { fetchKpis, fetchCharts } from "@/api/queries";
+import { fetchKpis, fetchCharts, fetchCompanies } from "@/api/queries";
 import type { DashboardKpis, ChartData, KpiResult } from "@/api/types";
 
 export type Dashboard = "procurement" | "financial" | "leadership" | "vendor" | "utilization";
 
 const VALID_DASHBOARDS: Dashboard[] = ["procurement", "financial", "leadership", "vendor", "utilization"];
 
-export function useKpi(dashboard: Dashboard) {
+export function useKpi(dashboard: Dashboard, companyCode?: string) {
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -28,19 +28,27 @@ export function useKpi(dashboard: Dashboard) {
   }, [queryClient]);
 
   return useQuery<DashboardKpis>({
-    queryKey: ["kpi", dashboard],
-    queryFn: () => fetchKpis(dashboard),
+    queryKey: ["kpi", dashboard, companyCode ?? ""],
+    queryFn: () => fetchKpis(dashboard, companyCode),
   });
 }
 
-export function useCharts(dashboard: Dashboard) {
+export function useCharts(dashboard: Dashboard, companyCode?: string) {
   return useQuery<ChartData>({
-    queryKey: ["charts", dashboard],
-    queryFn: () => fetchCharts(dashboard),
+    queryKey: ["charts", dashboard, companyCode ?? ""],
+    queryFn: () => fetchCharts(dashboard, companyCode),
   });
 }
 
-export function useKpiValue(dashboard: Dashboard, kpiCode: string): KpiResult | undefined {
-  const { data } = useKpi(dashboard);
+export function useKpiValue(dashboard: Dashboard, kpiCode: string, companyCode?: string): KpiResult | undefined {
+  const { data } = useKpi(dashboard, companyCode);
   return data?.kpis.find((k) => k.kpi_code === kpiCode);
+}
+
+export function useCompanies() {
+  return useQuery({
+    queryKey: ["companies"],
+    queryFn: fetchCompanies,
+    staleTime: 5 * 60 * 1000,
+  });
 }

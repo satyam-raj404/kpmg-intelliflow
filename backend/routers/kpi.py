@@ -1,22 +1,51 @@
 """KPI router — dashboard KPIs, charts, and kpi_config management."""
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from database import get_connection
-from services.kpi_engine import compute_all, compute_chart_data
+from services.kpi_engine import compute_all, compute_chart_data, compute_procurement_live
 
 router = APIRouter()
 
 VALID_DASHBOARDS = {"procurement", "financial", "leadership", "vendor", "utilization"}
 
 
+# ── Company list ───────────────────────────────────────────────────────────────
+
+@router.get("/companies")
+def get_companies():
+    """Return distinct company codes present in po_dump, joined with company_plant_master for names."""
+    conn = get_connection()
+    rows = conn.execute("""
+        SELECT DISTINCT p.company_code,
+               COALESCE(c.company_name, p.company_code) AS company_name
+        FROM po_dump p
+        LEFT JOIN company_plant_master c ON c.company_code = p.company_code
+        WHERE p.company_code IS NOT NULL AND p.company_code != ''
+        ORDER BY p.company_code
+    """).fetchall()
+    return {"companies": [dict(r) for r in rows]}
+
+
 # ── Dashboard KPIs ─────────────────────────────────────────────────────────────
 
 @router.get("/kpi/{dashboard}")
-def get_kpis(dashboard: str):
+def get_kpis(dashboard: str, company_code: str = Query("")):
     if dashboard not in VALID_DASHBOARDS:
         raise HTTPException(404, f"Dashboard '{dashboard}' not found.")
     conn = get_connection()
+
+    if company_code and dashboard == "procurement":
+        # Validate company_code exists in po_dump
+        exists = conn.execute(
+            "SELECT 1 FROM po_dump WHERE company_code = ? LIMIT 1", (company_code,)
+        ).fetchone()
+        if not exists:
+            raise HTTPException(404, f"Company '{company_code}' not found in po_dump.")
+        kpis = compute_procurement_live(conn, company_code)
+        computed_at = kpis[0]["computed_at"] if kpis else None
+        return {"dashboard": dashboard, "computed_at": computed_at, "kpis": kpis}
+
     rows = conn.execute(
         "SELECT * FROM kpi_results WHERE dashboard = ? ORDER BY kpi_code",
         (dashboard,),
@@ -27,11 +56,11 @@ def get_kpis(dashboard: str):
 
 
 @router.get("/charts/{dashboard}")
-def get_charts(dashboard: str):
+def get_charts(dashboard: str, company_code: str = Query("")):
     if dashboard not in VALID_DASHBOARDS:
         raise HTTPException(404, f"Dashboard '{dashboard}' not found.")
     conn = get_connection()
-    data = compute_chart_data(conn, dashboard)
+    data = compute_chart_data(conn, dashboard, company_code)
     return {"dashboard": dashboard, "series": data}
 
 

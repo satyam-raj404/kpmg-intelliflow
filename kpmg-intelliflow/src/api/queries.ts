@@ -9,11 +9,18 @@ import type {
   P2PEventsResponse,
 } from "./types";
 
-export const fetchKpis = (dashboard: string) =>
-  apiFetch<DashboardKpis>(`/kpi/${dashboard}`);
+export const fetchKpis = (dashboard: string, companyCode?: string) => {
+  const qs = companyCode ? `?company_code=${encodeURIComponent(companyCode)}` : "";
+  return apiFetch<DashboardKpis>(`/kpi/${dashboard}${qs}`);
+};
 
-export const fetchCharts = (dashboard: string) =>
-  apiFetch<ChartData>(`/charts/${dashboard}`);
+export const fetchCharts = (dashboard: string, companyCode?: string) => {
+  const qs = companyCode ? `?company_code=${encodeURIComponent(companyCode)}` : "";
+  return apiFetch<ChartData>(`/charts/${dashboard}${qs}`);
+};
+
+export const fetchCompanies = () =>
+  apiFetch<{ companies: { company_code: string; company_name: string }[] }>("/companies");
 
 export const fetchBatchStatus = (batchId: string) =>
   apiFetch<BatchStatus>(`/upload/${batchId}`);
