@@ -1,6 +1,6 @@
 """Step 5 — Process mining events + anomaly detection."""
-import sqlite3
 from datetime import datetime, timedelta
+from typing import Any
 
 
 IDEAL_PATHS = {
@@ -39,7 +39,7 @@ def _classify_variant(activities: list[str]) -> str:
     return "INCOMPLETE"
 
 
-def generate_events(conn: sqlite3.Connection) -> None:
+def generate_events(conn: Any) -> None:
     conn.execute("DELETE FROM process_mining_events")
 
     facts = conn.execute("""
@@ -94,7 +94,7 @@ def generate_events(conn: sqlite3.Connection) -> None:
             SELECT invoice_doc, invoice_year FROM invoice_dump
             WHERE (clearing_doc IS NULL OR clearing_doc = '')
               AND due_date < ?
-              AND julianday(?) - julianday(due_date) > 30
+              AND (?::DATE - due_date::DATE) > 30
         """, (today, today)).fetchall()
         for r in rows:
             overdue_invoices.add((r[0], r[1]))

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -7,12 +8,9 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  LineChart,
-  Line,
   PieChart,
   Pie,
   Cell,
-  Legend,
 } from "recharts";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
@@ -20,7 +18,7 @@ import { KpiCard } from "@/components/KpiCard";
 import { SectionCard } from "@/components/SectionCard";
 import { brand } from "@/lib/brand";
 import { formatINR } from "@/lib/format";
-import { useKpi, useKpiValue, useCharts } from "@/hooks/useKpi";
+import { useKpi, useKpiValue, useKpiCompanies, useCharts } from "@/hooks/useKpi";
 
 export const Route = createFileRoute("/vendors")({
   head: () => ({
@@ -32,32 +30,58 @@ export const Route = createFileRoute("/vendors")({
   component: VendorDashboard,
 });
 
+function CompanyFilter({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { data } = useKpiCompanies("vendor");
+  const companies = data?.companies ?? [];
+  if (companies.length <= 1) return null;
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span className="text-muted-foreground font-medium">Company:</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="border border-border rounded-md px-2 py-1 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+      >
+        <option value="ALL">All Companies</option>
+        {companies.filter((c) => c !== "ALL").map((c) => (
+          <option key={c} value={c}>{c}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function VendorDashboard() {
+  const [company, setCompany] = useState("ALL");
+
   return (
     <AppShell>
-      <PageHeader title="Vendor Performance" subtitle="Delivery, compliance, and spend concentration analytics" />
-      <KpiRow />
+      <div className="flex items-center justify-between">
+        <PageHeader title="Vendor Performance" subtitle="Delivery, compliance, and spend concentration analytics" />
+        <CompanyFilter value={company} onChange={setCompany} />
+      </div>
+      <KpiRow company={company} />
+      <VendorHealthStats company={company} />
       <div className="grid grid-cols-2 gap-4 mt-4">
-        <OTIFTrend />
+        <VendorDeliveryChart company={company} />
         <ComplianceDonut />
       </div>
       <div className="grid grid-cols-2 gap-4 mt-4">
-        <TopVendors />
+        <TopVendors company={company} />
         <VendorTypeChart />
       </div>
     </AppShell>
   );
 }
 
-function KpiRow() {
-  const { isLoading } = useKpi("vendor");
-  const v1 = useKpiValue("vendor", "ACTIVE_VENDOR_COUNT");
-  const v2 = useKpiValue("vendor", "VENDOR_COMPLIANCE_RATE");
-  const v3 = useKpiValue("vendor", "OTIF_RATE");
-  const v4 = useKpiValue("vendor", "AVG_DELIVERY_DELAY");
-  const v5 = useKpiValue("vendor", "SHORT_DELIVERY_RATE");
-  const v7 = useKpiValue("vendor", "BLOCKED_VENDOR_COUNT");
-  const v8 = useKpiValue("vendor", "VENDOR_MASTER_CHANGES");
+function KpiRow({ company }: { company: string }) {
+  const { isLoading } = useKpi("vendor", company);
+  const v1 = useKpiValue("vendor", "ACTIVE_VENDOR_COUNT",    company);
+  const v2 = useKpiValue("vendor", "VENDOR_COMPLIANCE_RATE", company);
+  const v3 = useKpiValue("vendor", "VENDOR_DELIVERY_DAYS",   company);
+  const v4 = useKpiValue("vendor", "AVG_DELIVERY_DELAY",     company);
+  const v7 = useKpiValue("vendor", "BLOCKED_VENDOR_COUNT",   company);
+  const v8 = useKpiValue("vendor", "VENDOR_MASTER_CHANGES",  company);
 
   const fmt = (v: number | null | undefined, unit: string | null | undefined) => {
     if (v == null) return isLoading ? "—" : "No data";
@@ -72,42 +96,107 @@ function KpiRow() {
       <div className="grid grid-cols-4 gap-3">
         <KpiCard label="Active Vendor Count" value={fmt(v1?.value_numeric, v1?.unit)} size="lg" sublabel="Not deleted, not purchasing-blocked" index={0} />
         <KpiCard label="Vendor Compliance Rate" value={fmt(v2?.value_numeric, v2?.unit)} size="lg" sublabel="Not blocked & not deleted ÷ total" threshold={v2?.value_numeric != null && v2.value_numeric < 90 ? { label: "Below 90%", tone: "warning" } : { label: "Good", tone: "success" }} index={1} />
-        <KpiCard label="OTIF Rate" value={fmt(v3?.value_numeric, v3?.unit)} size="lg" sublabel="On-time & in-full deliveries" threshold={v3?.value_numeric != null && v3.value_numeric < 80 ? { label: "Below 80% target", tone: "danger" } : { label: "On target", tone: "success" }} index={2} />
+        <KpiCard label="Avg Delivery Lead Time" value={fmt(v3?.value_numeric, v3?.unit)} size="lg" sublabel="Avg days: expected delivery → first GRN (−=early, +=late)" threshold={v3?.value_numeric != null && v3.value_numeric > 0 ? { label: "Late on avg", tone: "warning" } : { label: "On / early", tone: "success" }} index={2} />
         <KpiCard label="Avg Delivery Delay" value={fmt(v4?.value_numeric, v4?.unit)} size="lg" sublabel="Late deliveries only (days past expected)" index={3} />
       </div>
-      <div className="grid grid-cols-4 gap-3 mt-3">
-        <KpiCard label="Short Delivery Rate" value={fmt(v5?.value_numeric, v5?.unit)} size="md" sublabel="GRN qty < 95% of scheduled qty" threshold={v5?.value_numeric != null && v5.value_numeric > 10 ? { label: "> 10% threshold", tone: "warning" } : { label: "Acceptable", tone: "success" }} index={4} />
-        <KpiCard label="Blocked Vendor Count" value={fmt(v7?.value_numeric, v7?.unit)} size="md" sublabel="central_purchasing_block or posting_block = X" threshold={v7?.value_numeric != null && v7.value_numeric > 0 ? { label: "Review required", tone: "danger" } : undefined} index={5} />
-        <KpiCard label="Vendor Master Changes" value={fmt(v8?.value_numeric, v8?.unit)} size="md" sublabel="KRED object changes this month" index={6} />
-        <KpiCard label="Top Vendor Spend" value="See chart →" size="md" sublabel="Top-10 by spend share" index={7} />
+      <div className="grid grid-cols-3 gap-3 mt-3">
+        <KpiCard label="Blocked Vendor Count" value={fmt(v7?.value_numeric, v7?.unit)} size="md" sublabel="central_purchasing_block or posting_block = X" threshold={v7?.value_numeric != null && v7.value_numeric > 0 ? { label: "Review required", tone: "danger" } : undefined} index={4} />
+        <KpiCard label="Vendor Master Changes" value={fmt(v8?.value_numeric, v8?.unit)} size="md" sublabel="KRED object changes this month" index={5} />
+        <KpiCard label="Top Vendor Spend" value="See chart →" size="md" sublabel="Top-10 by spend share" index={6} />
       </div>
     </>
   );
 }
 
-function OTIFTrend() {
-  const { data, isLoading } = useCharts("vendor");
-  const chartData = (data?.series ?? []).map((p) => ({
-    month: p.month ?? "",
-    otif: (p.otif_pct as number) ?? 0,
+function VendorHealthStats({ company }: { company: string }) {
+  const { data: kpiData, isLoading } = useKpi("vendor", company);
+  const v2 = kpiData?.kpis.find((k) => k.kpi_code === "VENDOR_BREAKDOWN");
+
+  const h = (() => {
+    try { return v2?.value_text ? JSON.parse(v2.value_text) : null; } catch { return null; }
+  })();
+
+  const stats: Array<{ label: string; value: number; color: string }> = h ? [
+    { label: "Active",        value: h.active,        color: "text-emerald-600" },
+    { label: "Non-Active",    value: h.non_active,     color: "text-red-500"    },
+    { label: "One-Time",      value: h.one_time,       color: "text-amber-500"  },
+    { label: "Domestic",      value: h.domestic,       color: "text-blue-500"   },
+    { label: "International", value: h.international,  color: "text-purple-500" },
+    { label: "MSME",          value: h.msme,           color: "text-teal-600"   },
+  ] : [];
+
+  return (
+    <SectionCard title="Vendor Health Breakdown" subtitle="Master data segmentation · 3-block compliance check">
+      {isLoading ? (
+        <div className="text-sm text-muted-foreground py-4">Loading…</div>
+      ) : !h ? (
+        <div className="text-sm text-muted-foreground py-4">Upload vendor master</div>
+      ) : (
+        <div className="flex items-center gap-6 py-2 flex-wrap">
+          {stats.map((s) => (
+            <div key={s.label} className="flex flex-col items-center gap-0.5 min-w-[72px]">
+              <span className={`text-2xl font-bold font-tabular ${s.color}`}>{s.value}</span>
+              <span className="text-[11px] text-muted-foreground font-medium">{s.label}</span>
+            </div>
+          ))}
+          <div className="ml-auto pl-6 border-l border-border flex flex-col items-end gap-0.5">
+            <span className="text-2xl font-bold font-tabular text-foreground">{h.total}</span>
+            <span className="text-[11px] text-muted-foreground">Total Vendors</span>
+          </div>
+          {h.compliance_rate != null && (
+            <div className="flex flex-col items-end gap-0.5">
+              <span className={`text-2xl font-bold font-tabular ${h.compliance_rate >= 90 ? "text-emerald-600" : "text-amber-500"}`}>
+                {h.compliance_rate.toFixed(1)}%
+              </span>
+              <span className="text-[11px] text-muted-foreground">Compliance Rate</span>
+            </div>
+          )}
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+function VendorDeliveryChart({ company }: { company: string }) {
+  const { data: kpiData, isLoading } = useKpi("vendor", company);
+  const kpi = kpiData?.kpis.find((k) => k.kpi_code === "VENDOR_DELIVERY_DAYS");
+
+  let vendors: Array<{ vendor: string; name: string; avg_days: number; po_lines: number }> = [];
+  if (kpi?.value_text) {
+    try { vendors = JSON.parse(kpi.value_text).slice(0, 15); } catch {}
+  }
+
+  const chartData = vendors.map((v) => ({
+    name: v.name.length > 20 ? v.name.slice(0, 20) + "…" : v.name,
+    avg_days: v.avg_days,
+    po_lines: v.po_lines,
   }));
 
   return (
-    <SectionCard title="OTIF Rate Trend" subtitle="Monthly on-time in-full %">
+    <SectionCard title="Vendor Delivery Lead Time" subtitle="Avg days: expected delivery → first GRN (−=early, +=late)">
       <div className="h-64">
         {isLoading ? (
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Loading…</div>
         ) : chartData.length === 0 ? (
-          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Upload GRN and delivery data to view trend</div>
+          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Upload PO and GRN data to view</div>
         ) : (
           <ResponsiveContainer>
-            <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
-              <XAxis dataKey="month" tickLine={false} axisLine={false} />
-              <YAxis tickLine={false} axisLine={false} domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-              <Tooltip formatter={(v: number) => [`${v.toFixed(1)}%`, "OTIF"]} />
-              <Line type="monotone" dataKey="otif" stroke={brand.colors.success} strokeWidth={2} dot={{ r: 3 }} />
-            </LineChart>
+            <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 40, left: 110, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false} />
+              <XAxis type="number" tickLine={false} axisLine={false} tickFormatter={(v) => `${v > 0 ? "+" : ""}${v}d`} />
+              <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} width={110} tick={{ fontSize: 10 }} />
+              <Tooltip
+                formatter={(v: number, _n, props) => [
+                  `${v > 0 ? "+" : ""}${v}d · ${props.payload.po_lines} PO lines`,
+                  "Avg Lead Time",
+                ]}
+              />
+              <Bar dataKey="avg_days" radius={[0, 3, 3, 0]}>
+                {chartData.map((d, i) => (
+                  <Cell key={i} fill={d.avg_days > 0 ? brand.colors.warning : brand.colors.success} />
+                ))}
+              </Bar>
+            </BarChart>
           </ResponsiveContainer>
         )}
       </div>
@@ -115,8 +204,8 @@ function OTIFTrend() {
   );
 }
 
-function TopVendors() {
-  const { data: kpiData, isLoading } = useKpi("vendor");
+function TopVendors({ company }: { company: string }) {
+  const { data: kpiData, isLoading } = useKpi("vendor", company);
   const v6 = kpiData?.kpis.find((k) => k.kpi_code === "TOP_VENDOR_SPEND");
 
   let vendors: Array<{ vendor: string; name: string; spend: number; share_pct: number }> = [];

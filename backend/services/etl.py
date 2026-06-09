@@ -55,7 +55,7 @@ def run_etl(
             rows_accepted = ?,
             rows_rejected = ?,
             rejection_sample = ?,
-            completed_at = datetime('now')
+            completed_at = NOW()::TEXT
         WHERE batch_id = ?
     """, (
         dataset_type, rows_accepted, rows_rejected,

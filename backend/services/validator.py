@@ -1,6 +1,5 @@
 """Step 2 — Validation rules per dataset."""
-import sqlite3
-from typing import Tuple
+from typing import Any, Tuple
 
 import pandas as pd
 
@@ -98,7 +97,7 @@ ENUM_RULES: dict[str, dict[str, list[str]]] = {
 def validate(
     df: pd.DataFrame,
     dataset_type: str,
-    conn: sqlite3.Connection,
+    conn: Any,
 ) -> Tuple[pd.DataFrame, list[dict]]:
     rejection_log: list[dict] = []
     valid_mask = pd.Series([True] * len(df), index=df.index)
@@ -194,8 +193,11 @@ def validate(
 
         # 6b: Duplicates against existing DB data (warn only — allows re-upload)
         try:
-            table_cols = [r[1] for r in conn.execute(
-                f"PRAGMA table_info({dataset_type})").fetchall()]
+            table_cols = [r[0] for r in conn.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = 'public' AND table_name = ? "
+                "ORDER BY ordinal_position",
+                (dataset_type,)).fetchall()]
             if all(c in table_cols for c in comp_key_cols_present):
                 where_clause = " AND ".join(f"{c} = ?" for c in comp_key_cols_present)
                 for idx in df[valid_mask].index:

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -20,7 +21,7 @@ import { KpiCard } from "@/components/KpiCard";
 import { SectionCard } from "@/components/SectionCard";
 import { formatINR } from "@/lib/format";
 import { brand } from "@/lib/brand";
-import { useKpi, useKpiValue, useCharts } from "@/hooks/useKpi";
+import { useKpi, useKpiValue, useKpiCompanies, useCharts } from "@/hooks/useKpi";
 
 export const Route = createFileRoute("/financial")({
   head: () => ({
@@ -32,33 +33,60 @@ export const Route = createFileRoute("/financial")({
   component: FinancialDashboard,
 });
 
+function CompanyFilter({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { data } = useKpiCompanies("financial");
+  const companies = data?.companies ?? [];
+
+  if (companies.length <= 1) return null;
+
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span className="text-muted-foreground font-medium">Company:</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="border border-border rounded-md px-2 py-1 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+      >
+        <option value="ALL">All Companies</option>
+        {companies.filter((c) => c !== "ALL").map((c) => (
+          <option key={c} value={c}>{c}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function FinancialDashboard() {
+  const [company, setCompany] = useState("ALL");
+
   return (
     <AppShell>
-      <PageHeader title="Financial Dashboard" subtitle="Spend vs budget tracking, cash flow, invoice/payment cycle health" />
-      <KpiRow />
+      <div className="flex items-center justify-between">
+        <PageHeader title="Financial Dashboard" subtitle="Spend vs budget tracking, cash flow, invoice/payment cycle health" />
+        <CompanyFilter value={company} onChange={setCompany} />
+      </div>
+      <KpiRow company={company} />
+      <PaymentTimingRow company={company} />
       <div className="grid grid-cols-2 gap-4 mt-4">
         <PaymentTrend />
-        <PaymentBehavior />
+        <PaymentBehavior company={company} />
       </div>
-      <div className="grid grid-cols-2 gap-4 mt-4">
-        <InvoiceAgingBuckets />
+      <div className="mt-4">
         <ThreeWayMatchTrend />
       </div>
     </AppShell>
   );
 }
 
-function KpiRow() {
-  const { isLoading } = useKpi("financial");
-  const f1 = useKpiValue("financial", "TOTAL_PAYMENTS_YTD");
-  const f2 = useKpiValue("financial", "PAYMENT_TO_PO_RATIO");
-  const f3 = useKpiValue("financial", "THREE_WAY_MATCH_RATE");
-  const f4 = useKpiValue("financial", "INVOICE_PROCESSING_DAYS");
-  const f5 = useKpiValue("financial", "ON_TIME_PAYMENT_RATE");
-  const f6 = useKpiValue("financial", "AVG_PAYMENT_DELAY");
-  const f7 = useKpiValue("financial", "OPEN_INVOICE_VALUE");
-  const f8 = useKpiValue("financial", "DISCOUNT_CAPTURE_RATE");
+function KpiRow({ company }: { company: string }) {
+  const { isLoading } = useKpi("financial", company);
+  const f1 = useKpiValue("financial", "TOTAL_PAYMENTS_YTD", company);
+  const f2 = useKpiValue("financial", "PAYMENT_TO_PO_RATIO", company);
+  const f3 = useKpiValue("financial", "THREE_WAY_MATCH_RATE", company);
+  const f4 = useKpiValue("financial", "INVOICE_PROCESSING_DAYS", company);
+  const f5 = useKpiValue("financial", "ON_TIME_PAYMENT_RATE", company);
+  const f7 = useKpiValue("financial", "OPEN_INVOICE_VALUE", company);
+  const fpr = useKpiValue("financial", "APPROVED_PR_COUNT", company);
 
   const fmt = (v: number | null | undefined, unit: string | null | undefined) => {
     if (v == null) return isLoading ? "—" : "No data";
@@ -74,23 +102,67 @@ function KpiRow() {
         <KpiCard label="Total Payments (YTD)" value={fmt(f1?.value_numeric, f1?.unit)} size="lg" sublabel="SUM payment_dump this FY" index={0} />
         <KpiCard label="Payment-to-PO Ratio" value={fmt(f2?.value_numeric, f2?.unit)} size="lg" sublabel="Payments ÷ Total PO Value" index={1} />
         <KpiCard label="3-Way Match Rate" value={fmt(f3?.value_numeric, f3?.unit)} size="lg" sublabel="GRN qty ≈ Invoice qty (±5%)" threshold={f3?.value_numeric != null && f3.value_numeric < 85 ? { label: "Below 85% target", tone: "danger" } : { label: "Good", tone: "success" }} index={2} />
-        <KpiCard label="Invoice Processing Days" value={fmt(f4?.value_numeric, f4?.unit)} size="lg" sublabel="Avg vendor_invoice_date → posting_date" index={3} />
+        <KpiCard label="Invoice Processing Days" value={fmt(f4?.value_numeric, f4?.unit)} size="lg" sublabel="Avg vendor_invoice_date → clearing_date" index={3} />
       </div>
-      <div className="grid grid-cols-4 gap-3 mt-3">
+      <div className="grid grid-cols-3 gap-3 mt-3">
         <KpiCard label="On-Time Payment Rate" value={fmt(f5?.value_numeric, f5?.unit)} size="md" sublabel="Paid on/before due_date" threshold={f5?.value_numeric != null && f5.value_numeric < 80 ? { label: "Below target", tone: "warning" } : { label: "On track", tone: "success" }} index={4} />
-        <KpiCard label="Avg Payment Delay" value={fmt(f6?.value_numeric, f6?.unit)} size="md" sublabel="Late payments only (days past due)" index={5} />
-        <KpiCard label="Open Invoice Value" value={fmt(f7?.value_numeric, f7?.unit)} size="md" sublabel="Invoices with no clearing doc" threshold={f7?.value_numeric != null && f7.value_numeric > 1_000_000 ? { label: "High outstanding", tone: "warning" } : undefined} index={6} />
-        <KpiCard label="Discount Capture Rate" value={fmt(f8?.value_numeric, f8?.unit)} size="md" sublabel="Early pay discounts captured" index={7} />
+        <KpiCard label="Open Invoice Value" value={fmt(f7?.value_numeric, f7?.unit)} size="md" sublabel="Unpaid invoices net of credit notes" threshold={f7?.value_numeric != null && f7.value_numeric > 1_000_000 ? { label: "High outstanding", tone: "warning" } : undefined} index={5} />
+        <KpiCard label="Approved PRs (YTD)" value={fmt(fpr?.value_numeric, fpr?.unit)} size="md" sublabel="Distinct approved PR line items this FY" index={6} />
       </div>
     </>
   );
 }
 
+function PaymentTimingRow({ company }: { company: string }) {
+  const { isLoading } = useKpi("financial", company);
+  const early  = useKpiValue("financial", "EARLY_PAYMENT_COUNT",   company);
+  const ontime = useKpiValue("financial", "ON_TIME_PAYMENT_COUNT", company);
+  const late   = useKpiValue("financial", "LATE_PAYMENT_COUNT",    company);
+  const summary = useKpiValue("financial", "PAYMENT_TIMING_SUMMARY", company);
+
+  const parsed = (() => {
+    try { return summary?.value_text ? JSON.parse(summary.value_text) : null; } catch { return null; }
+  })();
+
+  const fmt = (v: number | null | undefined) =>
+    v == null ? (isLoading ? "—" : "No data") : v.toFixed(0);
+
+  return (
+    <div className="grid grid-cols-3 gap-3 mt-3">
+      <KpiCard
+        label="Early Payments"
+        value={fmt(early?.value_numeric)}
+        size="md"
+        sublabel={parsed?.avg_days_early ? `Avg ${parsed.avg_days_early}d before due` : "Cleared before due date"}
+        threshold={{ label: "Favourable", tone: "success" }}
+        index={8}
+      />
+      <KpiCard
+        label="On-Time Payments"
+        value={fmt(ontime?.value_numeric)}
+        size="md"
+        sublabel="Cleared exactly on due date"
+        threshold={{ label: "Ideal", tone: "success" }}
+        index={9}
+      />
+      <KpiCard
+        label="Late Payments"
+        value={fmt(late?.value_numeric)}
+        size="md"
+        sublabel={parsed?.avg_days_late ? `Avg ${parsed.avg_days_late}d past due` : "Cleared after due date"}
+        threshold={late?.value_numeric != null && late.value_numeric > 0 ? { label: "Needs attention", tone: "danger" } : { label: "None", tone: "success" }}
+        index={10}
+      />
+    </div>
+  );
+}
+
 function PaymentTrend() {
   const { data, isLoading } = useCharts("financial");
-  const chartData = (data?.series ?? []).map((p) => ({
+  const raw = data?.series as unknown as { type?: string; monthly?: Array<{ month: string; payments: number }> };
+  const chartData = (raw?.monthly ?? []).map((p) => ({
     month: p.month ?? "",
-    payments: ((p.payments as number) ?? 0) / 1_00_00_000,
+    payments: (p.payments ?? 0) / 1_00_00_000,
   }));
 
   return (
@@ -122,49 +194,57 @@ function PaymentTrend() {
   );
 }
 
-function PaymentBehavior() {
-  const { data, isLoading } = useCharts("financial");
-  const raw = data?.series as unknown as { type?: string; payment_split?: { on_time: number; late: number; total: number } };
-  const split = raw?.payment_split;
+function PaymentBehavior({ company }: { company: string }) {
+  const summary = useKpiValue("financial", "PAYMENT_TIMING_SUMMARY", company);
+  const { isLoading } = useKpi("financial", company);
 
-  const pieData = split ? [
-    { name: "On-Time", value: split.on_time, fill: brand.colors.success },
-    { name: "Late",    value: split.late,    fill: brand.colors.danger  },
+  const parsed = (() => {
+    try { return summary?.value_text ? JSON.parse(summary.value_text) : null; } catch { return null; }
+  })();
+
+  const pieData = parsed ? [
+    { name: "Early",   value: parsed.early,   fill: brand.colors.accent   },
+    { name: "On-Time", value: parsed.on_time,  fill: brand.colors.success  },
+    { name: "Late",    value: parsed.late,     fill: brand.colors.danger   },
   ] : [];
 
+  const total = parsed?.total ?? 0;
+
   return (
-    <SectionCard title="Payment On-Time vs Late" subtitle="Count of payments vs due date">
+    <SectionCard title="Payment Timing Breakdown" subtitle="Early / On-Time / Late vs due date">
       <div className="h-64">
         {isLoading ? (
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Loading…</div>
-        ) : pieData.length === 0 || !split?.total ? (
+        ) : !parsed || total === 0 ? (
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Upload payment + invoice data</div>
         ) : (
           <div className="flex items-center h-full gap-6">
-            <ResponsiveContainer width="60%" height="100%">
+            <ResponsiveContainer width="55%" height="100%">
               <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" innerRadius={52} outerRadius={88}
+                <Pie data={pieData} cx="50%" cy="50%" innerRadius={48} outerRadius={82}
                   dataKey="value" paddingAngle={3} label={false}>
                   {pieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
                 </Pie>
                 <Tooltip formatter={(v: number) => [`${v} payments`]} />
               </PieChart>
             </ResponsiveContainer>
-            <div className="flex flex-col gap-3">
-              {pieData.map(d => (
+            <div className="flex flex-col gap-3 flex-1">
+              {pieData.map((d) => (
                 <div key={d.name} className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded-sm" style={{ background: d.fill }} />
-                  <div>
+                  <div className="h-3 w-3 rounded-sm flex-shrink-0" style={{ background: d.fill }} />
+                  <div className="min-w-0">
                     <div className="text-[11px] font-medium">{d.name}</div>
                     <div className="text-[18px] font-semibold font-tabular">{d.value}</div>
                     <div className="text-[10px] text-muted-foreground">
-                      {split.total ? ((d.value / split.total) * 100).toFixed(1) : 0}%
+                      {total ? ((d.value / total) * 100).toFixed(1) : 0}%
                     </div>
                   </div>
                 </div>
               ))}
               <div className="text-[10px] text-muted-foreground pt-1 border-t border-border">
-                Total: {split?.total ?? 0} payments
+                Total: {total} payments
+                {parsed?.avg_days_early ? ` · Avg early: ${parsed.avg_days_early}d` : ""}
+                {parsed?.avg_days_late  ? ` · Avg late: ${parsed.avg_days_late}d`  : ""}
               </div>
             </div>
           </div>
@@ -174,41 +254,9 @@ function PaymentBehavior() {
   );
 }
 
-function InvoiceAgingBuckets() {
-  const { data, isLoading } = useCharts("financial");
-  const raw = data?.series as unknown as { type?: string; aging_buckets?: Array<{ bucket: string; value: number }> };
-  const buckets = raw?.aging_buckets ?? [];
-
-  const BUCKET_COLORS = [brand.colors.success, brand.colors.accent, brand.colors.warning, brand.colors.danger];
-
-  return (
-    <SectionCard title="Open Invoice Aging" subtitle="Unpaid invoices by age bucket — ₹ Cr">
-      <div className="h-64">
-        {isLoading ? (
-          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Loading…</div>
-        ) : buckets.length === 0 ? (
-          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Upload invoice data</div>
-        ) : (
-          <ResponsiveContainer>
-            <BarChart data={buckets} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
-              <XAxis dataKey="bucket" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
-              <YAxis tickLine={false} axisLine={false} tickFormatter={(v) => `₹${v}Cr`} tick={{ fontSize: 10 }} />
-              <Tooltip formatter={(v: number) => [`₹${v.toFixed(2)} Cr`, "Outstanding"]} />
-              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                {buckets.map((_, i) => <Cell key={i} fill={BUCKET_COLORS[i]} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        )}
-      </div>
-    </SectionCard>
-  );
-}
 
 function ThreeWayMatchTrend() {
   const { data, isLoading } = useCharts("financial");
-  // Use monthly data as proxy for 3-way match trend over time
   const raw = data?.series as unknown;
   const monthly = Array.isArray(raw)
     ? raw

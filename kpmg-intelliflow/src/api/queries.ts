@@ -2,6 +2,7 @@ import { apiFetch } from "./client";
 import type {
   DashboardKpis,
   ChartData,
+  CompaniesResponse,
   UploadResponse,
   BatchStatus,
   LifecycleData,
@@ -9,8 +10,11 @@ import type {
   P2PEventsResponse,
 } from "./types";
 
-export const fetchKpis = (dashboard: string) =>
-  apiFetch<DashboardKpis>(`/kpi/${dashboard}`);
+export const fetchKpis = (dashboard: string, companyCode = "ALL") =>
+  apiFetch<DashboardKpis>(`/kpi/${dashboard}?company_code=${encodeURIComponent(companyCode)}`);
+
+export const fetchKpiCompanies = (dashboard: string) =>
+  apiFetch<CompaniesResponse>(`/kpi/${dashboard}/companies`);
 
 export const fetchCharts = (dashboard: string) =>
   apiFetch<ChartData>(`/charts/${dashboard}`);
