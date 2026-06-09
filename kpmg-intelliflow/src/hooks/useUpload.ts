@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect, useRef } from "react";
 import { uploadFile, fetchBatchStatus } from "@/api/queries";
 import type { BatchStatus, UploadResponse } from "@/api/types";
+import { useApp } from "@/context/AppContext";
 
 interface UploadProgress {
   pct: number;
@@ -10,9 +11,12 @@ interface UploadProgress {
 
 export function useUpload() {
   const queryClient = useQueryClient();
+  const { addActivity } = useApp();
   const [batchId, setBatchId] = useState<string | null>(null);
   const [progress, setProgress] = useState<UploadProgress>({ pct: 0, message: "" });
   const esRef = useRef<EventSource | null>(null);
+  const filenameRef = useRef<string>("");
+  const loggedBatchRef = useRef<string | null>(null);
 
   // SSE progress listener
   useEffect(() => {
@@ -35,10 +39,21 @@ export function useUpload() {
   }, [batchId, queryClient]);
 
   const mutation = useMutation<UploadResponse, Error, File>({
-    mutationFn: uploadFile,
+    mutationFn: (file: File) => {
+      filenameRef.current = file.name;
+      return uploadFile(file);
+    },
     onSuccess: (data) => {
       setBatchId(data.batch_id);
       setProgress({ pct: 5, message: "Upload received, processing…" });
+    },
+    onError: (err) => {
+      addActivity({
+        type: "upload",
+        label: "Data Upload",
+        detail: `${filenameRef.current || "file"} — ${err.message || "Upload failed"}`,
+        status: "failed",
+      });
     },
   });
 
@@ -52,6 +67,30 @@ export function useUpload() {
       return status === "PROCESSING" ? 2000 : false;
     },
   });
+
+  // Log to history when batch completes or fails
+  useEffect(() => {
+    const status = batchQuery.data?.status;
+    if (!status || !batchId || loggedBatchRef.current === batchId) return;
+    if (status === "COMPLETED") {
+      loggedBatchRef.current = batchId;
+      const rows = batchQuery.data?.rows_accepted;
+      addActivity({
+        type: "upload",
+        label: "Data Upload",
+        detail: `${filenameRef.current}${rows ? ` — ${rows.toLocaleString()} rows loaded` : ""}`,
+        status: "success",
+      });
+    } else if (status === "FAILED") {
+      loggedBatchRef.current = batchId;
+      addActivity({
+        type: "upload",
+        label: "Data Upload",
+        detail: `${filenameRef.current} — ${batchQuery.data?.error_message || "Processing failed"}`,
+        status: "failed",
+      });
+    }
+  }, [batchQuery.data?.status, batchId, addActivity]);
 
   const reset = () => {
     setBatchId(null);

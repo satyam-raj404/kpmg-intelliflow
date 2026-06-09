@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Logo } from "@/components/Logo";
-import { useApp, ROLES } from "@/context/AppContext";
+import { useApp, ROLES, DEMO_PERSONAS } from "@/context/AppContext";
 import type { Role } from "@/types";
 
 export const Route = createFileRoute("/login")({
@@ -10,7 +10,7 @@ export const Route = createFileRoute("/login")({
 });
 
 function Login() {
-  const { setRole } = useApp();
+  const { setRole, setUser } = useApp();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,8 +21,10 @@ function Login() {
   };
 
   const pickRole = (r: Role) => {
+    const persona = DEMO_PERSONAS[r];
     setRole(r);
-    setEmail(`${r.toLowerCase().replace(/\s+/g, ".")}@kpmg.com`);
+    setUser(persona);
+    setEmail(persona.email);
     setPassword("demo1234");
   };
 

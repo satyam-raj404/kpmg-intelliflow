@@ -9,6 +9,8 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as HistoryRouteImport } from './routes/history'
 import { Route as VendorsRouteImport } from './routes/vendors'
 import { Route as VendorRepoRouteImport } from './routes/vendor-repo'
 import { Route as UtilizationRouteImport } from './routes/utilization'
@@ -25,6 +27,16 @@ import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HistoryRoute = HistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const VendorsRoute = VendorsRouteImport.update({
   id: '/vendors',
   path: '/vendors',
@@ -103,6 +115,8 @@ const AdminAuditRoute = AdminAuditRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/history': typeof HistoryRoute
+  '/profile': typeof ProfileRoute
   '/actions': typeof ActionsRoute
   '/dashboard': typeof DashboardRoute
   '/financial': typeof FinancialRoute
@@ -120,6 +134,8 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/history': typeof HistoryRoute
+  '/profile': typeof ProfileRoute
   '/actions': typeof ActionsRoute
   '/dashboard': typeof DashboardRoute
   '/financial': typeof FinancialRoute
@@ -138,6 +154,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/history': typeof HistoryRoute
+  '/profile': typeof ProfileRoute
   '/actions': typeof ActionsRoute
   '/dashboard': typeof DashboardRoute
   '/financial': typeof FinancialRoute
@@ -157,6 +175,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/history'
+    | '/profile'
     | '/actions'
     | '/dashboard'
     | '/financial'
@@ -174,6 +194,8 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/history'
+    | '/profile'
     | '/actions'
     | '/dashboard'
     | '/financial'
@@ -191,6 +213,8 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/history'
+    | '/profile'
     | '/actions'
     | '/dashboard'
     | '/financial'
@@ -209,6 +233,8 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  HistoryRoute: typeof HistoryRoute
+  ProfileRoute: typeof ProfileRoute
   ActionsRoute: typeof ActionsRoute
   DashboardRoute: typeof DashboardRoute
   FinancialRoute: typeof FinancialRoute
@@ -227,6 +253,20 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/history': {
+      id: '/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof HistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/vendors': {
       id: '/vendors'
       path: '/vendors'
@@ -337,6 +377,8 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  HistoryRoute: HistoryRoute,
+  ProfileRoute: ProfileRoute,
   ActionsRoute: ActionsRoute,
   DashboardRoute: DashboardRoute,
   FinancialRoute: FinancialRoute,

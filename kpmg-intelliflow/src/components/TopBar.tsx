@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Search, Bell, ChevronDown, LogOut, User as UserIcon } from "lucide-react";
 import { motion } from "framer-motion";
+import { useNavigate } from "@tanstack/react-router";
 import { useApp, ROLES, roleInitials } from "@/context/AppContext";
 import { notifications } from "@/data/mock";
 import {
@@ -16,7 +17,8 @@ import { cn } from "@/lib/utils";
 const PERIODS = ["Q1 FY24", "Q2 FY24", "Q3 FY24", "FY24", "Custom"];
 
 export function TopBar() {
-  const { role, setRole, period, setPeriod } = useApp();
+  const { role, setRole, period, setPeriod, user } = useApp();
+  const navigate = useNavigate();
   const [unread, setUnread] = useState(notifications.filter((n) => !n.read).length);
   const [openNotif, setOpenNotif] = useState(false);
 
@@ -102,11 +104,14 @@ export function TopBar() {
 
       <DropdownMenu>
         <DropdownMenuTrigger className="h-8 pl-0.5 pr-2 rounded-md border border-border bg-background flex items-center gap-2 hover:border-accent/40 hover:bg-secondary/50 transition-all duration-200">
-          <div className="h-6 w-6 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
-            {roleInitials("Demo User")}
+          <div
+            className="h-6 w-6 rounded-full text-white text-[10px] font-bold flex items-center justify-center"
+            style={{ background: user.avatarColor }}
+          >
+            {roleInitials(user.name)}
           </div>
           <div className="text-left leading-tight hidden xl:block">
-            <div className="text-[12px] font-medium">Demo User</div>
+            <div className="text-[12px] font-medium">{user.name}</div>
             <div className="text-[9px] text-muted-foreground">{role}</div>
           </div>
           <ChevronDown className="h-3 w-3 text-muted-foreground" />
@@ -120,7 +125,9 @@ export function TopBar() {
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
-          <DropdownMenuItem><UserIcon className="h-3.5 w-3.5 mr-2" /> Profile</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => navigate({ to: "/profile" })}>
+            <UserIcon className="h-3.5 w-3.5 mr-2" /> Profile
+          </DropdownMenuItem>
           <DropdownMenuItem><LogOut className="h-3.5 w-3.5 mr-2" /> Sign out</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

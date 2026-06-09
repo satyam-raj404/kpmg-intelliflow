@@ -1,4 +1,4 @@
-import { Link, useLocation } from "@tanstack/react-router";
+import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
   LayoutDashboard,
   Wallet,
@@ -12,10 +12,11 @@ import {
   History,
   Settings,
   Upload,
+  User as UserIcon,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Logo } from "./Logo";
-import { useApp } from "@/context/AppContext";
+import { useApp, roleInitials } from "@/context/AppContext";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
@@ -38,6 +39,7 @@ const operations: NavItem[] = [
   { label: "Vendor Repository", to: "/vendor-repo", icon: BookOpen },
   { label: "Action Items", to: "/actions", icon: ListTodo },
   { label: "Data Upload", to: "/upload", icon: Upload },
+  { label: "Activity History", to: "/history", icon: History },
 ];
 
 const admin: NavItem[] = [
@@ -85,6 +87,29 @@ function Section({ title, items, isAdmin }: { title: string; items: NavItem[]; i
   );
 }
 
+function SidebarProfileButton() {
+  const { user, role } = useApp();
+  const navigate = useNavigate();
+  return (
+    <button
+      onClick={() => navigate({ to: "/profile" })}
+      className="w-full flex items-center gap-2 px-2 py-2 rounded-md hover:bg-sidebar-accent transition-colors text-left"
+    >
+      <div
+        className="h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+        style={{ background: user.avatarColor }}
+      >
+        {roleInitials(user.name)}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[12px] font-medium text-sidebar-foreground truncate">{user.name}</div>
+        <div className="text-[10px] text-sidebar-foreground/40 truncate">{role}</div>
+      </div>
+      <UserIcon className="h-3.5 w-3.5 text-sidebar-foreground/30 shrink-0" />
+    </button>
+  );
+}
+
 export function Sidebar() {
   const { role } = useApp();
   const isAdmin = role === "Admin";
@@ -102,8 +127,8 @@ export function Sidebar() {
         <Section title="Admin" items={admin} isAdmin={isAdmin} />
       </div>
 
-      <div className="border-t border-sidebar-border px-4 py-3">
-        <div className="text-[11px] text-sidebar-foreground/25">© 2024 KPMG</div>
+      <div className="border-t border-sidebar-border px-2 py-2">
+        <SidebarProfileButton />
       </div>
     </aside>
   );
