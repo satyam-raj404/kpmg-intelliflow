@@ -60,8 +60,8 @@ function VendorDashboard() {
         <PageHeader title="Vendor Performance" subtitle="Delivery, compliance, and spend concentration analytics" />
         <CompanyFilter value={company} onChange={setCompany} />
       </div>
-      <KpiRow company={company} />
       <VendorHealthStats company={company} />
+      <KpiRow company={company} />
       <div className="grid grid-cols-2 gap-4 mt-4">
         <VendorDeliveryChart company={company} />
         <ComplianceDonut />
@@ -95,7 +95,7 @@ function KpiRow({ company }: { company: string }) {
     <>
       <div className="grid grid-cols-4 gap-3">
         <KpiCard label="Active Vendor Count" value={fmt(v1?.value_numeric, v1?.unit)} size="lg" sublabel="Not deleted, not purchasing-blocked" index={0} />
-        <KpiCard label="Vendor Compliance Rate" value={fmt(v2?.value_numeric, v2?.unit)} size="lg" sublabel="Not blocked & not deleted ÷ total" threshold={v2?.value_numeric != null && v2.value_numeric < 90 ? { label: "Below 90%", tone: "warning" } : { label: "Good", tone: "success" }} index={1} />
+        <KpiCard label="Vendor Active Rate" value={fmt(v2?.value_numeric, v2?.unit)} size="lg" sublabel="Not blocked & not deleted ÷ total" threshold={v2?.value_numeric != null && v2.value_numeric < 90 ? { label: "Below 90%", tone: "warning" } : { label: "Good", tone: "success" }} index={1} />
         <KpiCard label="Avg Delivery Lead Time" value={fmt(v3?.value_numeric, v3?.unit)} size="lg" sublabel="Avg days: expected delivery → first GRN (−=early, +=late)" threshold={v3?.value_numeric != null && v3.value_numeric > 0 ? { label: "Late on avg", tone: "warning" } : { label: "On / early", tone: "success" }} index={2} />
         <KpiCard label="Avg Delivery Delay" value={fmt(v4?.value_numeric, v4?.unit)} size="lg" sublabel="Late deliveries only (days past expected)" index={3} />
       </div>
@@ -270,16 +270,22 @@ function ComplianceDonut() {
               </PieChart>
             </ResponsiveContainer>
             <div className="flex flex-col gap-2.5">
-              {pieData.map(d => (
-                <div key={d.name} className="flex items-center gap-2">
-                  <div className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ background: d.fill }} />
-                  <div>
-                    <div className="text-[10px] text-muted-foreground">{d.name}</div>
-                    <div className="text-[16px] font-semibold font-tabular">{d.value}</div>
+              {pieData.map(d => {
+                const pct = comp.total > 0 ? ((d.value / comp.total) * 100).toFixed(1) : "0.0";
+                return (
+                  <div key={d.name} className="flex items-center gap-2">
+                    <div className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ background: d.fill }} />
+                    <div>
+                      <div className="text-[10px] text-muted-foreground">{d.name}</div>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-[16px] font-semibold font-tabular">{d.value}</span>
+                        <span className="text-[11px] text-muted-foreground font-tabular">{pct}%</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
-              <div className="text-[10px] text-muted-foreground pt-1 border-t border-border">Total: {comp.total}</div>
+                );
+              })}
+              <div className="text-[10px] text-muted-foreground pt-1 border-t border-border">Total: {comp.total} vendors</div>
             </div>
           </div>
         )}
@@ -291,7 +297,9 @@ function ComplianceDonut() {
 function VendorTypeChart() {
   const { data, isLoading } = useCharts("vendor");
   const raw = data?.series as unknown as { type?: string; vendor_types?: Array<{ type: string; count: number }> };
-  const types = raw?.vendor_types ?? [];
+  const ALL_TYPES = ["DOMESTIC", "INTERNATIONAL", "MSME", "ONE_TIME"];
+  const typeMap = new Map((raw?.vendor_types ?? []).map(t => [t.type, t.count]));
+  const types = ALL_TYPES.map(t => ({ type: t, count: typeMap.get(t) ?? 0 }));
   const COLORS = [brand.colors.primary, brand.colors.teal, brand.colors.accent, "#470A68"];
 
   return (
@@ -299,7 +307,7 @@ function VendorTypeChart() {
       <div className="h-64">
         {isLoading ? (
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Loading…</div>
-        ) : types.length === 0 ? (
+        ) : types.every(t => t.count === 0) ? (
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Upload vendor master</div>
         ) : (
           <ResponsiveContainer>

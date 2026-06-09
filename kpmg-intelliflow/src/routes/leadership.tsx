@@ -26,6 +26,14 @@ import { brand } from "@/lib/brand";
 import { useKpi, useKpiValue, useKpiCompanies, useCharts } from "@/hooks/useKpi";
 import { apiFetch } from "@/api/client";
 
+const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+function fmtMonth(raw: string): string {
+  if (!raw) return raw;
+  const m = raw.match(/^(\d{4})-(\d{2})/);
+  if (m) return `${MONTH_NAMES[parseInt(m[2], 10) - 1]}'${m[1].slice(2)}`;
+  return raw;
+}
+
 export const Route = createFileRoute("/leadership")({
   head: () => ({
     meta: [
@@ -174,14 +182,14 @@ function LeadershipDashboard() {
         />
         <CompanyFilter value={company} onChange={setCompany} />
       </div>
+      <SummaryCountsPanel company={company} />
       <KpiRow company={company} />
       <div className="grid grid-cols-2 gap-4 mt-4">
         <SpendTrend />
         <CapexOpexBreakdown company={company} />
       </div>
-      <div className="grid grid-cols-2 gap-4 mt-4">
+      <div className="mt-4">
         <RiskIndicators company={company} />
-        <SummaryCountsPanel company={company} />
       </div>
       <div className="grid grid-cols-2 gap-4 mt-4">
         <InvoiceByVendor />
@@ -191,7 +199,7 @@ function LeadershipDashboard() {
         <PrAging />
         <PrQuantityByProduct />
       </div>
-      <div className="grid grid-cols-2 gap-4 mt-4">
+      <div className="mt-4">
         <InvoiceVsPayment />
       </div>
     </AppShell>
@@ -340,9 +348,9 @@ function SpendTrend() {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
-              <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
+              <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} tickFormatter={fmtMonth} />
               <YAxis tickLine={false} axisLine={false} tickFormatter={(v) => `₹${v.toFixed(0)}Cr`} tick={{ fontSize: 10 }} />
-              <Tooltip formatter={(v: number, name: string) => [`₹${v.toFixed(2)} Cr`, name]} />
+              <Tooltip formatter={(v: number, name: string) => [`₹${v.toFixed(2)} Cr`, name]} labelFormatter={fmtMonth} />
               <Area type="monotone" dataKey="spend" name="Total"
                 stroke={brand.colors.accent} strokeWidth={2} fill="url(#spendGrad)" />
               <Line type="monotone" dataKey="capex" name="CAPEX"
@@ -434,12 +442,12 @@ function RiskIndicators({ company }: { company: string }) {
 
   return (
     <SectionCard title="Risk Indicators" subtitle="Key compliance & concentration metrics">
-      <div className="h-56">
+      <div className="h-64">
         {isLoading ? (
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Loading…</div>
         ) : (
           <ResponsiveContainer>
-            <BarChart data={barData} layout="vertical" margin={{ top: 8, right: 48, left: 120, bottom: 4 }}>
+            <BarChart data={barData} layout="vertical" margin={{ top: 8, right: 64, left: 8, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false} />
               <XAxis type="number" tickLine={false} axisLine={false} tickFormatter={(v) => `${v}`} tick={{ fontSize: 10 }} />
               <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} width={120} tick={{ fontSize: 10 }} />
@@ -492,7 +500,9 @@ function InvoiceByVendor() {
 function InvoiceByVendorType() {
   const { data, isLoading } = useCharts("leadership");
   const raw = data?.series as unknown as { type?: string; invoice_by_vendor_type?: Array<{ vendor_type: string; total_amount: number; invoice_count: number }> };
-  const typeData = raw?.invoice_by_vendor_type ?? [];
+  const ALL_VENDOR_TYPES = ["DOMESTIC", "INTERNATIONAL", "MSME", "ONE_TIME"];
+  const typeMap = new Map((raw?.invoice_by_vendor_type ?? []).map(t => [t.vendor_type, t]));
+  const typeData = ALL_VENDOR_TYPES.map(vt => typeMap.get(vt) ?? { vendor_type: vt, total_amount: 0, invoice_count: 0 });
 
   const COLORS = [brand.colors.primary, brand.colors.success, brand.colors.warning, brand.colors.danger, brand.colors.accent];
 
@@ -501,7 +511,7 @@ function InvoiceByVendorType() {
       <div className="h-64">
         {isLoading ? (
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Loading…</div>
-        ) : typeData.length === 0 ? (
+        ) : typeData.every(t => t.total_amount === 0) ? (
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Upload invoice & vendor data to view</div>
         ) : (
           <div className="flex flex-col gap-2 mt-2 px-1">
@@ -615,9 +625,9 @@ function InvoiceVsPayment() {
           <ResponsiveContainer>
             <ComposedChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
-              <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
+              <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} tickFormatter={fmtMonth} />
               <YAxis tickLine={false} axisLine={false} tickFormatter={(v) => `₹${v.toFixed(0)}Cr`} tick={{ fontSize: 10 }} />
-              <Tooltip formatter={(v: number, name: string) => [`₹${v.toFixed(2)} Cr`, name]} />
+              <Tooltip formatter={(v: number, name: string) => [`₹${v.toFixed(2)} Cr`, name]} labelFormatter={fmtMonth} />
               <Bar dataKey="invoice" name="Invoiced" fill={brand.colors.primary} radius={[2, 2, 0, 0]} opacity={0.8} />
               <Bar dataKey="payment" name="Paid" fill={brand.colors.success} radius={[2, 2, 0, 0]} opacity={0.8} />
             </ComposedChart>
