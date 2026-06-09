@@ -9,6 +9,7 @@ import {
   Tooltip,
   BarChart,
   Bar,
+  LabelList,
   Cell,
   ComposedChart,
   Line,
@@ -183,7 +184,9 @@ function LeadershipDashboard() {
         <CompanyFilter value={company} onChange={setCompany} />
       </div>
       <SummaryCountsPanel company={company} />
-      <KpiRow company={company} />
+      <div className="mt-6">
+        <KpiRow company={company} />
+      </div>
       <div className="grid grid-cols-2 gap-4 mt-4">
         <SpendTrend />
         <CapexOpexBreakdown company={company} />
@@ -402,7 +405,7 @@ function CapexOpexBreakdown({ company }: { company: string }) {
               ))}
             </div>
             <ResponsiveContainer height={120}>
-              <BarChart data={barData} layout="vertical" margin={{ top: 4, right: 32, left: 0, bottom: 4 }}>
+              <BarChart data={barData} layout="vertical" margin={{ top: 4, right: 80, left: 0, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false} />
                 <XAxis type="number" tickLine={false} axisLine={false} tickFormatter={(v) => `₹${v.toFixed(0)}Cr`} tick={{ fontSize: 10 }} />
                 <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} width={48} tick={{ fontSize: 11 }} />
@@ -411,6 +414,7 @@ function CapexOpexBreakdown({ company }: { company: string }) {
                   {barData.map((_, i) => (
                     <rect key={i} fill={i === 0 ? brand.colors.primary : brand.colors.success} />
                   ))}
+                  <LabelList dataKey="value" position="right" formatter={(v: number) => `₹${v.toFixed(1)}Cr`} style={{ fontSize: 9, fill: "#555" }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -447,7 +451,7 @@ function RiskIndicators({ company }: { company: string }) {
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Loading…</div>
         ) : (
           <ResponsiveContainer>
-            <BarChart data={barData} layout="vertical" margin={{ top: 8, right: 64, left: 8, bottom: 4 }}>
+            <BarChart data={barData} layout="vertical" margin={{ top: 8, right: 80, left: 8, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false} />
               <XAxis type="number" tickLine={false} axisLine={false} tickFormatter={(v) => `${v}`} tick={{ fontSize: 10 }} />
               <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} width={120} tick={{ fontSize: 10 }} />
@@ -456,6 +460,7 @@ function RiskIndicators({ company }: { company: string }) {
                 {barData.map((entry, i) => (
                   <rect key={i} fill={getColor(entry.value, entry.name)} />
                 ))}
+                <LabelList dataKey="value" position="right" formatter={(v: number) => v.toFixed(1)} style={{ fontSize: 9, fill: "#555" }} />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -481,12 +486,14 @@ function InvoiceByVendor() {
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Upload invoice data to view</div>
         ) : (
           <ResponsiveContainer>
-            <BarChart data={vendorData} layout="vertical" margin={{ top: 8, right: 48, left: 80, bottom: 4 }}>
+            <BarChart data={vendorData} layout="vertical" margin={{ top: 8, right: 88, left: 80, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false} />
               <XAxis type="number" tickLine={false} axisLine={false} tickFormatter={(v) => `₹${(v / 1_00_00_000).toFixed(0)}Cr`} tick={{ fontSize: 10 }} />
               <YAxis type="category" dataKey="vendor_name" tickLine={false} axisLine={false} width={76} tick={{ fontSize: 9 }} />
               <Tooltip formatter={(v: number) => [`₹${(v / 1_00_00_000).toFixed(2)} Cr`]} />
-              <Bar dataKey="total_amount" fill={brand.colors.accent} radius={[0, 3, 3, 0]} name="Invoice Amount" />
+              <Bar dataKey="total_amount" fill={brand.colors.accent} radius={[0, 3, 3, 0]} name="Invoice Amount">
+                <LabelList dataKey="total_amount" position="right" formatter={(v: number) => `₹${(v / 1_00_00_000).toFixed(1)}Cr`} style={{ fontSize: 9, fill: "#555" }} />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         )}
@@ -555,7 +562,7 @@ function PrAging() {
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm">No open PRs without PO</div>
         ) : (
           <ResponsiveContainer>
-            <BarChart data={aging} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
+            <BarChart data={aging} margin={{ top: 24, right: 16, left: 0, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
               <XAxis dataKey="bucket" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
               <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
@@ -564,6 +571,7 @@ function PrAging() {
                 {aging.map((_, i) => (
                   <rect key={i} fill={i === 3 ? brand.colors.danger : i === 2 ? brand.colors.warning : brand.colors.success} />
                 ))}
+                <LabelList dataKey="value" position="top" formatter={(v: number) => v.toFixed(0)} style={{ fontSize: 9, fill: "#555" }} />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -589,12 +597,14 @@ function PrQuantityByProduct() {
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Upload PR data to view</div>
         ) : (
           <ResponsiveContainer>
-            <BarChart data={qtyData} layout="vertical" margin={{ top: 8, right: 32, left: 56, bottom: 4 }}>
+            <BarChart data={qtyData} layout="vertical" margin={{ top: 8, right: 72, left: 56, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false} />
               <XAxis type="number" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
               <YAxis type="category" dataKey="material_group" tickLine={false} axisLine={false} width={52} tick={{ fontSize: 10 }} />
               <Tooltip formatter={(v: number, _n, p) => [`${v.toFixed(0)} (${p.payload.pr_lines} PR lines)`, "Qty"]} />
-              <Bar dataKey="total_qty" fill={brand.colors.success} radius={[0, 3, 3, 0]} />
+              <Bar dataKey="total_qty" fill={brand.colors.success} radius={[0, 3, 3, 0]}>
+                <LabelList dataKey="total_qty" position="right" formatter={(v: number) => v.toFixed(0)} style={{ fontSize: 9, fill: "#555" }} />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         )}
@@ -623,13 +633,17 @@ function InvoiceVsPayment() {
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Upload invoice & payment data to view</div>
         ) : (
           <ResponsiveContainer>
-            <ComposedChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
+            <ComposedChart data={chartData} margin={{ top: 24, right: 16, left: 0, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
               <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} tickFormatter={fmtMonth} />
               <YAxis tickLine={false} axisLine={false} tickFormatter={(v) => `₹${v.toFixed(0)}Cr`} tick={{ fontSize: 10 }} />
               <Tooltip formatter={(v: number, name: string) => [`₹${v.toFixed(2)} Cr`, name]} labelFormatter={fmtMonth} />
-              <Bar dataKey="invoice" name="Invoiced" fill={brand.colors.primary} radius={[2, 2, 0, 0]} opacity={0.8} />
-              <Bar dataKey="payment" name="Paid" fill={brand.colors.success} radius={[2, 2, 0, 0]} opacity={0.8} />
+              <Bar dataKey="invoice" name="Invoiced" fill={brand.colors.primary} radius={[2, 2, 0, 0]} opacity={0.8}>
+                <LabelList dataKey="invoice" position="top" formatter={(v: number) => `₹${v.toFixed(1)}Cr`} style={{ fontSize: 8, fill: "#555" }} />
+              </Bar>
+              <Bar dataKey="payment" name="Paid" fill={brand.colors.success} radius={[2, 2, 0, 0]} opacity={0.8}>
+                <LabelList dataKey="payment" position="top" formatter={(v: number) => `₹${v.toFixed(1)}Cr`} style={{ fontSize: 8, fill: "#555" }} />
+              </Bar>
             </ComposedChart>
           </ResponsiveContainer>
         )}

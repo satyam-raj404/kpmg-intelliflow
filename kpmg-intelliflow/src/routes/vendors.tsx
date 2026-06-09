@@ -4,6 +4,7 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
+  LabelList,
   CartesianGrid,
   XAxis,
   YAxis,
@@ -61,7 +62,9 @@ function VendorDashboard() {
         <CompanyFilter value={company} onChange={setCompany} />
       </div>
       <VendorHealthStats company={company} />
-      <KpiRow company={company} />
+      <div className="mt-6">
+        <KpiRow company={company} />
+      </div>
       <div className="grid grid-cols-2 gap-4 mt-4">
         <VendorDeliveryChart company={company} />
         <ComplianceDonut />
@@ -181,7 +184,7 @@ function VendorDeliveryChart({ company }: { company: string }) {
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Upload PO and GRN data to view</div>
         ) : (
           <ResponsiveContainer>
-            <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 40, left: 110, bottom: 4 }}>
+            <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 64, left: 110, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false} />
               <XAxis type="number" tickLine={false} axisLine={false} tickFormatter={(v) => `${v > 0 ? "+" : ""}${v}d`} />
               <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} width={110} tick={{ fontSize: 10 }} />
@@ -195,6 +198,7 @@ function VendorDeliveryChart({ company }: { company: string }) {
                 {chartData.map((d, i) => (
                   <Cell key={i} fill={d.avg_days > 0 ? brand.colors.warning : brand.colors.success} />
                 ))}
+                <LabelList dataKey="avg_days" position="right" formatter={(v: number) => `${v > 0 ? "+" : ""}${v}d`} style={{ fontSize: 9, fill: "#555" }} />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -226,12 +230,14 @@ function TopVendors({ company }: { company: string }) {
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Upload PO data to view vendor spend</div>
         ) : (
           <ResponsiveContainer>
-            <BarChart data={barData} layout="vertical" margin={{ top: 4, right: 32, left: 100, bottom: 4 }}>
+            <BarChart data={barData} layout="vertical" margin={{ top: 4, right: 88, left: 100, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false} />
               <XAxis type="number" tickLine={false} axisLine={false} tickFormatter={(v) => `₹${v.toFixed(0)}Cr`} />
               <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} width={100} tick={{ fontSize: 10 }} />
               <Tooltip formatter={(v: number) => [`₹${v.toFixed(2)} Cr`, "Spend"]} />
-              <Bar dataKey="spend" fill={brand.colors.primary} radius={[0, 3, 3, 0]} />
+              <Bar dataKey="spend" fill={brand.colors.primary} radius={[0, 3, 3, 0]}>
+                <LabelList dataKey="spend" position="right" formatter={(v: number) => `₹${v.toFixed(1)}Cr`} style={{ fontSize: 9, fill: "#555" }} />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         )}
@@ -311,13 +317,14 @@ function VendorTypeChart() {
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Upload vendor master</div>
         ) : (
           <ResponsiveContainer>
-            <BarChart data={types} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
+            <BarChart data={types} margin={{ top: 24, right: 16, left: 0, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
               <XAxis dataKey="type" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
               <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
               <Tooltip formatter={(v: number) => [`${v} vendors`]} />
               <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                 {types.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                <LabelList dataKey="count" position="top" formatter={(v: number) => v.toFixed(0)} style={{ fontSize: 9, fill: "#555" }} />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
