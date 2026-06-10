@@ -10,6 +10,7 @@ import {
   Tooltip,
   BarChart,
   Bar,
+  LabelList,
   Cell,
   PieChart,
   Pie,
@@ -22,6 +23,15 @@ import { SectionCard } from "@/components/SectionCard";
 import { formatINR } from "@/lib/format";
 import { brand } from "@/lib/brand";
 import { useKpi, useKpiValue, useKpiCompanies, useCharts } from "@/hooks/useKpi";
+
+const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+function fmtMonth(raw: string): string {
+  if (!raw) return raw;
+  const m = raw.match(/^(\d{4})-(\d{2})/);
+  if (m) return `${MONTH_NAMES[parseInt(m[2], 10) - 1]}'${m[1].slice(2)}`;
+  return raw;
+}
 
 export const Route = createFileRoute("/financial")({
   head: () => ({
@@ -182,9 +192,9 @@ function PaymentTrend() {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
-              <XAxis dataKey="month" tickLine={false} axisLine={false} />
+              <XAxis dataKey="month" tickLine={false} axisLine={false} tickFormatter={fmtMonth} tick={{ fontSize: 10 }} />
               <YAxis tickLine={false} axisLine={false} tickFormatter={(v) => `₹${v.toFixed(0)}Cr`} />
-              <Tooltip formatter={(v: number) => [`₹${v.toFixed(2)} Cr`, "Payments"]} />
+              <Tooltip formatter={(v: number) => [`₹${v.toFixed(2)} Cr`, "Payments"]} labelFormatter={fmtMonth} />
               <Area type="monotone" dataKey="payments" stroke={brand.colors.success} strokeWidth={2} fill="url(#payGrad)" />
             </AreaChart>
           </ResponsiveContainer>
@@ -276,12 +286,14 @@ function ThreeWayMatchTrend() {
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Upload payment data to view</div>
         ) : (
           <ResponsiveContainer>
-            <BarChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 4 }}>
+            <BarChart data={chartData} margin={{ top: 24, right: 16, left: 0, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
-              <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
+              <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} tickFormatter={fmtMonth} />
               <YAxis tickLine={false} axisLine={false} tickFormatter={(v) => `₹${v.toFixed(0)}Cr`} tick={{ fontSize: 10 }} />
-              <Tooltip formatter={(v: number) => [`₹${v.toFixed(2)} Cr`, "Payments"]} />
-              <Bar dataKey="payments" fill={brand.colors.success} radius={[3, 3, 0, 0]} />
+              <Tooltip formatter={(v: number) => [`₹${v.toFixed(2)} Cr`, "Payments"]} labelFormatter={fmtMonth} />
+              <Bar dataKey="payments" fill={brand.colors.success} radius={[3, 3, 0, 0]}>
+                <LabelList dataKey="payments" position="top" formatter={(v: number) => `₹${v.toFixed(1)}Cr`} style={{ fontSize: 9, fill: "#555" }} />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         )}

@@ -1200,7 +1200,7 @@ def _vendor(conn, FY, MTD, cc_cfg: str = "", company_code: str = "ALL"):
             )
             SELECT po.vendor,
                    COALESCE(MIN(vm.vendor_name), MIN(po.vendor_name), po.vendor) AS vendor_name,
-                   ROUND(AVG((gf.first_grn_date::DATE - po.delivery_date::DATE)::FLOAT), 1) AS avg_days,
+                   ROUND(AVG((gf.first_grn_date::DATE - po.delivery_date::DATE)::numeric), 1) AS avg_days,
                    COUNT(*) AS po_lines
             FROM po_dump po
             JOIN grn_first gf ON gf.purchasing_document = po.purchasing_document
@@ -1222,7 +1222,7 @@ def _vendor(conn, FY, MTD, cc_cfg: str = "", company_code: str = "ALL"):
                   AND entry_date IS NOT NULL AND entry_date != ''
                 GROUP BY purchasing_document, item
             )
-            SELECT ROUND(AVG((gf.first_grn_date::DATE - po.delivery_date::DATE)::FLOAT), 1)
+            SELECT ROUND(AVG((gf.first_grn_date::DATE - po.delivery_date::DATE)::numeric), 1)
             FROM po_dump po
             JOIN grn_first gf ON gf.purchasing_document = po.purchasing_document
                              AND gf.item               = po.item
