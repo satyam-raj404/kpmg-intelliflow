@@ -163,11 +163,6 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
          AND  cl.object_class     = 'EINKBELEG'
          AND  cl.change_indicator IN ('E', 'U')
          AND  cl.field_name       IN ('MATNR', 'NETPR', 'NETWR', 'MENGE')
-         AND  (
-               cl.table_key IS NULL
-               OR cl.table_key = ''
-               OR CAST(SUBSTR(cl.table_key, -5) AS INTEGER) = CAST(po.item AS INTEGER)
-              )
         WHERE (po.deletion_indicator IS NULL OR po.deletion_indicator NOT IN ('L', 'X'))
     """)
     p7_total = _run(conn, """
