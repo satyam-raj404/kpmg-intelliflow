@@ -1,9 +1,11 @@
-import { useState } from "react";
-import { Search, Bell, ChevronDown, LogOut, User as UserIcon } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Search, Bell, ChevronDown, LogOut, User as UserIcon, ShieldAlert, AlertTriangle, Info } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useApp, ROLES, roleInitials } from "@/context/AppContext";
-import { notifications } from "@/data/mock";
+import { fetchAnomalies } from "@/api/queries";
+import type { AnomalyCount } from "@/api/types";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,11 +18,39 @@ import { cn } from "@/lib/utils";
 
 const PERIODS = ["Q1 FY24", "Q2 FY24", "Q3 FY24", "FY24", "Custom"];
 
+function severityIcon(s: string) {
+  if (s === "HIGH") return <ShieldAlert className="h-3 w-3 shrink-0 text-danger mt-0.5" />;
+  if (s === "MEDIUM") return <AlertTriangle className="h-3 w-3 shrink-0 text-warning mt-0.5" />;
+  return <Info className="h-3 w-3 shrink-0 text-accent mt-0.5" />;
+}
+
+function humanize(code: string) {
+  return code.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export function TopBar() {
   const { role, setRole, period, setPeriod, user } = useApp();
   const navigate = useNavigate();
-  const [unread, setUnread] = useState(notifications.filter((n) => !n.read).length);
   const [openNotif, setOpenNotif] = useState(false);
+  const [dismissedAt, setDismissedAt] = useState(0);
+
+  const { data: anomalies = [], dataUpdatedAt } = useQuery<AnomalyCount[]>({
+    queryKey: ["anomalies"],
+    queryFn: fetchAnomalies,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+  });
+
+  const alertItems = useMemo(
+    () =>
+      [...anomalies].sort((a, b) => {
+        const rank = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+        return (rank[a.severity as keyof typeof rank] ?? 3) - (rank[b.severity as keyof typeof rank] ?? 3);
+      }),
+    [anomalies]
+  );
+
+  const unread = dismissedAt >= dataUpdatedAt ? 0 : alertItems.filter((a) => a.severity === "HIGH" || a.severity === "MEDIUM").length;
 
   return (
     <motion.header
@@ -70,35 +100,66 @@ export function TopBar() {
             </motion.span>
           )}
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-80 p-0">
+        <DropdownMenuContent align="end" className="w-88 p-0" style={{ width: "22rem" }}>
           <div className="px-3 py-2.5 border-b border-border flex items-center justify-between">
-            <span className="font-medium text-sm">Notifications</span>
-            <button onClick={() => setUnread(0)} className="text-[12px] text-accent hover:underline">Mark all read</button>
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-sm">Anomaly Alerts</span>
+              {alertItems.length > 0 && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-medium">
+                  {alertItems.length} active
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => setDismissedAt(Date.now())}
+              className="text-[12px] text-accent hover:underline"
+            >
+              Dismiss all
+            </button>
           </div>
-          <div className="max-h-80 overflow-y-auto">
-            {notifications.map((n, i) => (
-              <motion.div
-                key={n.id}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.03, duration: 0.2 }}
-                className="px-3 py-2.5 border-b border-border last:border-b-0 hover:bg-secondary/50 cursor-pointer transition-colors duration-150"
-              >
-                <div className="flex items-start gap-2">
-                  <span className={cn("mt-1.5 h-1.5 w-1.5 rounded-full shrink-0",
-                    n.severity === "critical" && "bg-danger",
-                    n.severity === "warning" && "bg-warning",
-                    n.severity === "info" && "bg-accent",
-                  )} />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13px] font-medium">{n.title}</div>
-                    <div className="text-[12px] text-muted-foreground">{n.description}</div>
-                    <div className="text-[11px] text-muted-foreground/50 mt-0.5">{n.time}</div>
+          <div className="max-h-[340px] overflow-y-auto">
+            {alertItems.length === 0 ? (
+              <div className="px-3 py-6 text-center text-[12px] text-muted-foreground">No anomalies detected</div>
+            ) : (
+              alertItems.map((a, i) => (
+                <motion.div
+                  key={a.anomaly_code}
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.03, duration: 0.2 }}
+                  className="px-3 py-2.5 border-b border-border last:border-b-0 hover:bg-secondary/50 transition-colors duration-150"
+                >
+                  <div className="flex items-start gap-2">
+                    {severityIcon(a.severity)}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-[12px] font-medium truncate">{humanize(a.anomaly_code)}</div>
+                        <span className={cn(
+                          "text-[9px] px-1.5 py-0.5 rounded font-bold shrink-0",
+                          a.severity === "HIGH" ? "bg-danger/10 text-danger" :
+                          a.severity === "MEDIUM" ? "bg-warning/10 text-warning" :
+                          "bg-accent/10 text-accent"
+                        )}>
+                          {a.count} PO{a.count !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{a.description}</div>
+                    </div>
                   </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              ))
+            )}
           </div>
+          {alertItems.length > 0 && (
+            <div className="px-3 py-2 border-t border-border bg-secondary/30">
+              <button
+                onClick={() => { navigate({ to: "/dashboard" }); setOpenNotif(false); }}
+                className="text-[11px] text-accent hover:underline w-full text-center"
+              >
+                View PO Deletion Monitor →
+              </button>
+            </div>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
