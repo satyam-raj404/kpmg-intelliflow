@@ -14,9 +14,11 @@ import { Route as VendorRepoRouteImport } from './routes/vendor-repo'
 import { Route as UtilizationRouteImport } from './routes/utilization'
 import { Route as UploadRouteImport } from './routes/upload'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as P2pRouteImport } from './routes/p2p'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LeadershipRouteImport } from './routes/leadership'
+import { Route as HistoryRouteImport } from './routes/history'
 import { Route as FinancialRouteImport } from './routes/financial'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ActionsRouteImport } from './routes/actions'
@@ -50,6 +52,11 @@ const SignupRoute = SignupRouteImport.update({
   path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const P2pRoute = P2pRouteImport.update({
   id: '/p2p',
   path: '/p2p',
@@ -63,6 +70,11 @@ const LoginRoute = LoginRouteImport.update({
 const LeadershipRoute = LeadershipRouteImport.update({
   id: '/leadership',
   path: '/leadership',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HistoryRoute = HistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FinancialRoute = FinancialRouteImport.update({
@@ -106,9 +118,11 @@ export interface FileRoutesByFullPath {
   '/actions': typeof ActionsRoute
   '/dashboard': typeof DashboardRoute
   '/financial': typeof FinancialRoute
+  '/history': typeof HistoryRoute
   '/leadership': typeof LeadershipRoute
   '/login': typeof LoginRoute
   '/p2p': typeof P2pRoute
+  '/profile': typeof ProfileRoute
   '/signup': typeof SignupRoute
   '/upload': typeof UploadRoute
   '/utilization': typeof UtilizationRoute
@@ -123,9 +137,11 @@ export interface FileRoutesByTo {
   '/actions': typeof ActionsRoute
   '/dashboard': typeof DashboardRoute
   '/financial': typeof FinancialRoute
+  '/history': typeof HistoryRoute
   '/leadership': typeof LeadershipRoute
   '/login': typeof LoginRoute
   '/p2p': typeof P2pRoute
+  '/profile': typeof ProfileRoute
   '/signup': typeof SignupRoute
   '/upload': typeof UploadRoute
   '/utilization': typeof UtilizationRoute
@@ -141,9 +157,11 @@ export interface FileRoutesById {
   '/actions': typeof ActionsRoute
   '/dashboard': typeof DashboardRoute
   '/financial': typeof FinancialRoute
+  '/history': typeof HistoryRoute
   '/leadership': typeof LeadershipRoute
   '/login': typeof LoginRoute
   '/p2p': typeof P2pRoute
+  '/profile': typeof ProfileRoute
   '/signup': typeof SignupRoute
   '/upload': typeof UploadRoute
   '/utilization': typeof UtilizationRoute
@@ -160,9 +178,11 @@ export interface FileRouteTypes {
     | '/actions'
     | '/dashboard'
     | '/financial'
+    | '/history'
     | '/leadership'
     | '/login'
     | '/p2p'
+    | '/profile'
     | '/signup'
     | '/upload'
     | '/utilization'
@@ -177,9 +197,11 @@ export interface FileRouteTypes {
     | '/actions'
     | '/dashboard'
     | '/financial'
+    | '/history'
     | '/leadership'
     | '/login'
     | '/p2p'
+    | '/profile'
     | '/signup'
     | '/upload'
     | '/utilization'
@@ -194,9 +216,11 @@ export interface FileRouteTypes {
     | '/actions'
     | '/dashboard'
     | '/financial'
+    | '/history'
     | '/leadership'
     | '/login'
     | '/p2p'
+    | '/profile'
     | '/signup'
     | '/upload'
     | '/utilization'
@@ -212,9 +236,11 @@ export interface RootRouteChildren {
   ActionsRoute: typeof ActionsRoute
   DashboardRoute: typeof DashboardRoute
   FinancialRoute: typeof FinancialRoute
+  HistoryRoute: typeof HistoryRoute
   LeadershipRoute: typeof LeadershipRoute
   LoginRoute: typeof LoginRoute
   P2pRoute: typeof P2pRoute
+  ProfileRoute: typeof ProfileRoute
   SignupRoute: typeof SignupRoute
   UploadRoute: typeof UploadRoute
   UtilizationRoute: typeof UtilizationRoute
@@ -262,6 +288,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/p2p': {
       id: '/p2p'
       path: '/p2p'
@@ -281,6 +314,13 @@ declare module '@tanstack/react-router' {
       path: '/leadership'
       fullPath: '/leadership'
       preLoaderRoute: typeof LeadershipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/history': {
+      id: '/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof HistoryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/financial': {
@@ -340,9 +380,11 @@ const rootRouteChildren: RootRouteChildren = {
   ActionsRoute: ActionsRoute,
   DashboardRoute: DashboardRoute,
   FinancialRoute: FinancialRoute,
+  HistoryRoute: HistoryRoute,
   LeadershipRoute: LeadershipRoute,
   LoginRoute: LoginRoute,
   P2pRoute: P2pRoute,
+  ProfileRoute: ProfileRoute,
   SignupRoute: SignupRoute,
   UploadRoute: UploadRoute,
   UtilizationRoute: UtilizationRoute,

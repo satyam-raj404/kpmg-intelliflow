@@ -242,12 +242,14 @@ function PODeletionMonitor() {
                 const flags = po.anomaly_flags
                   ? po.anomaly_flags.split(",").map((f) => f.trim()).filter(Boolean)
                   : [];
-                const hasHighRisk = flags.some((f) => ["MAVERICK_BUY", "VENDOR_BLOCK", "PAYMENT_BEFORE_GRN"].includes(f));
+                const HIGH_FLAGS = ["MAVERICK_BUY", "VENDOR_BLOCK", "PAYMENT_BEFORE_GRN", "THREE_WAY_MISMATCH", "DUPLICATE_INVOICE", "GRN_WITHOUT_PO"];
+                const MED_FLAGS  = ["PRICE_DEVIATION", "BACKDATED_PO", "LATE_DELIVERY", "SPLIT_PO", "OVERDUE_INVOICE"];
+                const hasHighRisk = flags.some((f) => HIGH_FLAGS.includes(f));
 
                 return (
                   <tr
                     key={`${po.purchasing_document}-${po.item}`}
-                    className={`hover:bg-secondary/30 transition-colors ${hasHighRisk ? "bg-danger/3" : ""}`}
+                    className={`hover:bg-secondary/30 transition-colors ${hasHighRisk ? "bg-danger/[0.03]" : ""}`}
                   >
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-1.5">
@@ -287,11 +289,11 @@ function PODeletionMonitor() {
                               key={flag}
                               title={flag}
                               className={`inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded font-medium ${
-                                ["MAVERICK_BUY", "VENDOR_BLOCK", "PAYMENT_BEFORE_GRN", "THREE_WAY_MISMATCH"].includes(flag)
+                                HIGH_FLAGS.includes(flag)
                                   ? "bg-danger/10 text-danger"
-                                  : ["PRICE_DEVIATION", "BACKDATED_PO", "LATE_DELIVERY"].includes(flag)
+                                  : MED_FLAGS.includes(flag)
                                   ? "bg-warning/10 text-warning"
-                                  : "bg-secondary text-muted-foreground"
+                                  : "bg-accent/10 text-accent"
                               }`}
                             >
                               <AlertTriangle className="h-2 w-2" />
