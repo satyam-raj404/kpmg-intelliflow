@@ -18,7 +18,7 @@ import { KpiCard } from "@/components/KpiCard";
 import { SectionCard } from "@/components/SectionCard";
 import { brand } from "@/lib/brand";
 import { formatINR } from "@/lib/format";
-import { useKpi, useKpiValue, useKpiCompanies, useCharts } from "@/hooks/useKpi";
+import { useKpi, useKpiValue, useKpiCompanies, useCharts, usePrefetchKpiCompanies } from "@/hooks/useKpi";
 
 export const Route = createFileRoute("/vendors")({
   head: () => ({
@@ -53,6 +53,7 @@ function CompanyFilter({ value, onChange }: { value: string; onChange: (v: strin
 
 function VendorDashboard() {
   const [company, setCompany] = useState("ALL");
+  usePrefetchKpiCompanies("vendor");
 
   return (
     <AppShell>

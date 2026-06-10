@@ -1,14 +1,18 @@
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from database import init_db
+from database import init_db, get_connection
 from routers import upload, kpi, p2p, events
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    # Pre-warm 8 worker-thread DB connections so all early requests skip the ~2s cold-start
+    loop = asyncio.get_event_loop()
+    await asyncio.gather(*[loop.run_in_executor(None, get_connection) for _ in range(8)])
     yield
 
 

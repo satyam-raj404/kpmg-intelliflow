@@ -3,9 +3,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "@tanstack/react-router";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
+import { useKpiEvents } from "@/hooks/useKpi";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
+  useKpiEvents();
 
   return (
     <div className="min-h-screen w-full flex bg-background">

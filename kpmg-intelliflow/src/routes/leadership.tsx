@@ -24,7 +24,7 @@ import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
 import { formatINR } from "@/lib/format";
 import { brand } from "@/lib/brand";
-import { useKpi, useKpiValue, useKpiCompanies, useCharts } from "@/hooks/useKpi";
+import { useKpi, useKpiValue, useKpiCompanies, useCharts, usePrefetchKpiCompanies } from "@/hooks/useKpi";
 import { apiFetch } from "@/api/client";
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -172,6 +172,7 @@ function CompanyFilter({ value, onChange }: { value: string; onChange: (v: strin
 
 function LeadershipDashboard() {
   const [company, setCompany] = useState("ALL");
+  usePrefetchKpiCompanies("leadership");
 
   return (
     <AppShell>

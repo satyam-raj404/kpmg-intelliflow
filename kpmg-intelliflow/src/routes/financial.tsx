@@ -22,7 +22,7 @@ import { KpiCard } from "@/components/KpiCard";
 import { SectionCard } from "@/components/SectionCard";
 import { formatINR } from "@/lib/format";
 import { brand } from "@/lib/brand";
-import { useKpi, useKpiValue, useKpiCompanies, useCharts } from "@/hooks/useKpi";
+import { useKpi, useKpiValue, useKpiCompanies, useCharts, usePrefetchKpiCompanies } from "@/hooks/useKpi";
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
@@ -68,6 +68,7 @@ function CompanyFilter({ value, onChange }: { value: string; onChange: (v: strin
 
 function FinancialDashboard() {
   const [company, setCompany] = useState("ALL");
+  usePrefetchKpiCompanies("financial");
 
   return (
     <AppShell>
