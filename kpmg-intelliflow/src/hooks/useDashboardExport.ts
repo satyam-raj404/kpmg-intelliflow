@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback } from "react";
-import html2canvas from "html2canvas";
+import { toPng } from "html-to-image";
 import jsPDF from "jspdf";
 
 export function useDashboardExport(title: string, company = "ALL") {
@@ -12,51 +12,60 @@ export function useDashboardExport(title: string, company = "ALL") {
     setIsExporting(true);
 
     try {
-      // Capture the full element height (including off-screen content)
-      const canvas = await html2canvas(el, {
-        scale: 1.5,
-        useCORS: true,
-        logging: false,
-        scrollX: 0,
-        scrollY: 0,
-        width: el.scrollWidth,
-        height: el.scrollHeight,
-        windowWidth: el.scrollWidth,
-        windowHeight: el.scrollHeight,
+      // toPng uses getComputedStyle() so oklch/lch/lab colors are resolved to
+      // rgb by the browser before serialization — no CSS parser involved
+      const dataUrl = await toPng(el, {
+        pixelRatio: 1.5,
+        skipFonts: false,
+        // Skip open tooltips/popovers that may float over content
+        filter: (node) =>
+          !(node instanceof HTMLElement &&
+            (node.classList.contains("recharts-tooltip-wrapper") ||
+             node.getAttribute("data-radix-popper-content-wrapper") != null)),
       });
 
-      // A4 landscape: 297mm × 210mm
+      // Load image to get natural dimensions
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const i = new Image();
+        i.onload = () => resolve(i);
+        i.onerror = reject;
+        i.src = dataUrl;
+      });
+
+      // A4 landscape: 297 × 210 mm
       const PDF_W = 297;
       const PDF_H = 210;
       const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
 
-      // px-per-mm ratio based on canvas width fitting the page width
-      const pxPerMm = canvas.width / PDF_W;
+      const pxPerMm = img.width / PDF_W;
       const pageHeightPx = PDF_H * pxPerMm;
 
-      // Slice canvas into A4-height chunks and add one page per chunk
+      // Draw full image onto an offscreen canvas once, then slice per page
+      const full = document.createElement("canvas");
+      full.width = img.width;
+      full.height = img.height;
+      full.getContext("2d")!.drawImage(img, 0, 0);
+
       let srcY = 0;
       let firstPage = true;
-      while (srcY < canvas.height) {
+      while (srcY < img.height) {
         if (!firstPage) pdf.addPage();
         firstPage = false;
 
-        const sliceH = Math.min(pageHeightPx, canvas.height - srcY);
+        const sliceH = Math.min(pageHeightPx, img.height - srcY);
         const slice = document.createElement("canvas");
-        slice.width = canvas.width;
+        slice.width = img.width;
         slice.height = Math.ceil(sliceH);
-        slice.getContext("2d")!.drawImage(canvas, 0, -srcY);
+        slice.getContext("2d")!.drawImage(full, 0, -srcY);
 
-        const imgH = sliceH / pxPerMm;
-        pdf.addImage(slice.toDataURL("image/png"), "PNG", 0, 0, PDF_W, imgH);
+        pdf.addImage(slice.toDataURL("image/png"), "PNG", 0, 0, PDF_W, sliceH / pxPerMm);
         srcY += pageHeightPx;
       }
 
-      // Filename encodes dashboard + company + date
       const date = new Date().toISOString().slice(0, 10);
       const co = company && company !== "ALL" ? `_${company}` : "";
-      const name = `IntelliFlow_${title.replace(/[\s/\\]+/g, "_")}${co}_${date}.pdf`;
-      pdf.save(name);
+      pdf.save(`IntelliFlow_${title.replace(/[\s/\\]+/g, "_")}${co}_${date}.pdf`);
+
     } catch (err) {
       console.error("[PDF export]", err);
     } finally {
