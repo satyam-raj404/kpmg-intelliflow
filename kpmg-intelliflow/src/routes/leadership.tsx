@@ -25,6 +25,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { formatINR } from "@/lib/format";
 import { brand } from "@/lib/brand";
 import { useKpi, useKpiValue, useKpiCompanies, useCharts, usePrefetchKpiCompanies } from "@/hooks/useKpi";
+import { useDashboardExport } from "@/hooks/useDashboardExport";
 import { apiFetch } from "@/api/client";
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -173,38 +174,43 @@ function CompanyFilter({ value, onChange }: { value: string; onChange: (v: strin
 function LeadershipDashboard() {
   const [company, setCompany] = useState("ALL");
   usePrefetchKpiCompanies("leadership");
+  const { containerRef, exportPdf, isExporting } = useDashboardExport("Leadership Dashboard", company);
 
   return (
     <AppShell>
-      <div className="flex items-center justify-between">
-        <PageHeader
-          title="Leadership Dashboard"
-          subtitle="Strategic portfolio view · Scannable in 30 seconds"
-          actions={<HighValueThresholdPanel />}
-        />
-        <CompanyFilter value={company} onChange={setCompany} />
-      </div>
-      <SummaryCountsPanel company={company} />
-      <div className="mt-6">
-        <KpiRow company={company} />
-      </div>
-      <div className="grid grid-cols-2 gap-4 mt-4">
-        <SpendTrend />
-        <CapexOpexBreakdown company={company} />
-      </div>
-      <div className="mt-4">
-        <RiskIndicators company={company} />
-      </div>
-      <div className="grid grid-cols-2 gap-4 mt-4">
-        <InvoiceByVendor />
-        <InvoiceByVendorType />
-      </div>
-      <div className="grid grid-cols-2 gap-4 mt-4">
-        <PrAging />
-        <PrQuantityByProduct />
-      </div>
-      <div className="mt-4">
-        <InvoiceVsPayment />
+      <div ref={containerRef}>
+        <div className="flex items-center justify-between">
+          <PageHeader
+            title="Leadership Dashboard"
+            subtitle="Strategic portfolio view · Scannable in 30 seconds"
+            actions={<HighValueThresholdPanel />}
+            onExportPdf={exportPdf}
+            isExporting={isExporting}
+          />
+          <CompanyFilter value={company} onChange={setCompany} />
+        </div>
+        <SummaryCountsPanel company={company} />
+        <div className="mt-6">
+          <KpiRow company={company} />
+        </div>
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <SpendTrend />
+          <CapexOpexBreakdown company={company} />
+        </div>
+        <div className="mt-4">
+          <RiskIndicators company={company} />
+        </div>
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <InvoiceByVendor />
+          <InvoiceByVendorType />
+        </div>
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <PrAging />
+          <PrQuantityByProduct />
+        </div>
+        <div className="mt-4">
+          <InvoiceVsPayment />
+        </div>
       </div>
     </AppShell>
   );

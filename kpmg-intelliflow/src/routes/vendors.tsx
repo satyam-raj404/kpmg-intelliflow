@@ -19,6 +19,7 @@ import { SectionCard } from "@/components/SectionCard";
 import { brand } from "@/lib/brand";
 import { formatINR } from "@/lib/format";
 import { useKpi, useKpiValue, useKpiCompanies, useCharts, usePrefetchKpiCompanies } from "@/hooks/useKpi";
+import { useDashboardExport } from "@/hooks/useDashboardExport";
 
 export const Route = createFileRoute("/vendors")({
   head: () => ({
@@ -54,22 +55,30 @@ function CompanyFilter({ value, onChange }: { value: string; onChange: (v: strin
 function VendorDashboard() {
   const [company, setCompany] = useState("ALL");
   usePrefetchKpiCompanies("vendor");
+  const { containerRef, exportPdf, isExporting } = useDashboardExport("Vendor Performance", company);
 
   return (
     <AppShell>
-      <div className="flex items-center justify-between">
-        <PageHeader title="Vendor Performance" subtitle="Delivery, compliance, and spend concentration analytics" />
-        <CompanyFilter value={company} onChange={setCompany} />
-      </div>
-      <KpiRow company={company} />
-      <VendorHealthStats company={company} />
-      <div className="grid grid-cols-2 gap-4 mt-4">
-        <VendorDeliveryChart company={company} />
-        <ComplianceDonut />
-      </div>
-      <div className="grid grid-cols-2 gap-4 mt-4">
-        <TopVendors company={company} />
-        <VendorTypeChart />
+      <div ref={containerRef}>
+        <div className="flex items-center justify-between">
+          <PageHeader
+            title="Vendor Performance"
+            subtitle="Delivery, compliance, and spend concentration analytics"
+            onExportPdf={exportPdf}
+            isExporting={isExporting}
+          />
+          <CompanyFilter value={company} onChange={setCompany} />
+        </div>
+        <KpiRow company={company} />
+        <VendorHealthStats company={company} />
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <VendorDeliveryChart company={company} />
+          <ComplianceDonut />
+        </div>
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <TopVendors company={company} />
+          <VendorTypeChart />
+        </div>
       </div>
     </AppShell>
   );

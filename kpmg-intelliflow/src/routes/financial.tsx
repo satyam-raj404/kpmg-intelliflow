@@ -23,6 +23,7 @@ import { SectionCard } from "@/components/SectionCard";
 import { formatINR } from "@/lib/format";
 import { brand } from "@/lib/brand";
 import { useKpi, useKpiValue, useKpiCompanies, useCharts, usePrefetchKpiCompanies } from "@/hooks/useKpi";
+import { useDashboardExport } from "@/hooks/useDashboardExport";
 
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
@@ -69,11 +70,18 @@ function CompanyFilter({ value, onChange }: { value: string; onChange: (v: strin
 function FinancialDashboard() {
   const [company, setCompany] = useState("ALL");
   usePrefetchKpiCompanies("financial");
+  const { containerRef, exportPdf, isExporting } = useDashboardExport("Financial Dashboard", company);
 
   return (
     <AppShell>
+      <div ref={containerRef}>
       <div className="flex items-center justify-between">
-        <PageHeader title="Financial Dashboard" subtitle="Spend vs budget tracking, cash flow, invoice/payment cycle health" />
+        <PageHeader
+          title="Financial Dashboard"
+          subtitle="Spend vs budget tracking, cash flow, invoice/payment cycle health"
+          onExportPdf={exportPdf}
+          isExporting={isExporting}
+        />
         <CompanyFilter value={company} onChange={setCompany} />
       </div>
       <KpiRow company={company} />
@@ -84,6 +92,7 @@ function FinancialDashboard() {
       </div>
       <div className="mt-4">
         <ThreeWayMatchTrend />
+      </div>
       </div>
     </AppShell>
   );

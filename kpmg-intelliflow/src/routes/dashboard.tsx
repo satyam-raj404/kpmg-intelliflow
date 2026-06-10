@@ -24,6 +24,7 @@ import { formatINR, formatDateShort } from "@/lib/format";
 import { brand } from "@/lib/brand";
 import { apiFetch } from "@/api/client";
 import { useKpi, useKpiValue, useCharts } from "@/hooks/useKpi";
+import { useDashboardExport } from "@/hooks/useDashboardExport";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -50,16 +51,24 @@ interface DeletedPO {
 }
 
 function ProcurementDashboard() {
+  const { containerRef, exportPdf, isExporting } = useDashboardExport("Procurement Dashboard");
   return (
     <AppShell>
-      <PageHeader title="Procurement Dashboard" subtitle="Real-time visibility into PO activity, breaches, and operational priorities" />
-      <KpiRow />
-      <div className="grid grid-cols-2 gap-4 mt-4">
-        <POValueTrend />
-        <POCountAndMaverick />
-      </div>
-      <div className="mt-4">
-        <PODeletionMonitor />
+      <div ref={containerRef}>
+        <PageHeader
+          title="Procurement Dashboard"
+          subtitle="Real-time visibility into PO activity, breaches, and operational priorities"
+          onExportPdf={exportPdf}
+          isExporting={isExporting}
+        />
+        <KpiRow />
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <POValueTrend />
+          <POCountAndMaverick />
+        </div>
+        <div className="mt-4">
+          <PODeletionMonitor />
+        </div>
       </div>
     </AppShell>
   );

@@ -1,5 +1,5 @@
 import { type ReactNode } from "react";
-import { Download, FileSpreadsheet } from "lucide-react";
+import { Download, FileSpreadsheet, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useApp } from "@/context/AppContext";
@@ -9,9 +9,18 @@ interface PageHeaderProps {
   subtitle?: string;
   actions?: ReactNode;
   showExport?: boolean;
+  onExportPdf?: () => void;
+  isExporting?: boolean;
 }
 
-export function PageHeader({ title, subtitle, actions, showExport = true }: PageHeaderProps) {
+export function PageHeader({
+  title,
+  subtitle,
+  actions,
+  showExport = true,
+  onExportPdf,
+  isExporting = false,
+}: PageHeaderProps) {
   const { period } = useApp();
 
   return (
@@ -38,11 +47,16 @@ export function PageHeader({ title, subtitle, actions, showExport = true }: Page
         {showExport && (
           <>
             <button
-              onClick={() => toast.success("Export ready")}
-              className="h-7 px-2.5 rounded-md border border-border bg-background text-[12px] font-medium flex items-center gap-1 hover:border-accent/50 hover:bg-secondary/50 transition-all duration-200"
+              onClick={onExportPdf ?? (() => toast.info("PDF export not configured"))}
+              disabled={isExporting}
+              className="h-7 px-2.5 rounded-md border border-border bg-background text-[12px] font-medium flex items-center gap-1 hover:border-accent/50 hover:bg-secondary/50 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <Download className="h-3 w-3" />
-              PDF
+              {isExporting ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Download className="h-3 w-3" />
+              )}
+              {isExporting ? "Exporting…" : "PDF"}
             </button>
             <button
               onClick={() => toast.success("Export ready")}

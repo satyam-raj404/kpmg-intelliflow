@@ -20,6 +20,7 @@ import { SectionCard } from "@/components/SectionCard";
 import { formatINR } from "@/lib/format";
 import { brand } from "@/lib/brand";
 import { useKpi, useKpiValue, useCharts } from "@/hooks/useKpi";
+import { useDashboardExport } from "@/hooks/useDashboardExport";
 
 export const Route = createFileRoute("/utilization")({
   head: () => ({
@@ -44,27 +45,32 @@ function pct(v: number | null | undefined): string {
 // ── Main Dashboard ─────────────────────────────────────────────────────────
 
 function UtilizationDashboard() {
+  const { containerRef, exportPdf, isExporting } = useDashboardExport("CAPEX_OPEX Dashboard");
   return (
     <AppShell>
-      <PageHeader
-        title="CAPEX / OPEX Dashboard"
-        subtitle="Capital vs operational expenditure split, category breakdown, and plant-level view"
-      />
+      <div ref={containerRef}>
+        <PageHeader
+          title="CAPEX / OPEX Dashboard"
+          subtitle="Capital vs operational expenditure split, category breakdown, and plant-level view"
+          onExportPdf={exportPdf}
+          isExporting={isExporting}
+        />
 
-      {/* Row 1 — Spend totals */}
-      <SpendRow />
+        {/* Row 1 — Spend totals */}
+        <SpendRow />
 
-      {/* Row 2 — Count / value KPIs */}
-      <CountRow />
+        {/* Row 2 — Count / value KPIs */}
+        <CountRow />
 
-      {/* Charts */}
-      <div className="grid grid-cols-2 gap-4 mt-4">
-        <MonthlyTrend />
-        <PlantBreakdown />
-      </div>
-      <div className="grid grid-cols-2 gap-4 mt-4">
-        <CategoryBreakdown type="CAPEX" />
-        <CategoryBreakdown type="OPEX" />
+        {/* Charts */}
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <MonthlyTrend />
+          <PlantBreakdown />
+        </div>
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <CategoryBreakdown type="CAPEX" />
+          <CategoryBreakdown type="OPEX" />
+        </div>
       </div>
     </AppShell>
   );
