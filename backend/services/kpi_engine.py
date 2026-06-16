@@ -82,7 +82,15 @@ def _cc(company_code: str, alias: str = "") -> str:
 
 # ── PROCUREMENT ───────────────────────────────────────────────────────────────
 
-def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
+def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31",
+                 cc_cfg: str = "", company_code: str = "ALL"):
+
+    _cc_codes = [c.strip() for c in cc_cfg.split(',') if c.strip()]
+    _cc_list  = ','.join(f"'{c}'" for c in _cc_codes) if _cc_codes else None
+    _cc_bare  = f"company_code IN ({_cc_list})"        if _cc_list else "1=1"
+    _cc_po    = f"po.company_code IN ({_cc_list})"     if _cc_list else "1=1"
+    _cc_pr    = f"pr.company_code IN ({_cc_list})"     if _cc_list else "1=1"
+    _cc_fact  = f"company_code IN ({_cc_list})"        if _cc_list else "1=1"
 
     # P1 — Total PO Value MTD
     # Uses COALESCE(created_on, document_date) — created_on=ERDAT preferred; document_date=BEDAT fallback
@@ -91,17 +99,19 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
         FROM po_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
           AND COALESCE(NULLIF(created_on,''), document_date) >= {MTD}
+          AND {_cc_bare}
     """)
-    _upsert(conn, "procurement", "TOTAL_PO_VALUE_MTD", "Total PO Value (MTD)", p1, None, "INR")
+    _upsert(conn, "procurement", "TOTAL_PO_VALUE_MTD", "Total PO Value (MTD)", p1, None, "INR", company_code=company_code)
 
     # P2 — Active PO Count: DISTINCT purchasing_document, not delivery-complete, not deleted
-    p2 = _run(conn, """
+    p2 = _run(conn, f"""
         SELECT COUNT(DISTINCT purchasing_document)
         FROM po_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
           AND (delivery_completed IS NULL OR delivery_completed = '')
+          AND {_cc_bare}
     """)
-    _upsert(conn, "procurement", "ACTIVE_PO_COUNT", "Active PO Count", p2, None, "count")
+    _upsert(conn, "procurement", "ACTIVE_PO_COUNT", "Active PO Count", p2, None, "count", company_code=company_code)
 
     # P3 — High-Value PO Count (threshold from kpi_config — user-configurable)
     p3 = _run(conn, f"""
@@ -109,26 +119,28 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
         FROM po_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
           AND CAST(net_order_value AS REAL) > {high_value_threshold}
+          AND {_cc_bare}
     """)
     _upsert(conn, "procurement", "HIGH_VALUE_PO_COUNT",
-            f"High-Value PO Count (>₹{int(high_value_threshold):,})", p3, None, "count")
+            f"High-Value PO Count (>₹{int(high_value_threshold):,})", p3, None, "count", company_code=company_code)
 
     # P4 — Avg PR-to-PO Conversion Time
     # AVG(PO.created_on − PR.created_on); excludes deleted PRs, negative values
-    p4 = _run(conn, """
+    p4 = _run(conn, f"""
         SELECT AVG(CAST(pr_to_po_days AS REAL))
         FROM pr_po_grn_invoice
         WHERE pr_to_po_days IS NOT NULL
           AND pr_to_po_days >= 0
           AND purchase_requisition IS NOT NULL
           AND purchasing_document  IS NOT NULL
+          AND {_cc_fact}
     """)
-    _upsert(conn, "procurement", "PR_TO_PO_DAYS", "Avg PR-to-PO Time (days)", p4, None, "days")
+    _upsert(conn, "procurement", "PR_TO_PO_DAYS", "Avg PR-to-PO Time (days)", p4, None, "days", company_code=company_code)
 
     # P5 — PO Approval Cycle Time: PO creation (ERDAT) → release via change_log FRGZU
     # field_name = 'FRGZU' only; change_indicator IN ('E','U'); new_value LIKE 'X%'
     # release_indicator LIKE 'X%' covers single and multi-level release
-    p5 = _run(conn, """
+    p5 = _run(conn, f"""
         SELECT AVG((cl.change_date::DATE - po.created_on::DATE)::FLOAT)
         FROM po_dump po
         JOIN change_log cl
@@ -140,8 +152,9 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
         WHERE po.release_indicator LIKE 'X%'
           AND (po.deletion_indicator IS NULL OR po.deletion_indicator NOT IN ('L', 'X'))
           AND po.created_on IS NOT NULL AND po.created_on != ''
+          AND {_cc_po}
     """)
-    _upsert(conn, "procurement", "PO_APPROVAL_CYCLE", "PO Approval Cycle (days)", p5, None, "days")
+    _upsert(conn, "procurement", "PO_APPROVAL_CYCLE", "PO Approval Cycle (days)", p5, None, "days", company_code=company_code)
 
     # P6 — PO Deletion Frequency MTD (item level — deletion_indicator lives on EKPO)
     p6 = _run(conn, f"""
@@ -149,13 +162,14 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
         FROM po_dump
         WHERE deletion_indicator = 'L'
           AND COALESCE(NULLIF(created_on,''), document_date) >= {MTD}
+          AND {_cc_bare}
     """)
-    _upsert(conn, "procurement", "PO_DELETION_MTD", "PO Deleted Line Items (MTD)", p6, None, "count")
+    _upsert(conn, "procurement", "PO_DELETION_MTD", "PO Deleted Line Items (MTD)", p6, None, "count", company_code=company_code)
 
     # P7 — PO Amendment Rate
     # Numerator: distinct PO line items with change to MATNR/NETPR/NETWR/MENGE
     # Item match: CDPOS-TABKEY rightmost 5 chars vs po_dump.item; fallback when table_key NULL
-    p7_amended = _run(conn, """
+    p7_amended = _run(conn, f"""
         SELECT COUNT(DISTINCT po.purchasing_document || '|' || po.item)
         FROM po_dump po
         JOIN change_log cl
@@ -164,13 +178,15 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
          AND  cl.change_indicator IN ('E', 'U')
          AND  cl.field_name       IN ('MATNR', 'NETPR', 'NETWR', 'MENGE')
         WHERE (po.deletion_indicator IS NULL OR po.deletion_indicator NOT IN ('L', 'X'))
+          AND {_cc_po}
     """)
-    p7_total = _run(conn, """
+    p7_total = _run(conn, f"""
         SELECT COUNT(DISTINCT purchasing_document || '|' || item) FROM po_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+          AND {_cc_bare}
     """)
     p7 = round((p7_amended / p7_total * 100), 2) if p7_amended and p7_total else None
-    _upsert(conn, "procurement", "PO_AMENDMENT_RATE", "PO Amendment Rate (%)", p7, None, "%")
+    _upsert(conn, "procurement", "PO_AMENDMENT_RATE", "PO Amendment Rate (%)", p7, None, "%", company_code=company_code)
 
     # P8 — Open PO Aging (overdue open PO line items)
     # Open PO = delivery_completed blank + order_qty != delivered_qty + not deleted
@@ -187,12 +203,13 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
               CAST(COALESCE(NULLIF(po.delivered_quantity, ''), '0') AS REAL)
           AND pod.expected_delivery_date IS NOT NULL AND pod.expected_delivery_date != ''
           AND ('{ref_date}'::DATE - pod.expected_delivery_date::DATE) > 0
+          AND {_cc_po}
     """
     p8 = _run(conn, f"""
         SELECT COUNT(DISTINCT po.purchasing_document || '|' || po.item)
         {_OPEN_PO_WHERE}
     """)
-    _upsert(conn, "procurement", "OPEN_PO_AGING", "Open PO Line Items (Overdue)", p8, None, "count")
+    _upsert(conn, "procurement", "OPEN_PO_AGING", "Open PO Line Items (Overdue)", p8, None, "count", company_code=company_code)
 
     try:
         bucket_row = conn.execute(f"""
@@ -214,7 +231,7 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
             "90+d":   int(bucket_row[3] or 0),
         }
         _upsert(conn, "procurement", "OPEN_PO_AGING_BUCKETS",
-                "Open PO Aging Buckets", None, json.dumps(buckets), "json")
+                "Open PO Aging Buckets", None, json.dumps(buckets), "json", company_code=company_code)
     except Exception:
         pass
 
@@ -224,42 +241,48 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
         FROM po_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
           AND COALESCE(NULLIF(created_on,''), document_date) >= {FY}
+          AND {_cc_bare}
     """)
-    _upsert(conn, "procurement", "TOTAL_PO_VALUE_YTD", "Total PO Value (YTD)", p9, None, "INR")
+    _upsert(conn, "procurement", "TOTAL_PO_VALUE_YTD", "Total PO Value (YTD)", p9, None, "INR", company_code=company_code)
 
     # P10 — PO Line Count YTD (item level)
     p10 = _run(conn, f"""
         SELECT COUNT(DISTINCT purchasing_document || '|' || item) FROM po_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
           AND COALESCE(NULLIF(created_on,''), document_date) >= {FY}
+          AND {_cc_bare}
     """)
-    _upsert(conn, "procurement", "PO_LINE_COUNT_YTD", "PO Line Count (YTD)", p10, None, "count")
+    _upsert(conn, "procurement", "PO_LINE_COUNT_YTD", "PO Line Count (YTD)", p10, None, "count", company_code=company_code)
 
     # P11 — Approved PR Count vs Total Active PRs (header level)
-    pr_total = _run(conn, """
+    pr_total = _run(conn, f"""
         SELECT COUNT(DISTINCT purchase_requisition) FROM pr_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator = '')
+          AND {_cc_bare}
     """)
-    pr_approved = _run(conn, """
+    pr_approved = _run(conn, f"""
         SELECT COUNT(DISTINCT purchase_requisition) FROM pr_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator = '')
           AND release_status LIKE 'X%'
+          AND {_cc_bare}
     """)
-    _upsert(conn, "procurement", "APPROVED_PR_TOTAL",    "Total Active PRs", pr_total,    None, "count")
-    _upsert(conn, "procurement", "APPROVED_PR_APPROVED", "Approved PRs",     pr_approved, None, "count")
+    _upsert(conn, "procurement", "APPROVED_PR_TOTAL",    "Total Active PRs", pr_total,    None, "count", company_code=company_code)
+    _upsert(conn, "procurement", "APPROVED_PR_APPROVED", "Approved PRs",     pr_approved, None, "count", company_code=company_code)
 
     # P12 — Approved PO Count vs Total Active POs (header level)
-    po_total_hdr = _run(conn, """
+    po_total_hdr = _run(conn, f"""
         SELECT COUNT(DISTINCT purchasing_document) FROM po_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+          AND {_cc_bare}
     """)
-    po_approved_hdr = _run(conn, """
+    po_approved_hdr = _run(conn, f"""
         SELECT COUNT(DISTINCT purchasing_document) FROM po_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
           AND release_indicator LIKE 'X%'
+          AND {_cc_bare}
     """)
-    _upsert(conn, "procurement", "APPROVED_PO_TOTAL",    "Total Active POs", po_total_hdr,    None, "count")
-    _upsert(conn, "procurement", "APPROVED_PO_APPROVED", "Approved POs",     po_approved_hdr, None, "count")
+    _upsert(conn, "procurement", "APPROVED_PO_TOTAL",    "Total Active POs", po_total_hdr,    None, "count", company_code=company_code)
+    _upsert(conn, "procurement", "APPROVED_PO_APPROVED", "Approved POs",     po_approved_hdr, None, "count", company_code=company_code)
 
     # ── Frontend-expected aliases ─────────────────────────────────────────────
 
@@ -268,44 +291,50 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
         FROM po_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
           AND COALESCE(NULLIF(created_on,''), document_date) >= {MTD}
+          AND {_cc_bare}
     """)
-    _upsert(conn, "procurement", "PO_COUNT_MTD", "PO Count (MTD)", po_count_mtd, None, "count")
+    _upsert(conn, "procurement", "PO_COUNT_MTD", "PO Count (MTD)", po_count_mtd, None, "count", company_code=company_code)
 
     avg_po = _run(conn, f"""
         SELECT AVG(CAST(net_order_value AS REAL))
         FROM po_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
           AND document_date >= {MTD}
+          AND {_cc_bare}
     """)
-    _upsert(conn, "procurement", "AVG_PO_VALUE", "Average PO Value (MTD)", avg_po, None, "INR")
+    _upsert(conn, "procurement", "AVG_PO_VALUE", "Average PO Value (MTD)", avg_po, None, "INR", company_code=company_code)
 
     hv_total = _run(conn, f"""
         SELECT COUNT(DISTINCT purchasing_document) FROM po_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
           AND document_date >= {FY}
+          AND {_cc_bare}
     """)
     hv_rate = round((p3 / hv_total * 100), 2) if p3 and hv_total else None
     _upsert(conn, "procurement", "HIGH_VALUE_PO_RATE",
-            f"High-Value PO Rate (>₹{int(high_value_threshold):,})", hv_rate, None, "%")
+            f"High-Value PO Rate (>₹{int(high_value_threshold):,})", hv_rate, None, "%", company_code=company_code)
 
-    mav_total = _run(conn, """
+    mav_total = _run(conn, f"""
         SELECT COUNT(DISTINCT purchasing_document) FROM po_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L', 'X'))
+          AND {_cc_bare}
     """)
-    mav_count = _run(conn, """
+    mav_count = _run(conn, f"""
         SELECT COUNT(DISTINCT purchasing_document) FROM po_dump
         WHERE (purchase_requisition IS NULL OR purchase_requisition = '')
           AND (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L', 'X'))
+          AND {_cc_bare}
     """)
     mav_rate = round((mav_count / mav_total * 100), 2) if mav_count and mav_total else 0.0
-    _upsert(conn, "procurement", "MAVERICK_SPEND_RATE", "Maverick Spend Rate (%)", mav_rate, None, "%")
+    _upsert(conn, "procurement", "MAVERICK_SPEND_RATE", "Maverick Spend Rate (%)", mav_rate, None, "%", company_code=company_code)
 
     active_v = _run(conn, f"""
         SELECT COUNT(DISTINCT vendor) FROM po_dump
         WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
           AND document_date >= {FY}
+          AND {_cc_bare}
     """)
-    _upsert(conn, "procurement", "ACTIVE_VENDOR_COUNT_MTD", "Active Vendors (YTD)", active_v, None, "count")
+    _upsert(conn, "procurement", "ACTIVE_VENDOR_COUNT_MTD", "Active Vendors (YTD)", active_v, None, "count", company_code=company_code)
 
     # OPEN_PR_AGING — kept for frontend compatibility
     p_pr_aging = _run(conn, f"""
@@ -315,13 +344,14 @@ def _procurement(conn, FY, MTD, high_value_threshold, ref_date="2023-03-31"):
           AND (pr.deletion_indicator IS NULL OR pr.deletion_indicator = '')
           AND pr.release_date IS NOT NULL
           AND ('{ref_date}'::DATE - pr.release_date::DATE) > 7
+          AND {_cc_pr}
           AND NOT EXISTS (
               SELECT 1 FROM po_dump po
               WHERE po.purchase_requisition = pr.purchase_requisition
                 AND po.item_of_requisition  = pr.item_of_requisition
           )
     """)
-    _upsert(conn, "procurement", "OPEN_PR_AGING", "Open PR Lines > 7 Days", p_pr_aging, None, "count")
+    _upsert(conn, "procurement", "OPEN_PR_AGING", "Open PR Lines > 7 Days", p_pr_aging, None, "count", company_code=company_code)
 
 
 # ── FINANCIAL ─────────────────────────────────────────────────────────────────
@@ -1772,7 +1802,15 @@ def compute_all(conn: Any) -> None:
     high_val = float(_get_config(conn, "HIGH_VALUE_PO_THRESHOLD", "10000000"))
     overall_cc_cfg = _get_config(conn, "ACTIVE_COMPANY_CODES", "")
 
-    _procurement(conn, FY, MTD, high_val, ref_date)
+    # Procurement KPIs: run once per distinct company in po_dump, then once for ALL
+    _cc_rows_procurement = conn.execute(
+        "SELECT DISTINCT company_code FROM po_dump "
+        "WHERE company_code IS NOT NULL AND company_code != ''"
+    ).fetchall()
+    for (cc,) in _cc_rows_procurement:
+        _procurement(conn, FY, MTD, high_val, ref_date, cc_cfg=cc, company_code=cc)
+    _procurement(conn, FY, MTD, high_val, ref_date,
+                 cc_cfg=overall_cc_cfg, company_code="ALL")
 
     # Financial KPIs: run once per distinct company in invoice_dump, then once for ALL
     _cc_rows = conn.execute(

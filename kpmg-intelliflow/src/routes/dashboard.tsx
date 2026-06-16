@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -14,7 +15,7 @@ import {
   Legend,
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
-import { Trash2, AlertTriangle } from "lucide-react";
+import { Trash2, AlertTriangle, ShieldAlert, Info, LogIn, LogOut, RefreshCw } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
 import { KpiCard } from "@/components/KpiCard";
@@ -23,7 +24,9 @@ import { StatusPill } from "@/components/StatusPill";
 import { formatINR, formatDateShort } from "@/lib/format";
 import { brand } from "@/lib/brand";
 import { apiFetch } from "@/api/client";
-import { useKpi, useKpiValue, useCharts } from "@/hooks/useKpi";
+import { fetchAnomalies } from "@/api/queries";
+import type { AnomalyCount } from "@/api/types";
+import { useKpi, useKpiValue, useKpiCompanies, useCharts, usePrefetchKpiCompanies } from "@/hooks/useKpi";
 import { useDashboardExport } from "@/hooks/useDashboardExport";
 
 export const Route = createFileRoute("/dashboard")({
@@ -50,18 +53,44 @@ interface DeletedPO {
   anomaly_flags: string | null;
 }
 
+function CompanyFilter({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { data } = useKpiCompanies("procurement");
+  const companies = data?.companies ?? [];
+  if (companies.length <= 1) return null;
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span className="text-muted-foreground font-medium">Company:</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="border border-border rounded-md px-2 py-1 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+      >
+        <option value="ALL">All Companies</option>
+        {companies.filter((c) => c !== "ALL").map((c) => (
+          <option key={c} value={c}>{c}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function ProcurementDashboard() {
-  const { containerRef, exportPdf, isExporting } = useDashboardExport("Procurement Dashboard");
+  const [company, setCompany] = useState("ALL");
+  usePrefetchKpiCompanies("procurement");
+  const { containerRef, exportPdf, isExporting } = useDashboardExport("Procurement Dashboard", company);
   return (
     <AppShell>
       <div ref={containerRef}>
-        <PageHeader
-          title="Procurement Dashboard"
-          subtitle="Real-time visibility into PO activity, breaches, and operational priorities"
-          onExportPdf={exportPdf}
-          isExporting={isExporting}
-        />
-        <KpiRow />
+        <div className="flex items-center justify-between">
+          <PageHeader
+            title="Procurement Dashboard"
+            subtitle="Real-time visibility into PO activity, breaches, and operational priorities"
+            onExportPdf={exportPdf}
+            isExporting={isExporting}
+          />
+          <CompanyFilter value={company} onChange={setCompany} />
+        </div>
+        <KpiRow company={company} />
         <div className="grid grid-cols-2 gap-4 mt-4">
           <POValueTrend />
           <POCountAndMaverick />
@@ -69,29 +98,32 @@ function ProcurementDashboard() {
         <div className="mt-4">
           <PODeletionMonitor />
         </div>
+        <div className="mt-4">
+          <AlertCenter />
+        </div>
       </div>
     </AppShell>
   );
 }
 
-function KpiRow() {
-  const { isLoading } = useKpi("procurement");
+function KpiRow({ company }: { company: string }) {
+  const { isLoading } = useKpi("procurement", company);
   // KPI 1 — Total PO Value MTD
-  const p1 = useKpiValue("procurement", "TOTAL_PO_VALUE_MTD");
+  const p1 = useKpiValue("procurement", "TOTAL_PO_VALUE_MTD", company);
   // KPI 2 — Active PO Count (all active, no date filter)
-  const p2 = useKpiValue("procurement", "ACTIVE_PO_COUNT");
+  const p2 = useKpiValue("procurement", "ACTIVE_PO_COUNT", company);
   // KPI 3 — High-Value PO Count (threshold configurable)
-  const p3 = useKpiValue("procurement", "HIGH_VALUE_PO_COUNT");
+  const p3 = useKpiValue("procurement", "HIGH_VALUE_PO_COUNT", company);
   // KPI 4 — Avg PR-to-PO Conversion Time
-  const p4 = useKpiValue("procurement", "PR_TO_PO_DAYS");
+  const p4 = useKpiValue("procurement", "PR_TO_PO_DAYS", company);
   // KPI 5 — PO Cycle Time (Creation → Approval)
-  const p5 = useKpiValue("procurement", "PO_APPROVAL_CYCLE");
+  const p5 = useKpiValue("procurement", "PO_APPROVAL_CYCLE", company);
   // KPI 6 — PO Deletion Frequency MTD
-  const p6 = useKpiValue("procurement", "PO_DELETION_MTD");
+  const p6 = useKpiValue("procurement", "PO_DELETION_MTD", company);
   // KPI 7 — PO Amendment Rate
-  const p7 = useKpiValue("procurement", "PO_AMENDMENT_RATE");
+  const p7 = useKpiValue("procurement", "PO_AMENDMENT_RATE", company);
   // KPI 8 — Open PR Aging > 7 days without PO
-  const p8 = useKpiValue("procurement", "OPEN_PR_AGING");
+  const p8 = useKpiValue("procurement", "OPEN_PR_AGING", company);
 
   const fmt = (v: number | null | undefined, unit: string | null | undefined) => {
     if (v == null) return isLoading ? "—" : "No data";
@@ -114,6 +146,7 @@ function KpiRow() {
           sublabel="SUM net_order_value · created_on in current month · active POs only"
           size="lg"
           index={0}
+          kpiCode="TOTAL_PO_VALUE_MTD"
         />
         <KpiCard
           label="Active PO Count"
@@ -121,6 +154,7 @@ function KpiRow() {
           sublabel="COUNT DISTINCT purchasing_document · not delivery-complete · not deleted"
           size="lg"
           index={1}
+          kpiCode="ACTIVE_PO_COUNT"
         />
         <KpiCard
           label="High-Value PO Count"
@@ -128,6 +162,7 @@ function KpiRow() {
           sublabel={`POs above ${hvLabel} · threshold configurable in Admin → Settings`}
           size="lg"
           index={2}
+          kpiCode="HIGH_VALUE_PO_COUNT"
         />
         <KpiCard
           label="Open PR Aging (>7d)"
@@ -142,6 +177,7 @@ function KpiRow() {
               : undefined
           }
           index={3}
+          kpiCode="OPEN_PR_AGING"
         />
       </div>
 
@@ -160,6 +196,7 @@ function KpiRow() {
               : undefined
           }
           index={4}
+          kpiCode="PR_TO_PO_DAYS"
         />
         <KpiCard
           label="PO Cycle Time"
@@ -174,6 +211,7 @@ function KpiRow() {
               : undefined
           }
           index={5}
+          kpiCode="PO_APPROVAL_CYCLE"
         />
         <KpiCard
           label="PO Deletions (MTD)"
@@ -188,6 +226,7 @@ function KpiRow() {
               : undefined
           }
           index={6}
+          kpiCode="PO_DELETION_MTD"
         />
         <KpiCard
           label="PO Amendment Rate"
@@ -202,9 +241,145 @@ function KpiRow() {
               : undefined
           }
           index={7}
+          kpiCode="PO_AMENDMENT_RATE"
         />
       </div>
     </>
+  );
+}
+
+interface SessionEvent {
+  user_name: string;
+  action: string;
+  details: string;
+  created_at: string;
+}
+
+function humanize(code: string) {
+  return code.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function AlertCenter() {
+  const { data: anomalies = [], isLoading: loadingAnom } = useQuery<AnomalyCount[]>({
+    queryKey: ["anomalies"],
+    queryFn: fetchAnomalies,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+  });
+
+  const { data: sessions = [], isLoading: loadingSessions } = useQuery<SessionEvent[]>({
+    queryKey: ["auth-sessions"],
+    queryFn: () => apiFetch<SessionEvent[]>("/auth/sessions?limit=25"),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+
+  const sorted = [...anomalies].sort((a, b) => {
+    const rank: Record<string, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+    return (rank[a.severity] ?? 3) - (rank[b.severity] ?? 3);
+  });
+
+  const highCount = sorted.filter(a => a.severity === "HIGH").length;
+
+  function actionIcon(action: string) {
+    if (action === "LOGIN")       return <LogIn className="h-3 w-3 text-success" />;
+    if (action === "LOGOUT")      return <LogOut className="h-3 w-3 text-danger" />;
+    return <RefreshCw className="h-3 w-3 text-warning" />;
+  }
+
+  function actionColor(action: string) {
+    if (action === "LOGIN")  return "bg-success/10 text-success";
+    if (action === "LOGOUT") return "bg-danger/10 text-danger";
+    return "bg-warning/10 text-warning";
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      {/* Anomaly Alerts */}
+      <SectionCard
+        title="Anomaly Alerts"
+        subtitle={`${sorted.length} active anomaly types · refreshes every 2 min`}
+        actions={
+          highCount > 0 ? (
+            <StatusPill tone="danger" dot>{highCount} High Risk</StatusPill>
+          ) : sorted.length > 0 ? (
+            <StatusPill tone="warning" dot>Review Required</StatusPill>
+          ) : (
+            <StatusPill tone="success" dot>All Clear</StatusPill>
+          )
+        }
+        bodyClassName="p-0"
+      >
+        {loadingAnom ? (
+          <div className="p-6 text-center text-sm text-muted-foreground">Loading…</div>
+        ) : sorted.length === 0 ? (
+          <div className="p-6 text-center text-sm text-muted-foreground">No anomalies detected</div>
+        ) : (
+          <div className="max-h-[320px] overflow-y-auto divide-y divide-border">
+            {sorted.map((a) => (
+              <div key={a.anomaly_code} className="flex items-start gap-2.5 px-4 py-2.5 hover:bg-secondary/30 transition-colors">
+                <div className={`mt-0.5 h-5 w-5 rounded-full flex items-center justify-center shrink-0 ${
+                  a.severity === "HIGH"   ? "bg-danger/10" :
+                  a.severity === "MEDIUM" ? "bg-warning/10" : "bg-accent/10"
+                }`}>
+                  {a.severity === "HIGH"   ? <ShieldAlert className="h-3 w-3 text-danger" />  :
+                   a.severity === "MEDIUM" ? <AlertTriangle className="h-3 w-3 text-warning" /> :
+                                             <Info className="h-3 w-3 text-accent" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[12px] font-medium truncate">{humanize(a.anomaly_code)}</span>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold shrink-0 ${
+                      a.severity === "HIGH"   ? "bg-danger/10 text-danger" :
+                      a.severity === "MEDIUM" ? "bg-warning/10 text-warning" : "bg-accent/10 text-accent"
+                    }`}>{a.count} PO{a.count !== 1 ? "s" : ""}</span>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{a.description}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </SectionCard>
+
+      {/* User Activity */}
+      <SectionCard
+        title="User Activity"
+        subtitle="Login, logout, and role-switch events"
+        bodyClassName="p-0"
+      >
+        {loadingSessions ? (
+          <div className="p-6 text-center text-sm text-muted-foreground">Loading…</div>
+        ) : sessions.length === 0 ? (
+          <div className="p-6 text-center text-sm text-muted-foreground">No activity recorded yet</div>
+        ) : (
+          <div className="max-h-[320px] overflow-y-auto divide-y divide-border">
+            {sessions.map((s, i) => (
+              <div key={i} className="flex items-center gap-2.5 px-4 py-2.5 hover:bg-secondary/30 transition-colors">
+                <div className={`h-6 w-6 rounded-full flex items-center justify-center shrink-0 ${
+                  s.action === "LOGIN"       ? "bg-success/10" :
+                  s.action === "LOGOUT"      ? "bg-danger/10"  : "bg-warning/10"
+                }`}>
+                  {actionIcon(s.action)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[12px] font-medium truncate">{s.user_name}</span>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium shrink-0 ${actionColor(s.action)}`}>
+                      {s.action.replace("_", " ")}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5 truncate">
+                    {s.details}
+                    {s.created_at ? ` · ${formatDateShort(s.created_at.split("T")[0] || s.created_at.slice(0, 10))}` : ""}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </SectionCard>
+    </div>
   );
 }
 

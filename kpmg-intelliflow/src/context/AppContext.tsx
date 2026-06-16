@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import type { Role } from "@/types";
 
 export interface UserProfile {
@@ -44,8 +44,9 @@ const DEFAULT_PROFILE: UserProfile = {
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [role, setRole] = useState<Role>("Procurement Manager");
+  const [role, setRoleState] = useState<Role>("Procurement Manager");
   const [period, setPeriod] = useState("Q2 FY24");
+  const sessionFired = useRef(false);
 
   const [user, setUserState] = useState<UserProfile>(() => {
     try {
@@ -72,6 +73,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     localStorage.setItem("intellisource_activity_log", JSON.stringify(activityLog));
   }, [activityLog]);
+
+  useEffect(() => {
+    if (sessionFired.current) return;
+    sessionFired.current = true;
+    fetch("http://localhost:8001/api/auth/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_name: user.name, user_email: user.email, role, action: "LOGIN" }),
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const setRole = useCallback((r: Role) => {
+    setRoleState(r);
+    setUserState((currentUser) => {
+      fetch("http://localhost:8001/api/auth/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_name: currentUser.name, user_email: currentUser.email, role: r, action: "ROLE_SWITCH" }),
+      }).catch(() => {});
+      return currentUser;
+    });
+  }, []);
 
   const setUser = useCallback((u: UserProfile) => {
     setUserState(u);

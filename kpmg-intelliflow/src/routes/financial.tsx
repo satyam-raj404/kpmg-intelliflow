@@ -119,15 +119,15 @@ function KpiRow({ company }: { company: string }) {
   return (
     <>
       <div className="grid grid-cols-4 gap-3">
-        <KpiCard label="Total Payments (YTD)" value={fmt(f1?.value_numeric, f1?.unit)} size="lg" sublabel="SUM payment_dump this FY" index={0} />
-        <KpiCard label="Payment-to-PO Ratio" value={fmt(f2?.value_numeric, f2?.unit)} size="lg" sublabel="Payments ÷ Total PO Value" index={1} />
-        <KpiCard label="3-Way Match Rate" value={fmt(f3?.value_numeric, f3?.unit)} size="lg" sublabel="GRN qty ≈ Invoice qty (±5%)" threshold={f3?.value_numeric != null && f3.value_numeric < 85 ? { label: "Below 85% target", tone: "danger" } : { label: "Good", tone: "success" }} index={2} />
-        <KpiCard label="Invoice Processing Days" value={fmt(f4?.value_numeric, f4?.unit)} size="lg" sublabel="Avg vendor_invoice_date → clearing_date" index={3} />
+        <KpiCard label="Total Payments (YTD)" value={fmt(f1?.value_numeric, f1?.unit)} size="lg" sublabel="SUM payment_dump this FY" index={0} kpiCode="TOTAL_PAYMENTS_YTD" />
+        <KpiCard label="Payment-to-PO Ratio" value={fmt(f2?.value_numeric, f2?.unit)} size="lg" sublabel="Payments ÷ Total PO Value" index={1} kpiCode="PAYMENT_TO_PO_RATIO" />
+        <KpiCard label="3-Way Match Rate" value={fmt(f3?.value_numeric, f3?.unit)} size="lg" sublabel="GRN qty ≈ Invoice qty (±5%)" threshold={f3?.value_numeric != null && f3.value_numeric < 85 ? { label: "Below 85% target", tone: "danger" } : { label: "Good", tone: "success" }} index={2} kpiCode="THREE_WAY_MATCH_RATE" />
+        <KpiCard label="Invoice Processing Days" value={fmt(f4?.value_numeric, f4?.unit)} size="lg" sublabel="Avg vendor_invoice_date → clearing_date" index={3} kpiCode="INVOICE_PROCESSING_DAYS" />
       </div>
       <div className="grid grid-cols-3 gap-3 mt-3">
-        <KpiCard label="On-Time Payment Rate" value={fmt(f5?.value_numeric, f5?.unit)} size="md" sublabel="Paid on/before due_date" threshold={f5?.value_numeric != null && f5.value_numeric < 80 ? { label: "Below target", tone: "warning" } : { label: "On track", tone: "success" }} index={4} />
-        <KpiCard label="Open Invoice Value" value={fmt(f7?.value_numeric, f7?.unit)} size="md" sublabel="Unpaid invoices net of credit notes" threshold={f7?.value_numeric != null && f7.value_numeric > 1_000_000 ? { label: "High outstanding", tone: "warning" } : undefined} index={5} />
-        <KpiCard label="Approved PRs (YTD)" value={fmt(fpr?.value_numeric, fpr?.unit)} size="md" sublabel="Distinct approved PR line items this FY" index={6} />
+        <KpiCard label="On-Time Payment Rate" value={fmt(f5?.value_numeric, f5?.unit)} size="md" sublabel="Paid on/before due_date" threshold={f5?.value_numeric != null && f5.value_numeric < 80 ? { label: "Below target", tone: "warning" } : { label: "On track", tone: "success" }} index={4} kpiCode="ON_TIME_PAYMENT_RATE" />
+        <KpiCard label="Open Invoice Value" value={fmt(f7?.value_numeric, f7?.unit)} size="md" sublabel="Unpaid invoices net of credit notes" threshold={f7?.value_numeric != null && f7.value_numeric > 1_000_000 ? { label: "High outstanding", tone: "warning" } : undefined} index={5} kpiCode="OPEN_INVOICE_VALUE" />
+        <KpiCard label="Approved PRs (YTD)" value={fmt(fpr?.value_numeric, fpr?.unit)} size="md" sublabel="Distinct approved PR line items this FY" index={6} kpiCode="APPROVED_PR_COUNT" />
       </div>
     </>
   );
@@ -156,6 +156,7 @@ function PaymentTimingRow({ company }: { company: string }) {
         sublabel={parsed?.avg_days_early ? `Avg ${parsed.avg_days_early}d before due` : "Cleared before due date"}
         threshold={{ label: "Favourable", tone: "success" }}
         index={8}
+        kpiCode="EARLY_PAYMENT_COUNT"
       />
       <KpiCard
         label="On-Time Payments"
@@ -164,6 +165,7 @@ function PaymentTimingRow({ company }: { company: string }) {
         sublabel="Cleared exactly on due date"
         threshold={{ label: "Ideal", tone: "success" }}
         index={9}
+        kpiCode="ON_TIME_PAYMENT_COUNT"
       />
       <KpiCard
         label="Late Payments"
@@ -172,6 +174,7 @@ function PaymentTimingRow({ company }: { company: string }) {
         sublabel={parsed?.avg_days_late ? `Avg ${parsed.avg_days_late}d past due` : "Cleared after due date"}
         threshold={late?.value_numeric != null && late.value_numeric > 0 ? { label: "Needs attention", tone: "danger" } : { label: "None", tone: "success" }}
         index={10}
+        kpiCode="LATE_PAYMENT_COUNT"
       />
     </div>
   );

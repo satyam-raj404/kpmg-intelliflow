@@ -1,10 +1,24 @@
 import asyncio
+import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+# Load .env from repo root if python-dotenv available, else manual parse
+_env_file = Path(__file__).parent.parent / ".env"
+if _env_file.exists():
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(_env_file)
+    except ImportError:
+        for _line in _env_file.read_text().splitlines():
+            if "=" in _line and not _line.startswith("#"):
+                _k, _v = _line.split("=", 1)
+                os.environ.setdefault(_k.strip(), _v.strip())
+
 from database import init_db, get_connection
-from routers import upload, kpi, p2p, events
+from routers import upload, kpi, p2p, events, actions, auth, chat
 
 
 @asynccontextmanager
@@ -41,10 +55,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(upload.router, prefix="/api")
-app.include_router(kpi.router,    prefix="/api")
-app.include_router(p2p.router,    prefix="/api")
-app.include_router(events.router, prefix="/api")
+app.include_router(upload.router,   prefix="/api")
+app.include_router(kpi.router,      prefix="/api")
+app.include_router(p2p.router,      prefix="/api")
+app.include_router(events.router,   prefix="/api")
+app.include_router(actions.router,  prefix="/api")
+app.include_router(auth.router,     prefix="/api")
+app.include_router(chat.router,     prefix="/api")
 
 
 @app.get("/api/health")

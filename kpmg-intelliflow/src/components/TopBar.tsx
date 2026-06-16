@@ -1,11 +1,8 @@
-import { useState, useMemo } from "react";
-import { Search, Bell, ChevronDown, LogOut, User as UserIcon, ShieldAlert, AlertTriangle, Info } from "lucide-react";
+import { Search, ChevronDown, LogOut, User as UserIcon, Sun, Moon, Contrast, ALargeSmall } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import { useApp, ROLES, roleInitials } from "@/context/AppContext";
-import { fetchAnomalies } from "@/api/queries";
-import type { AnomalyCount } from "@/api/types";
+import { useTheme, type FontSize } from "@/hooks/useTheme";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,39 +15,24 @@ import { cn } from "@/lib/utils";
 
 const PERIODS = ["Q1 FY24", "Q2 FY24", "Q3 FY24", "FY24", "Custom"];
 
-function severityIcon(s: string) {
-  if (s === "HIGH") return <ShieldAlert className="h-3 w-3 shrink-0 text-danger mt-0.5" />;
-  if (s === "MEDIUM") return <AlertTriangle className="h-3 w-3 shrink-0 text-warning mt-0.5" />;
-  return <Info className="h-3 w-3 shrink-0 text-accent mt-0.5" />;
-}
+const FONT_SIZES: { value: FontSize; label: string; title: string }[] = [
+  { value: "sm", label: "S", title: "Small text" },
+  { value: "md", label: "M", title: "Medium text (default)" },
+  { value: "lg", label: "L", title: "Large text" },
+];
 
-function humanize(code: string) {
-  return code.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+function fireLogout(user: { name: string; email: string }, role: string) {
+  fetch("http://localhost:8001/api/auth/session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_name: user.name, user_email: user.email, role, action: "LOGOUT" }),
+  }).catch(() => {});
 }
 
 export function TopBar() {
   const { role, setRole, period, setPeriod, user } = useApp();
   const navigate = useNavigate();
-  const [openNotif, setOpenNotif] = useState(false);
-  const [dismissedAt, setDismissedAt] = useState(0);
-
-  const { data: anomalies = [], dataUpdatedAt } = useQuery<AnomalyCount[]>({
-    queryKey: ["anomalies"],
-    queryFn: fetchAnomalies,
-    staleTime: 60_000,
-    refetchInterval: 120_000,
-  });
-
-  const alertItems = useMemo(
-    () =>
-      [...anomalies].sort((a, b) => {
-        const rank = { HIGH: 0, MEDIUM: 1, LOW: 2 };
-        return (rank[a.severity as keyof typeof rank] ?? 3) - (rank[b.severity as keyof typeof rank] ?? 3);
-      }),
-    [anomalies]
-  );
-
-  const unread = dismissedAt >= dataUpdatedAt ? 0 : alertItems.filter((a) => a.severity === "HIGH" || a.severity === "MEDIUM").length;
+  const { theme, toggle, fontSize, setFontSize, contrast, toggleContrast } = useTheme();
 
   return (
     <motion.header
@@ -86,82 +68,71 @@ export function TopBar() {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <DropdownMenu open={openNotif} onOpenChange={setOpenNotif}>
-        <DropdownMenuTrigger className="relative h-8 w-8 rounded-md border border-border bg-background flex items-center justify-center hover:border-accent/40 hover:bg-secondary/50 transition-all duration-200">
-          <Bell className="h-3.5 w-3.5 text-muted-foreground" />
-          {unread > 0 && (
-            <motion.span
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", stiffness: 500, damping: 25 }}
-              className="absolute -top-1 -right-1 h-3.5 min-w-3.5 px-0.5 rounded-full bg-danger text-white text-[9px] font-bold flex items-center justify-center"
-            >
-              {unread}
-            </motion.span>
+      {/* ── Theme toggle ─────────────────────────────── */}
+      <div className="flex items-center h-8 rounded-md border border-border bg-background overflow-hidden">
+        <button
+          onClick={() => toggle()}
+          title="Switch to KPMG Light theme"
+          className={cn(
+            "h-full px-2.5 flex items-center gap-1.5 text-[11px] font-medium transition-all duration-200",
+            theme === "light" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary/50",
           )}
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-88 p-0" style={{ width: "22rem" }}>
-          <div className="px-3 py-2.5 border-b border-border flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-sm">Anomaly Alerts</span>
-              {alertItems.length > 0 && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-medium">
-                  {alertItems.length} active
-                </span>
-              )}
-            </div>
-            <button
-              onClick={() => setDismissedAt(Date.now())}
-              className="text-[12px] text-accent hover:underline"
-            >
-              Dismiss all
-            </button>
-          </div>
-          <div className="max-h-[340px] overflow-y-auto">
-            {alertItems.length === 0 ? (
-              <div className="px-3 py-6 text-center text-[12px] text-muted-foreground">No anomalies detected</div>
-            ) : (
-              alertItems.map((a, i) => (
-                <motion.div
-                  key={a.anomaly_code}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.03, duration: 0.2 }}
-                  className="px-3 py-2.5 border-b border-border last:border-b-0 hover:bg-secondary/50 transition-colors duration-150"
-                >
-                  <div className="flex items-start gap-2">
-                    {severityIcon(a.severity)}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="text-[12px] font-medium truncate">{humanize(a.anomaly_code)}</div>
-                        <span className={cn(
-                          "text-[9px] px-1.5 py-0.5 rounded font-bold shrink-0",
-                          a.severity === "HIGH" ? "bg-danger/10 text-danger" :
-                          a.severity === "MEDIUM" ? "bg-warning/10 text-warning" :
-                          "bg-accent/10 text-accent"
-                        )}>
-                          {a.count} PO{a.count !== 1 ? "s" : ""}
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{a.description}</div>
-                    </div>
-                  </div>
-                </motion.div>
-              ))
+        >
+          <Sun className="h-3 w-3" />
+          <span className="hidden xl:inline">Light</span>
+        </button>
+        <button
+          onClick={() => toggle()}
+          title="Switch to Dark theme"
+          className={cn(
+            "h-full px-2.5 flex items-center gap-1.5 text-[11px] font-medium transition-all duration-200",
+            theme === "dark" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary/50",
+          )}
+        >
+          <Moon className="h-3 w-3" />
+          <span className="hidden xl:inline">Dark</span>
+        </button>
+      </div>
+
+      {/* ── Font size toggle ──────────────────────────── */}
+      <div
+        className="flex items-center h-8 rounded-md border border-border bg-background overflow-hidden"
+        title="Text size"
+      >
+        <div className="flex items-center px-2 border-r border-border text-muted-foreground/50 h-full">
+          <ALargeSmall className="h-3 w-3" />
+        </div>
+        {FONT_SIZES.map(({ value, label, title }) => (
+          <button
+            key={value}
+            onClick={() => setFontSize(value)}
+            title={title}
+            className={cn(
+              "h-full px-2.5 text-[11px] font-medium transition-all duration-200",
+              fontSize === value
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-secondary/50",
             )}
-          </div>
-          {alertItems.length > 0 && (
-            <div className="px-3 py-2 border-t border-border bg-secondary/30">
-              <button
-                onClick={() => { navigate({ to: "/dashboard" }); setOpenNotif(false); }}
-                className="text-[11px] text-accent hover:underline w-full text-center"
-              >
-                View PO Deletion Monitor →
-              </button>
-            </div>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Contrast toggle ───────────────────────────── */}
+      <button
+        onClick={toggleContrast}
+        title={contrast === "normal" ? "Enable high contrast" : "Disable high contrast"}
+        className={cn(
+          "h-8 px-2.5 rounded-md border text-[11px] font-medium flex items-center gap-1.5 transition-all duration-200",
+          contrast === "high"
+            ? "bg-primary text-primary-foreground border-primary"
+            : "bg-background border-border text-muted-foreground hover:border-accent/40 hover:bg-secondary/50",
+        )}
+      >
+        <Contrast className="h-3 w-3" />
+        <span className="hidden xl:inline">{contrast === "high" ? "High" : "Contrast"}</span>
+      </button>
 
       <DropdownMenu>
         <DropdownMenuTrigger className="h-8 pl-0.5 pr-2 rounded-md border border-border bg-background flex items-center gap-2 hover:border-accent/40 hover:bg-secondary/50 transition-all duration-200">
@@ -189,7 +160,9 @@ export function TopBar() {
           <DropdownMenuItem onClick={() => navigate({ to: "/profile" })}>
             <UserIcon className="h-3.5 w-3.5 mr-2" /> Profile
           </DropdownMenuItem>
-          <DropdownMenuItem><LogOut className="h-3.5 w-3.5 mr-2" /> Sign out</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => { fireLogout(user, role); navigate({ to: "/dashboard" }); }}>
+            <LogOut className="h-3.5 w-3.5 mr-2" /> Sign out
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </motion.header>

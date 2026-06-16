@@ -471,6 +471,20 @@ CREATE TABLE IF NOT EXISTS actions (
     closed_at           TEXT
 );
 
+CREATE TABLE IF NOT EXISTS logged_actions (
+    id              SERIAL PRIMARY KEY,
+    doc_type        TEXT NOT NULL,
+    doc_number      TEXT NOT NULL,
+    doc_item        TEXT,
+    vendor          TEXT,
+    changes         TEXT,
+    approver_email  TEXT NOT NULL,
+    notes           TEXT,
+    status          TEXT DEFAULT 'UNDER_REVIEW',
+    created_by      TEXT DEFAULT 'admin',
+    created_at      TEXT DEFAULT NOW()::TEXT
+);
+
 CREATE TABLE IF NOT EXISTS audit_log (
     log_id      SERIAL PRIMARY KEY,
     user_id     TEXT NOT NULL DEFAULT 'system',

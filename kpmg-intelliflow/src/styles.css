@@ -116,9 +116,109 @@
   --sidebar-ring: oklch(0.65 0.14 240);
 }
 
+/* ── KPMG Dark theme ───────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  /* Warm charcoal base — not pitch black, reduces eye strain */
+  --background: oklch(0.17 0.010 252);
+  --foreground: oklch(0.86 0.006 252);
+  --surface: oklch(0.21 0.010 252);
+  --surface-elevated: oklch(0.24 0.010 252);
+
+  --card: oklch(0.21 0.010 252);
+  --card-foreground: oklch(0.86 0.006 252);
+  --popover: oklch(0.23 0.010 252);
+  --popover-foreground: oklch(0.86 0.006 252);
+
+  /* KPMG Blue — brighter on dark for legibility */
+  --primary: oklch(0.52 0.18 262);
+  --primary-foreground: oklch(1 0 0);
+  --primary-dark: oklch(0.40 0.16 262);
+
+  /* Cyan accent — slightly softer so it doesn't burn */
+  --accent: oklch(0.64 0.14 240);
+  --accent-foreground: oklch(0.12 0 0);
+
+  --teal: oklch(0.65 0.11 192);
+  --purple-brand: oklch(0.60 0.14 302);
+
+  --secondary: oklch(0.25 0.008 252);
+  --secondary-foreground: oklch(0.78 0.006 252);
+
+  --muted: oklch(0.26 0.007 252);
+  --muted-foreground: oklch(0.62 0.008 252);
+
+  --destructive: oklch(0.62 0.20 25);
+  --destructive-foreground: oklch(1 0 0);
+
+  --success: oklch(0.62 0.15 155);
+  --warning: oklch(0.75 0.14 72);
+  --danger: oklch(0.62 0.20 25);
+  --info: oklch(0.64 0.14 240);
+
+  /* Borders clearly visible but not harsh */
+  --border: oklch(0.32 0.009 252);
+  --input: oklch(0.29 0.009 252);
+  --ring: oklch(0.64 0.14 240);
+
+  --chart-1: oklch(0.55 0.17 262);
+  --chart-2: oklch(0.64 0.14 240);
+  --chart-3: oklch(0.65 0.11 192);
+  --chart-4: oklch(0.60 0.14 302);
+  --chart-5: oklch(0.75 0.14 72);
+
+  /* Sidebar — slightly elevated from background, still KPMG blue family */
+  --sidebar: oklch(0.20 0.12 264);
+  --sidebar-foreground: oklch(0.90 0.005 252);
+  --sidebar-primary: oklch(0.64 0.14 240);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.28 0.13 264);
+  --sidebar-accent-foreground: oklch(1 0 0);
+  --sidebar-border: oklch(0.17 0.10 264);
+  --sidebar-ring: oklch(0.64 0.14 240);
+}
+
+/* ── High Contrast overlay ─────────────────────────────────────────────── */
+[data-contrast="high"] {
+  --foreground: oklch(0.06 0.008 250);
+  --card-foreground: oklch(0.06 0.008 250);
+  --popover-foreground: oklch(0.06 0.008 250);
+  --muted-foreground: oklch(0.30 0.008 250);
+  --secondary-foreground: oklch(0.12 0.008 250);
+  --border: oklch(0.70 0.005 250);
+  --input: oklch(0.70 0.005 250);
+  --background: oklch(1 0 0);
+  --surface: oklch(0.99 0 0);
+  --surface-elevated: oklch(0.98 0.002 250);
+  --card: oklch(1 0 0);
+  --muted: oklch(0.93 0.003 250);
+}
+
+[data-theme="dark"][data-contrast="high"] {
+  --foreground: oklch(0.97 0.003 250);
+  --card-foreground: oklch(0.97 0.003 250);
+  --popover-foreground: oklch(0.97 0.003 250);
+  --muted-foreground: oklch(0.78 0.006 252);
+  --secondary-foreground: oklch(0.90 0.005 252);
+  --border: oklch(0.48 0.010 252);
+  --input: oklch(0.45 0.010 252);
+  --background: oklch(0.11 0.008 252);
+  --surface: oklch(0.14 0.009 252);
+  --card: oklch(0.15 0.009 252);
+  --muted: oklch(0.20 0.008 252);
+}
+
+/* ── Font size (attribute on <html>) ───────────────────────────────────── */
+html[data-font-size="sm"] { zoom: 1.00; }
+html[data-font-size="md"] { zoom: 1.15; }
+html[data-font-size="lg"] { zoom: 1.30; }
+
 @layer base {
   * {
     border-color: var(--color-border);
+  }
+
+  html {
+    zoom: 1.15; /* default md — overridden by data-font-size attribute */
   }
 
   html, body {
@@ -147,16 +247,33 @@
 /* Recharts */
 .recharts-cartesian-axis-tick text {
   font-size: 12px;
-  fill: var(--color-muted-foreground);
+  fill: var(--color-muted-foreground) !important;
+}
+.recharts-legend-item-text {
+  color: var(--color-foreground) !important;
+  fill: var(--color-foreground) !important;
+}
+.recharts-label {
+  fill: var(--color-foreground) !important;
+}
+.recharts-cartesian-grid line {
+  stroke: var(--color-border) !important;
 }
 .recharts-tooltip-wrapper { outline: none !important; }
 .recharts-default-tooltip {
   border-radius: 8px !important;
   border: 1px solid var(--color-border) !important;
   background: var(--color-surface) !important;
+  color: var(--color-foreground) !important;
   font-size: 13px !important;
-  box-shadow: 0 8px 24px oklch(0 0 0 / 0.08) !important;
+  box-shadow: 0 8px 24px oklch(0 0 0 / 0.12) !important;
   backdrop-filter: blur(8px) !important;
+}
+.recharts-default-tooltip .recharts-tooltip-label {
+  color: var(--color-foreground) !important;
+}
+.recharts-default-tooltip .recharts-tooltip-item {
+  color: var(--color-foreground) !important;
 }
 
 :focus-visible {

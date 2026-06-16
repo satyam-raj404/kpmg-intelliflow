@@ -104,14 +104,14 @@ function KpiRow({ company }: { company: string }) {
   return (
     <>
       <div className="grid grid-cols-4 gap-3">
-        <KpiCard label="Active Vendor Count" value={fmt(v1?.value_numeric, v1?.unit)} size="lg" sublabel="Not deleted, not purchasing-blocked" index={0} />
-        <KpiCard label="Vendor Compliance Rate" value={fmt(v2?.value_numeric, v2?.unit)} size="lg" sublabel="Not blocked & not deleted ÷ total" threshold={v2?.value_numeric != null && v2.value_numeric < 90 ? { label: "Below 90%", tone: "warning" } : { label: "Good", tone: "success" }} index={1} />
-        <KpiCard label="Avg Delivery Lead Time" value={fmt(v3?.value_numeric, v3?.unit)} size="lg" sublabel="Avg days: expected delivery → first GRN (−=early, +=late)" threshold={v3?.value_numeric != null && v3.value_numeric > 0 ? { label: "Late on avg", tone: "warning" } : { label: "On / early", tone: "success" }} index={2} />
-        <KpiCard label="Avg Delivery Delay" value={fmt(v4?.value_numeric, v4?.unit)} size="lg" sublabel="Late deliveries only (days past expected)" index={3} />
+        <KpiCard label="Active Vendor Count" value={fmt(v1?.value_numeric, v1?.unit)} size="lg" sublabel="Not deleted, not purchasing-blocked" index={0} kpiCode="ACTIVE_VENDOR_COUNT" />
+        <KpiCard label="Vendor Compliance Rate" value={fmt(v2?.value_numeric, v2?.unit)} size="lg" sublabel="Not blocked & not deleted ÷ total" threshold={v2?.value_numeric != null && v2.value_numeric < 90 ? { label: "Below 90%", tone: "warning" } : { label: "Good", tone: "success" }} index={1} kpiCode="VENDOR_COMPLIANCE_RATE" />
+        <KpiCard label="Avg Delivery Lead Time" value={fmt(v3?.value_numeric, v3?.unit)} size="lg" sublabel="Avg days: expected delivery → first GRN (−=early, +=late)" threshold={v3?.value_numeric != null && v3.value_numeric > 0 ? { label: "Late on avg", tone: "warning" } : { label: "On / early", tone: "success" }} index={2} kpiCode="VENDOR_DELIVERY_DAYS" />
+        <KpiCard label="Avg Delivery Delay" value={fmt(v4?.value_numeric, v4?.unit)} size="lg" sublabel="Late deliveries only (days past expected)" index={3} kpiCode="AVG_DELIVERY_DELAY" />
       </div>
       <div className="grid grid-cols-3 gap-3 mt-3">
-        <KpiCard label="Blocked Vendor Count" value={fmt(v7?.value_numeric, v7?.unit)} size="md" sublabel="central_purchasing_block or posting_block = X" threshold={v7?.value_numeric != null && v7.value_numeric > 0 ? { label: "Review required", tone: "danger" } : undefined} index={4} />
-        <KpiCard label="Vendor Master Changes" value={fmt(v8?.value_numeric, v8?.unit)} size="md" sublabel="KRED object changes this month" index={5} />
+        <KpiCard label="Blocked Vendor Count" value={fmt(v7?.value_numeric, v7?.unit)} size="md" sublabel="central_purchasing_block or posting_block = X" threshold={v7?.value_numeric != null && v7.value_numeric > 0 ? { label: "Review required", tone: "danger" } : undefined} index={4} kpiCode="BLOCKED_VENDOR_COUNT" />
+        <KpiCard label="Vendor Master Changes" value={fmt(v8?.value_numeric, v8?.unit)} size="md" sublabel="KRED object changes this month" index={5} kpiCode="VENDOR_MASTER_CHANGES" />
         <KpiCard label="Top Vendor Spend" value="See chart →" size="md" sublabel="Top-10 by spend share" index={6} />
       </div>
     </>

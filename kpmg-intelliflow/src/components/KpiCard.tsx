@@ -3,6 +3,7 @@ import { TrendingUp, TrendingDown, Search } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { KpiDrillDown, type KpiDrillDownData } from "./KpiDrillDown";
+import { KpiInfoHover } from "./KpiInfoHover";
 
 interface KpiCardProps {
   label: string;
@@ -16,6 +17,7 @@ interface KpiCardProps {
   icon?: ReactNode;
   index?: number;
   drillDown?: KpiDrillDownData;
+  kpiCode?: string;
 }
 
 const valueSizes = {
@@ -44,6 +46,7 @@ export function KpiCard({
   icon,
   index = 0,
   drillDown,
+  kpiCode,
 }: KpiCardProps) {
   const [open, setOpen] = useState(false);
 
@@ -69,6 +72,7 @@ export function KpiCard({
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             {rightSlot}
+            {kpiCode && <KpiInfoHover kpiCode={kpiCode} />}
             {drillDown && (
               <Search className="h-3 w-3 text-muted-foreground/0 group-hover:text-muted-foreground/60 transition-colors" />
             )}

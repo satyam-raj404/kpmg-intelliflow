@@ -100,6 +100,7 @@ function SpendRow() {
         size="xl"
         sublabel="Capital expenditure — hardware, software, electrical"
         index={0}
+        kpiCode="CAPEX_SPEND_YTD"
       />
       <KpiCard
         label="Total OPEX Spend (YTD)"
@@ -107,6 +108,7 @@ function SpendRow() {
         size="xl"
         sublabel="Operational expenditure — services, maintenance, logistics"
         index={1}
+        kpiCode="OPEX_SPEND_YTD"
       />
       <KpiCard
         label="CAPEX %"
@@ -114,6 +116,7 @@ function SpendRow() {
         size="lg"
         sublabel="CAPEX share of total committed spend"
         index={2}
+        kpiCode="CAPEX_PCT"
       />
       <KpiCard
         label="OPEX %"
@@ -121,6 +124,7 @@ function SpendRow() {
         size="lg"
         sublabel="OPEX share of total committed spend"
         index={3}
+        kpiCode="OPEX_PCT"
       />
     </div>
   );
@@ -144,10 +148,10 @@ function CountRow() {
 
   return (
     <div className="grid grid-cols-6 gap-3 mt-3">
-      <KpiCard label="CAPEX PO Count (YTD)" value={fmt(capexPOs?.value_numeric, capexPOs?.unit)} size="md" sublabel="Distinct CAPEX POs this FY" index={4} />
-      <KpiCard label="OPEX PO Count (YTD)"  value={fmt(opexPOs?.value_numeric, opexPOs?.unit)}  size="md" sublabel="Distinct OPEX POs this FY"  index={5} />
-      <KpiCard label="Avg CAPEX PO Value"   value={fmt(capexAvg?.value_numeric, capexAvg?.unit)} size="md" sublabel="Mean value per CAPEX PO"  index={6} />
-      <KpiCard label="Avg OPEX PO Value"    value={fmt(opexAvg?.value_numeric, opexAvg?.unit)}   size="md" sublabel="Mean value per OPEX PO"   index={7} />
+      <KpiCard label="CAPEX PO Count (YTD)" value={fmt(capexPOs?.value_numeric, capexPOs?.unit)} size="md" sublabel="Distinct CAPEX POs this FY" index={4} kpiCode="CAPEX_PO_COUNT" />
+      <KpiCard label="OPEX PO Count (YTD)"  value={fmt(opexPOs?.value_numeric, opexPOs?.unit)}  size="md" sublabel="Distinct OPEX POs this FY"  index={5} kpiCode="OPEX_PO_COUNT" />
+      <KpiCard label="Avg CAPEX PO Value"   value={fmt(capexAvg?.value_numeric, capexAvg?.unit)} size="md" sublabel="Mean value per CAPEX PO"  index={6} kpiCode="CAPEX_AVG_PO_VALUE" />
+      <KpiCard label="Avg OPEX PO Value"    value={fmt(opexAvg?.value_numeric, opexAvg?.unit)}   size="md" sublabel="Mean value per OPEX PO"   index={7} kpiCode="OPEX_AVG_PO_VALUE" />
       <KpiCard
         label="CAPEX Pending Delivery"
         value={fmt(capexPend?.value_numeric, capexPend?.unit)}
@@ -156,6 +160,7 @@ function CountRow() {
         threshold={capexPend?.value_numeric != null && capexPend.value_numeric > 0
           ? { label: "Awaiting receipt", tone: "warning" } : undefined}
         index={8}
+        kpiCode="CAPEX_PENDING_VALUE"
       />
       <KpiCard
         label="OPEX Pending Delivery"
@@ -163,6 +168,7 @@ function CountRow() {
         size="md"
         sublabel="OPEX not yet delivery-complete"
         index={9}
+        kpiCode="OPEX_PENDING_VALUE"
       />
     </div>
   );

@@ -115,15 +115,15 @@ def get_stage_summary(
             COUNT(CASE WHEN f.invoice_posting_date IS NOT NULL THEN 1 END)  AS has_invoice,
             ROUND(AVG(CASE WHEN f.pr_to_po_days IS NOT NULL
                                 AND f.pr_to_po_days >= 0
-                           THEN CAST(f.pr_to_po_days AS REAL) END), 1)      AS avg_pr_to_po,
+                           THEN f.pr_to_po_days::numeric END), 1)           AS avg_pr_to_po,
             ROUND(AVG(CASE WHEN f.po_to_grn_days > 0
-                           THEN CAST(f.po_to_grn_days AS REAL) END), 1)     AS avg_po_to_grn,
+                           THEN f.po_to_grn_days::numeric END), 1)          AS avg_po_to_grn,
             ROUND(AVG(CASE WHEN f.grn_to_invoice_days > 0
-                           THEN CAST(f.grn_to_invoice_days AS REAL) END), 1) AS avg_grn_to_inv,
+                           THEN f.grn_to_invoice_days::numeric END), 1)     AS avg_grn_to_inv,
             ROUND(AVG(CASE WHEN f.invoice_to_payment_days IS NOT NULL
-                           THEN CAST(f.invoice_to_payment_days AS REAL) END), 1) AS avg_inv_to_pay,
+                           THEN f.invoice_to_payment_days::numeric END), 1) AS avg_inv_to_pay,
             ROUND(AVG(CASE WHEN f.total_cycle_days > 0
-                           THEN CAST(f.total_cycle_days AS REAL) END), 1)   AS avg_total,
+                           THEN f.total_cycle_days::numeric END), 1)        AS avg_total,
             COUNT(CASE WHEN f.is_maverick = 1 THEN 1 END)                   AS maverick_count,
             COUNT(CASE WHEN f.has_grn_return = 1 THEN 1 END)                AS grn_returns,
             COUNT(CASE WHEN f.has_credit_memo = 1 THEN 1 END)               AS credit_memos
@@ -385,3 +385,114 @@ def get_anomalies():
             "severity": severity, "description": description,
         })
     return result
+
+
+# ── /p2p/find ─────────────────────────────────────────────────────────────────
+
+@router.get("/p2p/find")
+def find_document(
+    doc_type:   str = Query(..., description="PO | PR | GRN | INVOICE"),
+    doc_number: str = Query(...),
+):
+    conn = get_connection()
+    dt = doc_type.upper().strip()
+
+    if dt == "PO":
+        fact_rows = conn.execute(
+            "SELECT * FROM pr_po_grn_invoice WHERE purchasing_document = ? LIMIT 20",
+            (doc_number,),
+        ).fetchall()
+    elif dt == "PR":
+        fact_rows = conn.execute(
+            "SELECT * FROM pr_po_grn_invoice WHERE purchase_requisition = ? LIMIT 20",
+            (doc_number,),
+        ).fetchall()
+    elif dt == "GRN":
+        po_row = conn.execute(
+            "SELECT purchasing_document FROM grn_dump WHERE mat_doc = ? LIMIT 1",
+            (doc_number,),
+        ).fetchone()
+        if not po_row:
+            return {"found": False, "doc_type": dt, "doc_number": doc_number, "chain": []}
+        fact_rows = conn.execute(
+            "SELECT * FROM pr_po_grn_invoice WHERE purchasing_document = ? LIMIT 20",
+            (po_row[0],),
+        ).fetchall()
+    elif dt == "INVOICE":
+        po_row = conn.execute(
+            "SELECT purchasing_document FROM po_invoice_dump WHERE invoice_doc = ? LIMIT 1",
+            (doc_number,),
+        ).fetchone()
+        if not po_row:
+            return {"found": False, "doc_type": dt, "doc_number": doc_number, "chain": []}
+        fact_rows = conn.execute(
+            "SELECT * FROM pr_po_grn_invoice WHERE purchasing_document = ? LIMIT 20",
+            (po_row[0],),
+        ).fetchall()
+    else:
+        return {"found": False, "doc_type": dt, "doc_number": doc_number, "chain": []}
+
+    if not fact_rows:
+        return {"found": False, "doc_type": dt, "doc_number": doc_number, "chain": []}
+
+    chain = [
+        {
+            "purchase_requisition":    r["purchase_requisition"],
+            "item_of_requisition":     r["item_of_requisition"],
+            "pr_release_date":         r["pr_release_date"],
+            "purchasing_document":     r["purchasing_document"],
+            "item":                    r["item"],
+            "vendor":                  r["vendor"],
+            "vendor_name":             r["vendor_name"],
+            "material_description":    r["material_description"],
+            "company_code":            r["company_code"],
+            "po_net_value":            r["po_net_value"],
+            "po_document_date":        r["po_document_date"],
+            "grn_posting_date":        r["grn_posting_date"],
+            "grn_quantity":            r["grn_quantity"],
+            "grn_amount":              r["grn_amount"],
+            "invoice_posting_date":    r["invoice_posting_date"],
+            "invoice_amount":          r["invoice_amount"],
+            "pr_to_po_days":           r["pr_to_po_days"],
+            "po_to_grn_days":          r["po_to_grn_days"],
+            "grn_to_invoice_days":     r["grn_to_invoice_days"],
+            "invoice_to_payment_days": r["invoice_to_payment_days"],
+            "is_maverick":             r["is_maverick"],
+        }
+        for r in fact_rows
+    ]
+    return {"found": True, "doc_type": dt, "doc_number": doc_number, "chain": chain}
+
+
+# ── /p2p/stage-records ────────────────────────────────────────────────────────
+
+_STAGE_FILTERS = {
+    "PR_CREATED":    "purchase_requisition IS NOT NULL AND purchase_requisition != ''",
+    "PR_APPROVED":   "pr_release_date IS NOT NULL AND pr_release_date != ''",
+    "PO_CREATED":    "purchasing_document IS NOT NULL AND purchasing_document != ''",
+    "PO_APPROVED":   "po_release_indicator = 'X'",
+    "GRN_POSTED":    "grn_posting_date IS NOT NULL AND grn_posting_date != ''",
+    "INVOICE_POSTED":"invoice_posting_date IS NOT NULL AND invoice_posting_date != ''",
+    "PAYMENT_MADE":  "invoice_to_payment_days IS NOT NULL",
+}
+
+
+@router.get("/p2p/stage-records")
+def get_stage_records(stage: str = Query(...), limit: int = Query(50, le=200)):
+    conn = get_connection()
+    where = _STAGE_FILTERS.get(stage.upper(), "1=1")
+    rows = conn.execute(f"""
+        SELECT purchase_requisition, item_of_requisition,
+               purchasing_document, item,
+               vendor, vendor_name, material_description, material_group, company_code,
+               po_document_date, po_net_value,
+               grn_posting_date, grn_quantity, grn_amount,
+               invoice_posting_date, invoice_amount,
+               pr_to_po_days, po_to_grn_days, grn_to_invoice_days, invoice_to_payment_days,
+               is_maverick
+        FROM pr_po_grn_invoice
+        WHERE {where}
+        ORDER BY po_document_date DESC NULLS LAST
+        LIMIT {limit}
+    """).fetchall()
+    return [dict(r) for r in rows]

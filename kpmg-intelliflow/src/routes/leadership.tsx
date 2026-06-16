@@ -247,6 +247,7 @@ function KpiRow({ company }: { company: string }) {
           size="xl"
           sublabel="Active POs this Indian FY"
           index={0}
+          kpiCode="TOTAL_SPEND_YTD"
         />
         <KpiCard
           label="Maverick PO Rate"
@@ -259,6 +260,7 @@ function KpiRow({ company }: { company: string }) {
               : { label: "Acceptable", tone: "success" }
           }
           index={1}
+          kpiCode="MAVERICK_BUY_RATE"
         />
         <KpiCard
           label="End-to-End Cycle"
@@ -271,6 +273,7 @@ function KpiRow({ company }: { company: string }) {
               : { label: "Within target", tone: "success" }
           }
           index={2}
+          kpiCode="E2E_CYCLE_TIME"
         />
         <KpiCard
           label="Vendor Concentration"
@@ -283,6 +286,7 @@ function KpiRow({ company }: { company: string }) {
               : undefined
           }
           index={3}
+          kpiCode="VENDOR_CONCENTRATION"
         />
       </div>
       <div className="grid grid-cols-4 gap-3 mt-3">
@@ -292,6 +296,7 @@ function KpiRow({ company }: { company: string }) {
           size="md"
           sublabel="PR price − PO price × qty"
           index={4}
+          kpiCode="NEGOTIATION_SAVINGS"
         />
         <KpiCard
           label="Supply Risk Score"
@@ -304,6 +309,7 @@ function KpiRow({ company }: { company: string }) {
               : { label: "Moderate", tone: "warning" }
           }
           index={5}
+          kpiCode="SUPPLY_RISK_SCORE"
         />
         <KpiCard
           label="SOD Conflicts"
@@ -316,6 +322,7 @@ function KpiRow({ company }: { company: string }) {
               : undefined
           }
           index={6}
+          kpiCode="SOD_CONFLICT_COUNT"
         />
         <KpiCard
           label="High-Value POs"
@@ -323,6 +330,7 @@ function KpiRow({ company }: { company: string }) {
           size="md"
           sublabel="Threshold set in header above"
           index={7}
+          kpiCode="HIGH_VALUE_PO_COUNT"
         />
       </div>
     </>
