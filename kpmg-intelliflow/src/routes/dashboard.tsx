@@ -427,7 +427,7 @@ function PODeletionMonitor() {
                   ? po.anomaly_flags.split(",").map((f) => f.trim()).filter(Boolean)
                   : [];
                 const HIGH_FLAGS = ["MAVERICK_BUY", "VENDOR_BLOCK", "PAYMENT_BEFORE_GRN", "THREE_WAY_MISMATCH", "DUPLICATE_INVOICE", "GRN_WITHOUT_PO"];
-                const MED_FLAGS  = ["PRICE_DEVIATION", "BACKDATED_PO", "LATE_DELIVERY", "SPLIT_PO", "OVERDUE_INVOICE"];
+                const MED_FLAGS  = ["PRICE_DEVIATION", "LATE_DELIVERY", "SPLIT_PO", "OVERDUE_INVOICE"];
                 const hasHighRisk = flags.some((f) => HIGH_FLAGS.includes(f));
 
                 return (

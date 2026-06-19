@@ -710,4 +710,319 @@ WHERE (deletion_indicator IS NULL
   AND UPPER(COALESCE(capex_opex_flag,'OPEX')) = 'OPEX'
   AND (delivery_completed IS NULL OR delivery_completed = '')`,
   },
+
+  // ── SOFTWARE LICENSE UTILIZATION ──────────────────────────────────────────
+
+  SW_LIC_UTIL_RATE: {
+    title: "Avg Software License Utilization Rate (%)",
+    description:
+      "Average utilization rate across all software tools in the license_usage table. Computed as active_users ÷ total_licenses per tool, averaged across all tools. Values below 70% trigger under-utilization warnings.",
+    formula: "AVG(active_users / total_licenses × 100) across all tools in license_usage",
+    sql: `SELECT tool_name, total_licenses, active_users,
+       ROUND(active_users * 100.0 / NULLIF(total_licenses, 0), 1) AS util_pct
+FROM license_usage
+-- Python: AVG of util_pct across all tools`,
+  },
+
+  SW_UNDERUTIL_COUNT: {
+    title: "Under-Utilized Software Tools",
+    description:
+      "Count of software tools where utilization rate is below 70% (active_users < 70% of total_licenses). These are candidates for license right-sizing or contract renegotiation.",
+    formula: "COUNT(tools) WHERE active_users / total_licenses < 0.70",
+    sql: `SELECT COUNT(*) FROM license_usage
+WHERE total_licenses > 0
+  AND CAST(active_users AS REAL) / total_licenses < 0.70`,
+  },
+
+  SW_TOTAL_LICENSES: {
+    title: "Total Licensed Seats",
+    description:
+      "Sum of total_licenses across all software tools in license_usage. Represents total contracted software seats regardless of usage.",
+    formula: "SUM(total_licenses) FROM license_usage",
+    sql: `SELECT SUM(total_licenses) FROM license_usage`,
+  },
+
+  SW_ACTIVE_USERS: {
+    title: "Total Active License Users",
+    description:
+      "Sum of active_users across all software tools. Represents the number of seats actively in use as of the last license_usage data upload.",
+    formula: "SUM(active_users) FROM license_usage",
+    sql: `SELECT SUM(active_users) FROM license_usage`,
+  },
+
+  SW_UNUSED_SEATS: {
+    title: "Unused License Seats",
+    description:
+      "Total licensed seats minus total active users across all tools. These are paid-for seats generating zero value — direct cost waste.",
+    formula: "SUM(total_licenses) − SUM(active_users) FROM license_usage",
+    sql: `SELECT SUM(total_licenses) - SUM(active_users) AS unused
+FROM license_usage`,
+  },
+
+  SW_ANNUAL_COST: {
+    title: "Total Annual SW License Cost (₹ Cr)",
+    description:
+      "Sum of annual_cost_inr across all tools in license_usage. Represents total committed software license expenditure per annum. Displayed in INR Crore.",
+    formula: "SUM(annual_cost_inr) / 1e7 FROM license_usage",
+    sql: `SELECT SUM(annual_cost_inr) / 1e7 AS cost_cr FROM license_usage`,
+  },
+
+  SW_COST_PER_USER: {
+    title: "Effective Cost Per Active User (INR)",
+    description:
+      "Total annual software license cost divided by total active users. Measures effective per-user spend — rising cost-per-user indicates under-utilization or price increases.",
+    formula: "SUM(annual_cost_inr) / SUM(active_users) FROM license_usage",
+    sql: `SELECT ROUND(SUM(annual_cost_inr) / NULLIF(SUM(active_users), 0), 0)
+FROM license_usage`,
+  },
+
+  SW_WASTED_COST: {
+    title: "Wasted License Cost — Under-Utilized Tools (₹ Cr)",
+    description:
+      "Estimated cost of licenses being wasted on under-utilized tools (util < 70%). Calculated as annual_cost_inr × (1 − utilization_rate) for each tool below 70%. This represents immediately recoverable savings.",
+    formula: "SUM(annual_cost_inr × (1 − util_rate)) WHERE util_rate < 0.70",
+    sql: `SELECT SUM(annual_cost_inr * (1.0 - CAST(active_users AS REAL) / total_licenses)) / 1e7
+FROM license_usage
+WHERE total_licenses > 0
+  AND CAST(active_users AS REAL) / total_licenses < 0.70`,
+  },
+
+  SW_RENEWAL_90D: {
+    title: "Software Licenses Renewing Within 90 Days",
+    description:
+      "Count of software tools with renewal_date within 90 days of today. These are contracts that need review — decide to renew at current scale, right-size, or cancel based on utilization data.",
+    formula: "COUNT(tools) WHERE renewal_date − TODAY ≤ 90 days",
+    sql: `SELECT COUNT(*) FROM license_usage
+WHERE renewal_date IS NOT NULL
+  AND (renewal_date::DATE - CURRENT_DATE) <= 90`,
+  },
+
+  SW_TOOL_BREAKDOWN: {
+    title: "Per-Tool License Breakdown (JSON)",
+    description:
+      "JSON array of all software tools with: tool name, total seats, active users, unused seats, utilization %, annual cost (₹ Cr), renewal date, and risk level (HIGH < 50%, MEDIUM < 70%, LOW ≥ 70%). Used to power the tool-level table in the UI.",
+    formula: "JSON per tool: util_pct, unused, cost_cr, risk = HIGH/MEDIUM/LOW",
+    sql: `SELECT tool_name, total_licenses, active_users,
+       total_licenses - active_users AS unused,
+       ROUND(active_users * 100.0 / NULLIF(total_licenses,0), 1) AS util_pct,
+       ROUND(annual_cost_inr / 1e7, 2) AS cost_cr,
+       renewal_date
+FROM license_usage
+-- Risk: HIGH if util<50%, MEDIUM if <70%, else LOW`,
+  },
+
+  SW_CAPEX_SPEND: {
+    title: "Software CAPEX Spend YTD (₹ Cr)",
+    description:
+      "Total PO net order value for SOFTWARE-categorized POs flagged as CAPEX (perpetual licenses, one-time ERP licenses) in the current financial year. Source: po_dump joined to po_categorization.",
+    formula: "SUM(net_order_value) / 1e7 WHERE po_category='SOFTWARE' AND capex_opex_flag='CAPEX' AND FY",
+    sql: `SELECT SUM(CAST(p.net_order_value AS REAL)) / 1e7
+FROM po_dump p
+JOIN po_categorization c
+  ON p.purchasing_document = c.purchasing_document AND p.item = c.item
+WHERE c.po_category = 'SOFTWARE'
+  AND c.capex_opex_flag = 'CAPEX'
+  AND (p.deletion_indicator IS NULL OR p.deletion_indicator NOT IN ('L','X'))
+  AND p.document_date >= {FY}`,
+  },
+
+  SW_OPEX_SPEND: {
+    title: "Software OPEX Spend YTD (₹ Cr)",
+    description:
+      "Total PO net order value for SOFTWARE-categorized POs flagged as OPEX (subscriptions, SaaS, maintenance contracts) in the current financial year.",
+    formula: "SUM(net_order_value) / 1e7 WHERE po_category='SOFTWARE' AND capex_opex_flag='OPEX' AND FY",
+    sql: `SELECT SUM(CAST(p.net_order_value AS REAL)) / 1e7
+FROM po_dump p
+JOIN po_categorization c
+  ON p.purchasing_document = c.purchasing_document AND p.item = c.item
+WHERE c.po_category = 'SOFTWARE'
+  AND c.capex_opex_flag = 'OPEX'
+  AND (p.deletion_indicator IS NULL OR p.deletion_indicator NOT IN ('L','X'))
+  AND p.document_date >= {FY}`,
+  },
+
+  SW_VENDOR_CONC: {
+    title: "Top SW Vendor Spend Concentration (%)",
+    description:
+      "Percentage of total software PO spend attributable to the single largest vendor. Values above 50% indicate high vendor dependency risk for software supply.",
+    formula: "top_vendor_spend / total_sw_spend × 100",
+    sql: `SELECT vendor_name, SUM(CAST(net_order_value AS REAL)) AS spend
+FROM po_dump p
+JOIN po_categorization c
+  ON p.purchasing_document = c.purchasing_document AND p.item = c.item
+WHERE c.po_category = 'SOFTWARE'
+  AND (p.deletion_indicator IS NULL OR p.deletion_indicator NOT IN ('L','X'))
+GROUP BY vendor_name
+ORDER BY spend DESC LIMIT 8
+-- Python: top_vendor_spend / total_sw_spend × 100`,
+  },
+
+  SW_VENDOR_BREAKDOWN: {
+    title: "Software Vendor Spend Breakdown (JSON)",
+    description:
+      "JSON array of top 8 software vendors by PO spend, with spend in ₹ Cr and percentage share of total software spend. Used to power the vendor bar chart.",
+    formula: "Top-8 vendors by SUM(net_order_value) WHERE po_category='SOFTWARE'",
+    sql: `SELECT p.vendor_name,
+       SUM(CAST(p.net_order_value AS REAL)) / 1e7 AS spend_cr
+FROM po_dump p
+JOIN po_categorization c
+  ON p.purchasing_document = c.purchasing_document AND p.item = c.item
+WHERE c.po_category = 'SOFTWARE'
+  AND (p.deletion_indicator IS NULL OR p.deletion_indicator NOT IN ('L','X'))
+GROUP BY p.vendor_name
+ORDER BY spend_cr DESC LIMIT 8`,
+  },
+
+  // ── MATERIALS UTILIZATION ──────────────────────────────────────────────────
+
+  MAT_DELIV_UTIL_RATE: {
+    title: "Material Delivery Utilization Rate (%)",
+    description:
+      "GRN (Goods Receipt) quantity received as a percentage of total ordered quantity on material POs. 100% = all ordered goods received. Low values indicate open purchase commitments awaiting delivery.",
+    formula: "SUM(grn_qty WHERE mvt=101 & dc=S) / SUM(po_order_quantity) × 100 for MATERIAL category POs",
+    sql: `SELECT SUM(CAST(COALESCE(NULLIF(g.quantity,''),'0') AS REAL)) AS grn_qty,
+       SUM(CAST(COALESCE(NULLIF(p.order_quantity,''),'0') AS REAL)) AS po_qty
+FROM po_dump p
+JOIN grn_dump g
+  ON p.purchasing_document = g.purchasing_document AND p.item = g.item
+LEFT JOIN po_categorization c
+  ON p.purchasing_document = c.purchasing_document AND p.item = c.item
+WHERE g.movement_type = '101' AND g.debit_credit_ind = 'S'
+  AND (p.deletion_indicator IS NULL OR p.deletion_indicator NOT IN ('L','X'))
+  AND (c.po_category IS NULL OR c.po_category = 'MATERIAL')
+-- Python: ROUND(grn_qty / po_qty * 100, 1)`,
+  },
+
+  MAT_DELIVERY_COMPLETE_PCT: {
+    title: "Delivery Completed POs (%)",
+    description:
+      "Percentage of material PO lines where SAP delivery_completed flag is set to 'X'. This is the SAP ELIKZ field from EKPO — manually or automatically set when all scheduled deliveries are received.",
+    formula: "COUNT(delivery_completed='X') / COUNT(*) × 100 WHERE FY and not deleted",
+    sql: `SELECT COUNT(CASE WHEN delivery_completed='X' THEN 1 END) * 100.0
+       / NULLIF(COUNT(*), 0)
+FROM po_dump
+WHERE (deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))
+  AND document_date >= {FY}`,
+  },
+
+  MAT_OPEN_PO_VALUE: {
+    title: "Open PO Value Not Yet GRN'd (₹ Cr)",
+    description:
+      "Total outstanding PO value where GRN amount received is more than 5% less than PO net value. Represents committed spend awaiting goods receipt — a working capital liability.",
+    formula: "SUM(po_net_value − grn_amount) WHERE grn_amount < po_net_value × 0.95",
+    sql: `SELECT SUM(f.po_net_value - COALESCE(f.grn_amount, 0)) / 1e7
+FROM pr_po_grn_invoice f
+WHERE f.po_deletion_indicator NOT IN ('L','X')
+  AND COALESCE(f.grn_amount, 0) < f.po_net_value * 0.95
+  AND f.po_net_value > 0`,
+  },
+
+  MAT_CAPEX_SPEND: {
+    title: "Material CAPEX Spend YTD (₹ Cr)",
+    description:
+      "Total PO net order value for MATERIAL-categorized POs flagged as CAPEX (machinery, equipment, capital assets). Source: po_dump joined to po_categorization.",
+    formula: "SUM(net_order_value) / 1e7 WHERE po_category='MATERIAL' AND capex_opex_flag='CAPEX' AND FY",
+    sql: `SELECT SUM(CAST(p.net_order_value AS REAL)) / 1e7
+FROM po_dump p
+JOIN po_categorization c
+  ON p.purchasing_document = c.purchasing_document AND p.item = c.item
+WHERE c.po_category = 'MATERIAL'
+  AND c.capex_opex_flag = 'CAPEX'
+  AND (p.deletion_indicator IS NULL OR p.deletion_indicator NOT IN ('L','X'))
+  AND p.document_date >= {FY}`,
+  },
+
+  MAT_OPEX_SPEND: {
+    title: "Material OPEX Spend YTD (₹ Cr)",
+    description:
+      "Total PO net order value for MATERIAL-categorized POs flagged as OPEX (consumables, royalty materials, imported licensed materials). Source: po_dump joined to po_categorization.",
+    formula: "SUM(net_order_value) / 1e7 WHERE po_category='MATERIAL' AND capex_opex_flag='OPEX' AND FY",
+    sql: `SELECT SUM(CAST(p.net_order_value AS REAL)) / 1e7
+FROM po_dump p
+JOIN po_categorization c
+  ON p.purchasing_document = c.purchasing_document AND p.item = c.item
+WHERE c.po_category = 'MATERIAL'
+  AND c.capex_opex_flag = 'OPEX'
+  AND (p.deletion_indicator IS NULL OR p.deletion_indicator NOT IN ('L','X'))
+  AND p.document_date >= {FY}`,
+  },
+
+  MAT_LICENSE_COST_TOT: {
+    title: "Material Licensing Cost Total (₹ Cr)",
+    description:
+      "Total royalty fees, import license charges, and patent fees across all active material POs. Sourced from material_license_cost table (SAP equivalent: KONV condition types ZLIC/ZROY). These costs are in addition to the base PO net value.",
+    formula: "SUM(license_fee_inr) / 1e7 FROM material_license_cost JOIN active po_dump",
+    sql: `SELECT SUM(mlc.license_fee_inr) / 1e7
+FROM material_license_cost mlc
+JOIN po_dump p
+  ON mlc.purchasing_document = p.purchasing_document AND mlc.item = p.item
+WHERE (p.deletion_indicator IS NULL OR p.deletion_indicator NOT IN ('L','X'))`,
+  },
+
+  MAT_LICENSE_BREAKDOWN: {
+    title: "Material License Cost by Type (JSON)",
+    description:
+      "JSON breakdown of material licensing costs by type: ROYALTY (IP/technology fees), IMPORT_LICENSE (customs/DGFT), PATENT (patent usage fees). Used to power the license cost bar chart.",
+    formula: "SUM(license_fee_inr) / 1e7 GROUP BY license_type FROM material_license_cost",
+    sql: `SELECT mlc.license_type,
+       SUM(mlc.license_fee_inr) / 1e7 AS cost_cr
+FROM material_license_cost mlc
+JOIN po_dump p
+  ON mlc.purchasing_document = p.purchasing_document AND mlc.item = p.item
+WHERE (p.deletion_indicator IS NULL OR p.deletion_indicator NOT IN ('L','X'))
+GROUP BY mlc.license_type`,
+  },
+
+  MAT_3WAY_MATCH: {
+    title: "3-Way Match Rate — Materials (%)",
+    description:
+      "Percentage of material PO lines where invoice amount matches GRN amount within 5% tolerance. Measures invoice accuracy for physical goods. Low rates indicate disputes, short-deliveries billed in full, or data quality issues.",
+    formula: "COUNT(|invoice_amt − grn_amt| / grn_amt < 5%) / COUNT(lines with GRN > 0) × 100",
+    sql: `SELECT
+  COUNT(CASE
+    WHEN f.grn_amount > 0
+     AND ABS(f.invoice_amount - f.grn_amount) / NULLIF(f.grn_amount, 0) < 0.05
+    THEN 1 END) * 100.0 / NULLIF(COUNT(CASE WHEN f.grn_amount > 0 THEN 1 END), 0)
+FROM pr_po_grn_invoice f
+LEFT JOIN po_categorization c
+  ON f.purchasing_document = c.purchasing_document AND f.item = c.item
+WHERE f.po_deletion_indicator NOT IN ('L','X')
+  AND (c.po_category IS NULL OR c.po_category = 'MATERIAL')`,
+  },
+
+  MAT_VENDOR_FILL_RATE: {
+    title: "Vendor GRN Fill Rate (JSON)",
+    description:
+      "JSON array of top 8 vendors by GRN quantity, showing their fill rate (GRN qty ÷ PO ordered qty × 100%). Color-coded: green ≥ 90%, amber ≥ 70%, red < 70%. Measures supplier delivery reliability.",
+    formula: "SUM(grn_qty) / SUM(po_qty) × 100 per vendor — top 8 by GRN volume",
+    sql: `SELECT p.vendor_name,
+       SUM(CAST(COALESCE(NULLIF(g.quantity,''),'0') AS REAL)) AS grn_qty,
+       SUM(CAST(COALESCE(NULLIF(p.order_quantity,''),'0') AS REAL)) AS po_qty
+FROM po_dump p
+JOIN grn_dump g
+  ON p.purchasing_document = g.purchasing_document AND p.item = g.item
+WHERE g.movement_type = '101' AND g.debit_credit_ind = 'S'
+  AND (p.deletion_indicator IS NULL OR p.deletion_indicator NOT IN ('L','X'))
+GROUP BY p.vendor_name
+HAVING SUM(CAST(COALESCE(NULLIF(p.order_quantity,''),'0') AS REAL)) > 0
+ORDER BY grn_qty DESC LIMIT 8`,
+  },
+
+  MAT_CAT_BREAKDOWN: {
+    title: "Material Spend by Category (JSON)",
+    description:
+      "JSON array of material PO spend grouped by sub_category (from po_categorization) or material_group (from po_dump). Shows top 8 categories by spend in ₹ Cr with PO count. Used to power the category breakdown bar chart.",
+    formula: "SUM(net_order_value) / 1e7 GROUP BY sub_category OR material_group WHERE po_category='MATERIAL'",
+    sql: `SELECT COALESCE(c.sub_category, p.material_group, 'OTHER') AS cat,
+       SUM(CAST(p.net_order_value AS REAL)) / 1e7 AS spend_cr,
+       COUNT(DISTINCT p.purchasing_document) AS po_count
+FROM po_dump p
+LEFT JOIN po_categorization c
+  ON p.purchasing_document = c.purchasing_document AND p.item = c.item
+WHERE (p.deletion_indicator IS NULL OR p.deletion_indicator NOT IN ('L','X'))
+  AND p.document_date >= {FY}
+  AND (c.po_category IS NULL OR c.po_category = 'MATERIAL')
+GROUP BY cat
+ORDER BY spend_cr DESC LIMIT 8`,
+  },
 };

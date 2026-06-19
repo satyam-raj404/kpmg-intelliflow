@@ -1409,9 +1409,334 @@ def _vendor(conn, FY, MTD, cc_cfg: str = "", company_code: str = "ALL"):
 
 # ── UTILIZATION (CAPEX / OPEX) ────────────────────────────────────────────────
 
-CAPEX_FLAG = "UPPER(COALESCE(capex_opex_flag,'OPEX')) = 'CAPEX'"
-OPEX_FLAG  = "UPPER(COALESCE(capex_opex_flag,'OPEX')) = 'OPEX'"
+CAPEX_FLAG  = "UPPER(COALESCE(capex_opex_flag,'OPEX')) = 'CAPEX'"
+OPEX_FLAG   = "UPPER(COALESCE(capex_opex_flag,'OPEX')) = 'OPEX'"
 NOT_DELETED = "(deletion_indicator IS NULL OR deletion_indicator NOT IN ('L','X'))"
+
+# Software keyword patterns for auto-categorisation
+import re as _re
+_SW_PATTERNS = [
+    (_re.compile(r'(?i)SAAS|SUBSCRIPTION|CLOUD LICENSE|ANNUAL LICENSE|MONTHLY LICENSE'), 'SUBSCRIPTION', 'OPEX'),
+    (_re.compile(r'(?i)PERPETUAL LICENSE|ONE.TIME LICENSE|PERPETUAL SOFTWARE'),           'PERPETUAL',     'CAPEX'),
+    (_re.compile(r'(?i)SOFTWARE MAINTENANCE|AMC SOFTWARE|ANNUAL MAINTENANCE|SUPPORT LICENSE'), 'MAINTENANCE', 'OPEX'),
+    (_re.compile(r'(?i)SAP LICENSE|ERP LICENSE|ORACLE LICENSE|SAP S/4|SAP ECC'),          'ERP_LICENSE',   'CAPEX'),
+    (_re.compile(r'(?i)MICROSOFT|ADOBE|SALESFORCE|JIRA|CONFLUENCE|GITHUB|LICENSE KEY'),   'IT_TOOL',       'OPEX'),
+    (_re.compile(r'(?i)ROYALTY|LICENSED MATERIAL|PATENT FEE|IP FEE|TECHNOLOGY FEE'),      'ROYALTY',       'OPEX'),
+    (_re.compile(r'(?i)IMPORT LICENSE|CUSTOMS LICENSE|DGFT|IEC LICENSE'),                 'IMPORT_LIC',    'OPEX'),
+    (_re.compile(r'(?i)MACHINERY|EQUIPMENT|TURBINE|COMPRESSOR|PLANT ASSET|CAPITAL EQUIP'), 'CAPEX_ASSET',  'CAPEX'),
+]
+_SW_CAT_PATTERNS = {
+    'SUBSCRIPTION': 'SOFTWARE', 'PERPETUAL': 'SOFTWARE', 'MAINTENANCE': 'SOFTWARE',
+    'ERP_LICENSE': 'SOFTWARE',  'IT_TOOL': 'SOFTWARE',
+    'ROYALTY': 'MATERIAL',      'IMPORT_LIC': 'MATERIAL', 'CAPEX_ASSET': 'MATERIAL',
+}
+
+
+def _auto_categorize(conn) -> None:
+    """Keyword-classify uncategorised POs into po_categorization.
+    Never overwrites rows where tagged_by != 'SYSTEM' (manual user tags).
+    """
+    try:
+        rows = conn.execute("""
+            SELECT p.purchasing_document, p.item, p.material_description,
+                   p.capex_opex_flag, p.material_group
+            FROM po_dump p
+            WHERE NOT EXISTS (
+                SELECT 1 FROM po_categorization c
+                WHERE c.purchasing_document = p.purchasing_document
+                  AND c.item = p.item
+                  AND c.tagged_by != 'SYSTEM'
+            )
+        """).fetchall()
+        for row in rows:
+            po_doc, item, desc, existing_co, _ = row[0], row[1], row[2] or '', row[3] or 'OPEX', row[4] or ''
+            matched_sub, matched_cat, matched_co = None, 'MATERIAL', existing_co or 'OPEX'
+            for pattern, sub, co in _SW_PATTERNS:
+                if pattern.search(desc):
+                    matched_sub = sub
+                    matched_cat = _SW_CAT_PATTERNS.get(sub, 'MATERIAL')
+                    matched_co  = co
+                    break
+            if matched_sub:
+                lic = matched_sub if matched_sub in ('SUBSCRIPTION','PERPETUAL','ROYALTY','IMPORT_LIC') else ''
+                conn.execute("""
+                    INSERT INTO po_categorization
+                        (purchasing_document, item, po_category, sub_category,
+                         capex_opex_flag, license_type, tagged_by, tagged_at)
+                    VALUES (%s,%s,%s,%s,%s,%s,'SYSTEM',NOW()::TEXT)
+                    ON CONFLICT(purchasing_document, item) DO UPDATE SET
+                        po_category    = EXCLUDED.po_category,
+                        sub_category   = EXCLUDED.sub_category,
+                        capex_opex_flag= EXCLUDED.capex_opex_flag,
+                        license_type   = EXCLUDED.license_type,
+                        tagged_at      = EXCLUDED.tagged_at
+                    WHERE po_categorization.tagged_by = 'SYSTEM'
+                """, (po_doc, item, matched_cat, matched_sub, matched_co, lic))
+    except Exception:
+        try: conn.rollback()
+        except Exception: pass
+
+
+def _utilization_software(conn, FY: str, company_code: str = "ALL") -> None:
+    """Software-specific utilization KPIs — license table (always ALL) + categorised POs."""
+    CC = f" AND p.company_code = '{company_code}'" if company_code != "ALL" else ""
+
+    # license_usage has no company_code — always store under 'ALL'
+    try:
+        rows = conn.execute("""
+            SELECT tool_name, total_licenses, active_users, annual_cost_inr, renewal_date
+            FROM license_usage
+        """).fetchall()
+
+        if rows:
+            util_rates  = [(r[2] / r[1] * 100) for r in rows if r[1] > 0]
+            avg_util    = round(sum(util_rates) / len(util_rates), 1) if util_rates else None
+            under_util  = sum(1 for r in rows if r[1] > 0 and r[2] / r[1] < 0.70)
+            total_seats = sum(r[1] for r in rows)
+            active_seats= sum(r[2] for r in rows)
+            unused_seats= total_seats - active_seats
+            total_cost  = sum(r[3] for r in rows)
+            wasted_cost = sum(r[3] * (1 - r[2] / r[1]) for r in rows if r[1] > 0 and r[2] / r[1] < 0.70)
+            cost_per_user = round(total_cost / active_seats, 0) if active_seats else None
+
+            import datetime as _dt
+            today = _dt.date.today()
+            renewing_90d = sum(
+                1 for r in rows
+                if r[4] and (_dt.date.fromisoformat(r[4]) - today).days <= 90
+            )
+
+            # License KPIs are org-wide — always stored under company_code param (shown same for all cos)
+            _upsert(conn, "utilization", "SW_LIC_UTIL_RATE",   "Avg License Utilization Rate",    avg_util,                None, "%",       company_code=company_code)
+            _upsert(conn, "utilization", "SW_UNDERUTIL_COUNT",  "Under-Utilized Tools (<70%)",     float(under_util),       None, "count",   company_code=company_code)
+            _upsert(conn, "utilization", "SW_TOTAL_LICENSES",   "Total Licensed Seats",            float(total_seats),      None, "seats",   company_code=company_code)
+            _upsert(conn, "utilization", "SW_ACTIVE_USERS",     "Total Active License Users",      float(active_seats),     None, "users",   company_code=company_code)
+            _upsert(conn, "utilization", "SW_UNUSED_SEATS",     "Unused License Seats",            float(unused_seats),     None, "seats",   company_code=company_code)
+            _upsert(conn, "utilization", "SW_ANNUAL_COST",      "Total Annual SW License Cost",    round(total_cost/1e7,2), None, "INR Cr",  company_code=company_code)
+            _upsert(conn, "utilization", "SW_COST_PER_USER",    "Effective Cost Per User (INR)",   cost_per_user,           None, "INR",     company_code=company_code)
+            _upsert(conn, "utilization", "SW_WASTED_COST",      "Wasted License Cost (Under-util)",round(wasted_cost/1e7,2),None, "INR Cr",  company_code=company_code)
+            _upsert(conn, "utilization", "SW_RENEWAL_90D",      "Licenses Renewing in 90 Days",   float(renewing_90d),     None, "count",   company_code=company_code)
+
+            tool_list = [{
+                "tool":    r[0],
+                "total":   r[1],
+                "active":  r[2],
+                "unused":  r[1] - r[2],
+                "util_pct": round(r[2] / r[1] * 100, 1) if r[1] > 0 else 0,
+                "cost_cr": round(r[3] / 1e7, 2),
+                "renewal": r[4],
+                "risk":    "HIGH" if (r[1] > 0 and r[2] / r[1] < 0.50) else
+                           "MEDIUM" if (r[1] > 0 and r[2] / r[1] < 0.70) else "LOW",
+            } for r in rows]
+            _upsert(conn, "utilization", "SW_TOOL_BREAKDOWN", "Software License Breakdown",
+                    None, json.dumps(tool_list), "json", company_code=company_code)
+    except Exception:
+        try: conn.rollback()
+        except Exception: pass
+
+    # Software PO spend — filtered by company
+    ND_P = NOT_DELETED.replace('deletion_indicator', 'p.deletion_indicator')
+    try:
+        sw_capex = _run(conn, f"""
+            SELECT SUM(CAST(p.net_order_value AS REAL))
+            FROM po_dump p
+            JOIN po_categorization c ON p.purchasing_document=c.purchasing_document AND p.item=c.item
+            WHERE c.po_category='SOFTWARE' AND c.capex_opex_flag='CAPEX'
+              AND {ND_P} AND p.document_date >= {FY}{CC}
+        """)
+        sw_opex = _run(conn, f"""
+            SELECT SUM(CAST(p.net_order_value AS REAL))
+            FROM po_dump p
+            JOIN po_categorization c ON p.purchasing_document=c.purchasing_document AND p.item=c.item
+            WHERE c.po_category='SOFTWARE' AND c.capex_opex_flag='OPEX'
+              AND {ND_P} AND p.document_date >= {FY}{CC}
+        """)
+        _upsert(conn, "utilization", "SW_CAPEX_SPEND", "Software CAPEX Spend YTD (Cr)", round((sw_capex or 0)/1e7,2), None, "INR Cr", company_code=company_code)
+        _upsert(conn, "utilization", "SW_OPEX_SPEND",  "Software OPEX Spend YTD (Cr)",  round((sw_opex  or 0)/1e7,2), None, "INR Cr", company_code=company_code)
+    except Exception:
+        try: conn.rollback()
+        except Exception: pass
+
+    # SW vendor concentration — filtered by company
+    try:
+        v_rows = conn.execute(f"""
+            SELECT p.vendor_name,
+                   SUM(CAST(p.net_order_value AS REAL)) AS spend
+            FROM po_dump p
+            JOIN po_categorization c ON p.purchasing_document=c.purchasing_document AND p.item=c.item
+            WHERE c.po_category='SOFTWARE' AND {ND_P}{CC}
+            GROUP BY p.vendor_name ORDER BY spend DESC LIMIT 8
+        """).fetchall()
+        if v_rows:
+            total_sw = sum(r[1] or 0 for r in v_rows)
+            top_conc = round((v_rows[0][1] or 0) / total_sw * 100, 1) if total_sw else None
+            _upsert(conn, "utilization", "SW_VENDOR_CONC", "SW Vendor Concentration (%)", top_conc, None, "%", company_code=company_code)
+            vendor_list = [{"vendor": r[0] or "Unknown", "spend_cr": round((r[1] or 0)/1e7,2),
+                            "pct": round((r[1] or 0)/total_sw*100,1)} for r in v_rows]
+            _upsert(conn, "utilization", "SW_VENDOR_BREAKDOWN", "SW Vendor Spend Breakdown",
+                    None, json.dumps(vendor_list), "json", company_code=company_code)
+    except Exception:
+        try: conn.rollback()
+        except Exception: pass
+
+
+def _utilization_materials(conn, FY: str, company_code: str = "ALL") -> None:
+    """Material-specific utilization KPIs — delivery, contract, licensing, CAPEX/OPEX."""
+    CC  = f" AND p.company_code = '{company_code}'" if company_code != "ALL" else ""
+    CC0 = f" AND company_code = '{company_code}'"   if company_code != "ALL" else ""
+    ND_P = NOT_DELETED.replace('deletion_indicator', 'p.deletion_indicator')
+
+    # Delivery utilization
+    try:
+        d_row = conn.execute(f"""
+            SELECT SUM(CAST(COALESCE(NULLIF(g.quantity,''),'0') AS REAL)),
+                   SUM(CAST(COALESCE(NULLIF(p.order_quantity,''),'0') AS REAL))
+            FROM po_dump p
+            JOIN grn_dump g ON p.purchasing_document=g.purchasing_document AND p.item=g.item
+            LEFT JOIN po_categorization c ON p.purchasing_document=c.purchasing_document AND p.item=c.item
+            WHERE g.movement_type='101' AND g.debit_credit_ind='S'
+              AND {ND_P}{CC}
+              AND (c.po_category IS NULL OR c.po_category='MATERIAL')
+        """).fetchone()
+        grn_qty, po_qty = (d_row[0] or 0), (d_row[1] or 0)
+        del_util = round(grn_qty / po_qty * 100, 1) if po_qty else None
+        _upsert(conn, "utilization", "MAT_DELIV_UTIL_RATE", "Material Delivery Utilization %", del_util, None, "%", company_code=company_code)
+    except Exception:
+        try: conn.rollback()
+        except Exception: pass
+
+    # Delivery complete %
+    try:
+        dc_row = conn.execute(f"""
+            SELECT COUNT(CASE WHEN delivery_completed='X' THEN 1 END) * 100.0 / NULLIF(COUNT(*),0)
+            FROM po_dump
+            WHERE {NOT_DELETED} AND document_date >= {FY}{CC0}
+        """).fetchone()
+        _upsert(conn, "utilization", "MAT_DELIVERY_COMPLETE_PCT", "Delivery Completed PO %",
+                round(dc_row[0],1) if dc_row and dc_row[0] else None, None, "%", company_code=company_code)
+    except Exception:
+        try: conn.rollback()
+        except Exception: pass
+
+    # Open PO value (not yet GRN'd) — pr_po_grn_invoice has company_code via po join
+    try:
+        open_val = _run(conn, f"""
+            SELECT SUM(f.po_net_value - COALESCE(f.grn_amount,0))
+            FROM pr_po_grn_invoice f
+            WHERE f.po_deletion_indicator NOT IN ('L','X')
+              AND COALESCE(f.grn_amount,0) < f.po_net_value * 0.95
+              AND f.po_net_value > 0
+              {("AND f.company_code = '" + company_code + "'") if company_code != "ALL" else ""}
+        """)
+        _upsert(conn, "utilization", "MAT_OPEN_PO_VALUE", "Open PO Value Not GRN'd (Cr)",
+                round((open_val or 0)/1e7,2), None, "INR Cr", company_code=company_code)
+    except Exception:
+        try: conn.rollback()
+        except Exception: pass
+
+    # CAPEX / OPEX for MATERIAL category
+    try:
+        for flag, code, name in [
+            ('CAPEX', 'MAT_CAPEX_SPEND', 'Material CAPEX Spend YTD (Cr)'),
+            ('OPEX',  'MAT_OPEX_SPEND',  'Material OPEX Spend YTD (Cr)'),
+        ]:
+            val = _run(conn, f"""
+                SELECT SUM(CAST(p.net_order_value AS REAL))
+                FROM po_dump p
+                JOIN po_categorization c ON p.purchasing_document=c.purchasing_document AND p.item=c.item
+                WHERE c.po_category='MATERIAL' AND c.capex_opex_flag='{flag}'
+                  AND {ND_P} AND p.document_date >= {FY}{CC}
+            """)
+            _upsert(conn, "utilization", code, name, round((val or 0)/1e7,2), None, "INR Cr", company_code=company_code)
+    except Exception:
+        try: conn.rollback()
+        except Exception: pass
+
+    # Licensing cost breakdown
+    try:
+        lic_rows = conn.execute(f"""
+            SELECT mlc.license_type,
+                   SUM(mlc.license_fee_inr) AS total_fee
+            FROM material_license_cost mlc
+            JOIN po_dump p ON mlc.purchasing_document=p.purchasing_document AND mlc.item=p.item
+            WHERE {ND_P}{CC}
+            GROUP BY mlc.license_type
+        """).fetchall()
+        total_lic = sum(r[1] or 0 for r in lic_rows)
+        _upsert(conn, "utilization", "MAT_LICENSE_COST_TOT", "Material Licensing Cost Total (Cr)",
+                round(total_lic/1e7,2), None, "INR Cr", company_code=company_code)
+        lic_list = [{"type": r[0], "cost_cr": round((r[1] or 0)/1e7,2)} for r in lic_rows]
+        _upsert(conn, "utilization", "MAT_LICENSE_BREAKDOWN", "Material License Cost Breakdown",
+                None, json.dumps(lic_list), "json", company_code=company_code)
+    except Exception:
+        try: conn.rollback()
+        except Exception: pass
+
+    # 3-way match rate (materials only)
+    try:
+        match_row = conn.execute(f"""
+            SELECT
+                COUNT(CASE WHEN f.grn_amount > 0
+                            AND ABS(f.invoice_amount - f.grn_amount) / NULLIF(f.grn_amount,0) < 0.05
+                           THEN 1 END) * 100.0 / NULLIF(COUNT(CASE WHEN f.grn_amount > 0 THEN 1 END),0)
+            FROM pr_po_grn_invoice f
+            LEFT JOIN po_categorization c ON f.purchasing_document=c.purchasing_document AND f.item=c.item
+            WHERE f.po_deletion_indicator NOT IN ('L','X')
+              AND (c.po_category IS NULL OR c.po_category='MATERIAL')
+              {("AND f.company_code = '" + company_code + "'") if company_code != "ALL" else ""}
+        """).fetchone()
+        _upsert(conn, "utilization", "MAT_3WAY_MATCH", "3-Way Match Rate (Materials %)",
+                round(match_row[0],1) if match_row and match_row[0] else None, None, "%", company_code=company_code)
+    except Exception:
+        try: conn.rollback()
+        except Exception: pass
+
+    # GRN fill rate by top vendors (JSON)
+    try:
+        vfill_rows = conn.execute(f"""
+            SELECT p.vendor_name,
+                   SUM(CAST(COALESCE(NULLIF(g.quantity,''),'0') AS REAL)) AS grn_qty,
+                   SUM(CAST(COALESCE(NULLIF(p.order_quantity,''),'0') AS REAL)) AS po_qty
+            FROM po_dump p
+            JOIN grn_dump g ON p.purchasing_document=g.purchasing_document AND p.item=g.item
+            WHERE g.movement_type='101' AND g.debit_credit_ind='S'
+              AND {ND_P}{CC}
+            GROUP BY p.vendor_name
+            HAVING SUM(CAST(COALESCE(NULLIF(p.order_quantity,''),'0') AS REAL)) > 0
+            ORDER BY grn_qty DESC LIMIT 8
+        """).fetchall()
+        fill_list = [{
+            "vendor":    r[0] or "Unknown",
+            "fill_pct":  round(r[1] / r[2] * 100, 1) if r[2] else 0,
+            "grn_qty":   round(r[1] or 0, 0),
+            "po_qty":    round(r[2] or 0, 0),
+        } for r in vfill_rows]
+        _upsert(conn, "utilization", "MAT_VENDOR_FILL_RATE", "Vendor GRN Fill Rate",
+                None, json.dumps(fill_list), "json", company_code=company_code)
+    except Exception:
+        try: conn.rollback()
+        except Exception: pass
+
+    # Category spend breakdown for materials (JSON)
+    try:
+        cat_rows = conn.execute(f"""
+            SELECT COALESCE(c.sub_category, p.material_group, 'OTHER') AS cat,
+                   SUM(CAST(p.net_order_value AS REAL)) AS spend,
+                   COUNT(DISTINCT p.purchasing_document) AS po_count
+            FROM po_dump p
+            LEFT JOIN po_categorization c ON p.purchasing_document=c.purchasing_document AND p.item=c.item
+            WHERE {NOT_DELETED.replace('deletion_indicator','p.deletion_indicator')}
+              AND p.document_date >= {FY}
+              AND (c.po_category IS NULL OR c.po_category='MATERIAL')
+            GROUP BY cat ORDER BY spend DESC LIMIT 8
+        """).fetchall()
+        cat_list = [{"cat": r[0], "spend_cr": round((r[1] or 0)/1e7,2), "po_count": int(r[2] or 0)} for r in cat_rows]
+        _upsert(conn, "utilization", "MAT_CAT_BREAKDOWN", "Material Spend by Category",
+                None, json.dumps(cat_list), "json")
+    except Exception:
+        try: conn.rollback()
+        except Exception: pass
+
 
 # Human-readable material group names
 MG_NAMES = {
@@ -1422,74 +1747,75 @@ MG_NAMES = {
 }
 
 
-def _utilization(conn, FY, MTD):
+def _utilization(conn, FY, MTD, company_code: str = "ALL"):
+    CC = f" AND company_code = '{company_code}'" if company_code != "ALL" else ""
 
     # U1 — Total CAPEX Spend YTD
     u1 = _run(conn, f"""
         SELECT SUM(CAST(net_order_value AS REAL)) FROM po_dump
-        WHERE {NOT_DELETED} AND document_date >= {FY} AND {CAPEX_FLAG}
+        WHERE {NOT_DELETED} AND document_date >= {FY} AND {CAPEX_FLAG}{CC}
     """)
-    _upsert(conn, "utilization", "CAPEX_SPEND_YTD", "Total CAPEX Spend (YTD)", u1, None, "INR")
+    _upsert(conn, "utilization", "CAPEX_SPEND_YTD", "Total CAPEX Spend (YTD)", u1, None, "INR", company_code=company_code)
 
     # U2 — Total OPEX Spend YTD
     u2 = _run(conn, f"""
         SELECT SUM(CAST(net_order_value AS REAL)) FROM po_dump
-        WHERE {NOT_DELETED} AND document_date >= {FY} AND {OPEX_FLAG}
+        WHERE {NOT_DELETED} AND document_date >= {FY} AND {OPEX_FLAG}{CC}
     """)
-    _upsert(conn, "utilization", "OPEX_SPEND_YTD", "Total OPEX Spend (YTD)", u2, None, "INR")
+    _upsert(conn, "utilization", "OPEX_SPEND_YTD", "Total OPEX Spend (YTD)", u2, None, "INR", company_code=company_code)
 
     # U3 — CAPEX % of total spend
     total_spend = (u1 or 0) + (u2 or 0)
     u3_capex_pct = round((u1 or 0) / total_spend * 100, 1) if total_spend else None
-    _upsert(conn, "utilization", "CAPEX_PCT", "CAPEX as % of Total Spend", u3_capex_pct, None, "%")
+    _upsert(conn, "utilization", "CAPEX_PCT", "CAPEX as % of Total Spend", u3_capex_pct, None, "%", company_code=company_code)
 
     # U4 — OPEX % of total spend
     u4_opex_pct = round((u2 or 0) / total_spend * 100, 1) if total_spend else None
-    _upsert(conn, "utilization", "OPEX_PCT", "OPEX as % of Total Spend", u4_opex_pct, None, "%")
+    _upsert(conn, "utilization", "OPEX_PCT", "OPEX as % of Total Spend", u4_opex_pct, None, "%", company_code=company_code)
 
     # U5 — CAPEX PO Count YTD
     u5 = _run(conn, f"""
         SELECT COUNT(DISTINCT purchasing_document) FROM po_dump
-        WHERE {NOT_DELETED} AND document_date >= {FY} AND {CAPEX_FLAG}
+        WHERE {NOT_DELETED} AND document_date >= {FY} AND {CAPEX_FLAG}{CC}
     """)
-    _upsert(conn, "utilization", "CAPEX_PO_COUNT", "CAPEX PO Count (YTD)", u5, None, "count")
+    _upsert(conn, "utilization", "CAPEX_PO_COUNT", "CAPEX PO Count (YTD)", u5, None, "count", company_code=company_code)
 
     # U6 — OPEX PO Count YTD
     u6 = _run(conn, f"""
         SELECT COUNT(DISTINCT purchasing_document) FROM po_dump
-        WHERE {NOT_DELETED} AND document_date >= {FY} AND {OPEX_FLAG}
+        WHERE {NOT_DELETED} AND document_date >= {FY} AND {OPEX_FLAG}{CC}
     """)
-    _upsert(conn, "utilization", "OPEX_PO_COUNT", "OPEX PO Count (YTD)", u6, None, "count")
+    _upsert(conn, "utilization", "OPEX_PO_COUNT", "OPEX PO Count (YTD)", u6, None, "count", company_code=company_code)
 
     # U7 — Avg CAPEX PO Value
     u7 = _run(conn, f"""
         SELECT AVG(CAST(net_order_value AS REAL)) FROM po_dump
-        WHERE {NOT_DELETED} AND {CAPEX_FLAG}
+        WHERE {NOT_DELETED} AND {CAPEX_FLAG}{CC}
     """)
-    _upsert(conn, "utilization", "CAPEX_AVG_PO_VALUE", "Avg CAPEX PO Value", u7, None, "INR")
+    _upsert(conn, "utilization", "CAPEX_AVG_PO_VALUE", "Avg CAPEX PO Value", u7, None, "INR", company_code=company_code)
 
     # U8 — Avg OPEX PO Value
     u8 = _run(conn, f"""
         SELECT AVG(CAST(net_order_value AS REAL)) FROM po_dump
-        WHERE {NOT_DELETED} AND {OPEX_FLAG}
+        WHERE {NOT_DELETED} AND {OPEX_FLAG}{CC}
     """)
-    _upsert(conn, "utilization", "OPEX_AVG_PO_VALUE", "Avg OPEX PO Value", u8, None, "INR")
+    _upsert(conn, "utilization", "OPEX_AVG_PO_VALUE", "Avg OPEX PO Value", u8, None, "INR", company_code=company_code)
 
     # U9 — CAPEX Pending Delivery Value (open, not delivery-complete)
     u9 = _run(conn, f"""
         SELECT SUM(CAST(net_order_value AS REAL)) FROM po_dump
-        WHERE {NOT_DELETED} AND {CAPEX_FLAG}
+        WHERE {NOT_DELETED} AND {CAPEX_FLAG}{CC}
           AND (delivery_completed IS NULL OR delivery_completed = '')
     """)
-    _upsert(conn, "utilization", "CAPEX_PENDING_VALUE", "CAPEX Pending Delivery", u9, None, "INR")
+    _upsert(conn, "utilization", "CAPEX_PENDING_VALUE", "CAPEX Pending Delivery", u9, None, "INR", company_code=company_code)
 
     # U10 — OPEX Pending Delivery Value
     u10 = _run(conn, f"""
         SELECT SUM(CAST(net_order_value AS REAL)) FROM po_dump
-        WHERE {NOT_DELETED} AND {OPEX_FLAG}
+        WHERE {NOT_DELETED} AND {OPEX_FLAG}{CC}
           AND (delivery_completed IS NULL OR delivery_completed = '')
     """)
-    _upsert(conn, "utilization", "OPEX_PENDING_VALUE", "OPEX Pending Delivery", u10, None, "INR")
+    _upsert(conn, "utilization", "OPEX_PENDING_VALUE", "OPEX Pending Delivery", u10, None, "INR", company_code=company_code)
 
     # U11 — CAPEX by Category (top material groups — JSON)
     try:
@@ -1498,7 +1824,7 @@ def _utilization(conn, FY, MTD):
                    SUM(CAST(net_order_value AS REAL)) AS v,
                    COUNT(DISTINCT purchasing_document) AS po_count
             FROM po_dump
-            WHERE {NOT_DELETED} AND {CAPEX_FLAG}
+            WHERE {NOT_DELETED} AND {CAPEX_FLAG}{CC}
             GROUP BY material_group ORDER BY v DESC LIMIT 6
         """).fetchall()
         capex_cats = [{"mg": r[0],
@@ -1506,7 +1832,7 @@ def _utilization(conn, FY, MTD):
                        "value": round(r[1], 2),
                        "po_count": int(r[2])} for r in rows]
         _upsert(conn, "utilization", "CAPEX_BY_CATEGORY",
-                "CAPEX by Category", None, json.dumps(capex_cats), "json")
+                "CAPEX by Category", None, json.dumps(capex_cats), "json", company_code=company_code)
     except Exception:
         pass
 
@@ -1517,7 +1843,7 @@ def _utilization(conn, FY, MTD):
                    SUM(CAST(net_order_value AS REAL)) AS v,
                    COUNT(DISTINCT purchasing_document) AS po_count
             FROM po_dump
-            WHERE {NOT_DELETED} AND {OPEX_FLAG}
+            WHERE {NOT_DELETED} AND {OPEX_FLAG}{CC}
             GROUP BY material_group ORDER BY v DESC LIMIT 6
         """).fetchall()
         opex_cats = [{"mg": r[0],
@@ -1525,7 +1851,7 @@ def _utilization(conn, FY, MTD):
                       "value": round(r[1], 2),
                       "po_count": int(r[2])} for r in rows]
         _upsert(conn, "utilization", "OPEX_BY_CATEGORY",
-                "OPEX by Category", None, json.dumps(opex_cats), "json")
+                "OPEX by Category", None, json.dumps(opex_cats), "json", company_code=company_code)
     except Exception:
         pass
 
@@ -1536,7 +1862,7 @@ def _utilization(conn, FY, MTD):
                    SUM(CASE WHEN {CAPEX_FLAG} THEN CAST(net_order_value AS REAL) ELSE 0 END) AS capex,
                    SUM(CASE WHEN {OPEX_FLAG}  THEN CAST(net_order_value AS REAL) ELSE 0 END) AS opex
             FROM po_dump
-            WHERE {NOT_DELETED}
+            WHERE {NOT_DELETED}{CC}
             GROUP BY plant ORDER BY (capex + opex) DESC
         """).fetchall()
         by_plant = [{"plant": r[0],
@@ -1544,9 +1870,16 @@ def _utilization(conn, FY, MTD):
                      "opex": round(r[2], 2),
                      "total": round(r[1] + r[2], 2)} for r in rows]
         _upsert(conn, "utilization", "CAPEX_OPEX_BY_PLANT",
-                "CAPEX/OPEX by Plant", None, json.dumps(by_plant), "json")
+                "CAPEX/OPEX by Plant", None, json.dumps(by_plant), "json", company_code=company_code)
     except Exception:
         pass
+
+    # Auto-categorize uncategorised POs (always global — no company filter needed)
+    if company_code == "ALL":
+        _auto_categorize(conn)
+
+    _utilization_software(conn, FY, company_code=company_code)
+    _utilization_materials(conn, FY, company_code=company_code)
 
 
 # ── CHART DATA ────────────────────────────────────────────────────────────────
@@ -1840,6 +2173,12 @@ def compute_all(conn: Any) -> None:
     for (cc,) in _cc_rows_vendor:
         _vendor(conn, FY, MTD, cc_cfg=cc, company_code=cc)
 
-    _utilization(conn, FY, MTD)
+    _cc_rows_util = conn.execute(
+        "SELECT DISTINCT company_code FROM po_dump "
+        "WHERE company_code IS NOT NULL AND company_code != ''"
+    ).fetchall()
+    for (cc,) in _cc_rows_util:
+        _utilization(conn, FY, MTD, company_code=cc)
+    _utilization(conn, FY, MTD, company_code="ALL")
 
     conn.commit()

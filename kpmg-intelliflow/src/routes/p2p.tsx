@@ -17,7 +17,6 @@ import { StatusPill }  from "@/components/StatusPill";
 import { apiFetch }    from "@/api/client";
 import { brand }       from "@/lib/brand";
 import { formatINR, formatDateShort } from "@/lib/format";
-import { useAnomalies } from "@/hooks/useP2P";
 
 export const Route = createFileRoute("/p2p")({
   head: () => ({ meta: [{ title: "P2P Lifecycle — KPMG IntelliSource" }] }),
@@ -139,12 +138,6 @@ const RAG_STYLES = {
   grey:  { bg: "bg-secondary",  border: "border-border",     text: "text-muted-foreground", dot: "#999" },
 };
 
-const ANOMALY_SEVERITY_COLOR: Record<string, string> = {
-  HIGH:   brand.colors.danger,
-  MEDIUM: brand.colors.warning,
-  LOW:    brand.colors.accent,
-};
-
 // ── Main Page ──────────────────────────────────────────────────────────────
 
 function P2PTracker() {
@@ -229,9 +222,8 @@ function P2PTracker() {
       )}
 
       {/* Bottom Charts */}
-      <div className="grid grid-cols-2 gap-4 mt-4">
+      <div className="mt-4">
         <MonthlyFunnel data={summary?.monthly_funnel ?? []} loading={loadingStages} />
-        <AnomalyPanel />
       </div>
 
       <div className="mt-4">
@@ -724,46 +716,6 @@ function MonthlyFunnel({ data, loading }: {
               <Line type="monotone" dataKey="grn"     name="GRN Posted"  stroke={brand.colors.teal}    strokeWidth={2} dot={{ r: 2 }} />
               <Line type="monotone" dataKey="invoice" name="Invoice"      stroke={brand.colors.accent}  strokeWidth={2} dot={{ r: 2 }} />
             </LineChart>
-          </ResponsiveContainer>
-        )}
-      </div>
-    </SectionCard>
-  );
-}
-
-// ── Anomaly Panel ──────────────────────────────────────────────────────────
-
-function AnomalyPanel() {
-  const { data: anomalies, isLoading } = useAnomalies();
-
-  return (
-    <SectionCard title="Anomaly Detection" subtitle="Flagged cases by type and severity">
-      <div className="h-56">
-        {isLoading ? (
-          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Loading…</div>
-        ) : !anomalies?.length ? (
-          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">No anomalies detected</div>
-        ) : (
-          <ResponsiveContainer>
-            <BarChart
-              data={anomalies.slice(0, 8).map(a => ({
-                code: a.anomaly_code.replace(/_/g, " "),
-                count: a.count,
-                severity: a.severity,
-              }))}
-              layout="vertical"
-              margin={{ top: 4, right: 40, left: 130, bottom: 4 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#eee" horizontal={false} />
-              <XAxis type="number" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
-              <YAxis type="category" dataKey="code" tickLine={false} axisLine={false} width={130} tick={{ fontSize: 9 }} />
-              <Tooltip formatter={(v: number, _n, p) => [`${v} cases`, p.payload.severity]} />
-              <Bar dataKey="count" radius={[0, 3, 3, 0]}>
-                {anomalies.slice(0, 8).map((a, i) => (
-                  <Cell key={i} fill={ANOMALY_SEVERITY_COLOR[a.severity] ?? "#999"} />
-                ))}
-              </Bar>
-            </BarChart>
           </ResponsiveContainer>
         )}
       </div>

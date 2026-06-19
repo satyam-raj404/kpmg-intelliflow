@@ -15,7 +15,6 @@ ANOMALY_CODES = {
     "LATE_DELIVERY":        ("MEDIUM", "GRN posting date exceeds expected delivery date"),
     "THREE_WAY_MISMATCH":   ("HIGH",   "GRN quantity differs from invoice quantity > 5%"),
     "DUPLICATE_INVOICE":    ("HIGH",   "Same vendor+amount+date appears > 1 time"),
-    "BACKDATED_PO":         ("MEDIUM", "PO document date < PR release date"),
     "PAYMENT_BEFORE_GRN":   ("HIGH",   "Payment posting date before GRN posting date"),
     "LONG_APPROVAL":        ("LOW",    "PR approval time > 7 days"),
     "PRICE_DEVIATION":      ("MEDIUM", "PO net price deviates > 10% from PR valuation price"),
@@ -214,9 +213,6 @@ def generate_events(conn: Any) -> None:
                     flags.append("DUPLICATE_INVOICE")
             except Exception:
                 pass
-
-        if pr_rel_date and po_doc_date and po_doc_date < pr_rel_date:
-            flags.append("BACKDATED_PO")
 
         if po in payment_before_grn_pos:
             flags.append("PAYMENT_BEFORE_GRN")

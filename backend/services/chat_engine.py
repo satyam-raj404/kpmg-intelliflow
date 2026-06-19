@@ -35,7 +35,7 @@ TABLES:
 - pr_po_grn_invoice: P2P FACT TABLE (purchase_requisition, purchasing_document, vendor, vendor_name, company_code, po_net_value[REAL], grn_amount, invoice_amount, pr_to_po_days, po_to_grn_days, grn_to_invoice_days, invoice_to_payment_days, total_cycle_days, grn_posting_date, invoice_posting_date, is_maverick, capex_opex_flag)
   Use for cycle time analysis. ROUND requires ::numeric cast e.g. ROUND(AVG(pr_to_po_days::numeric),1)
 - process_mining_events: Anomalies (purchasing_document, anomaly_flags[comma-sep], anomaly_count, variant_class)
-  Flags: SPLIT_PO, RETRO_PO, NO_GRN, PRICE_VARIANCE, MAVERICK_BUY, DELETED_AFTER_GRN, BACKDATED_PO
+  Flags: SPLIT_PO, RETRO_PO, NO_GRN, PRICE_VARIANCE, MAVERICK_BUY, DELETED_AFTER_GRN
 - kpi_results: Pre-computed KPIs (kpi_code, kpi_name, value_numeric, value_text, unit, dashboard, company_code)
   Dashboards: procurement, financial, leadership, vendor, utilization. Companies: 1001, 1002, 1003, ALL
 
