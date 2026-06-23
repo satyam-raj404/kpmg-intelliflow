@@ -25,12 +25,21 @@ SYSTEM_PROMPT = """You are IntelliSource AI — KPMG P2P procurement analytics a
 RULES: Always call a tool before answering data questions. Never invent numbers. Format INR values ≥1Cr as ₹X.XX Cr. Use at most 3 tool calls per response, then synthesize your final answer from the results you have.
 
 TABLES:
-- po_dump: POs (purchasing_document, vendor, vendor_name, net_order_value[TEXT], document_date, company_code, deletion_indicator, delivery_completed, capex_opex_flag, material_description)
+- po_dump: POs (purchasing_document, item, vendor, vendor_name, net_order_value[TEXT], document_date, company_code, plant, material_group, deletion_indicator, delivery_completed, release_indicator, capex_opex_flag, material_description)
   Active POs: deletion_indicator NOT IN ('L','X'). Cast value: CAST(COALESCE(NULLIF(net_order_value,''),'0') AS REAL)
-- pr_dump: PRs (purchase_requisition, material_description, order_quantity, release_status, release_date, created_on, company_code, deletion_indicator)
+- pr_dump: PRs (purchase_requisition, item_of_requisition, material_description, order_quantity, unit_of_measure, release_status, release_date, created_on, company_code, deletion_indicator)
 - grn_dump: GRNs (mat_doc, purchasing_document, quantity, posting_date)
-- po_invoice_dump: Invoices (invoice_doc, purchasing_document, amount_local_ccy[TEXT], invoice_date)
-- payment_dump: Payments (payment_doc, vendor, amount[TEXT], payment_date, purchasing_document)
+- po_invoice_dump: Invoices (invoice_doc, purchasing_document, item, invoice_year, amount_local_ccy[TEXT], posting_date, entry_date, reference_doc)
+  NOTE: date column is posting_date (NOT invoice_date). Join to payment via: po_invoice_dump.invoice_doc = payment_dump.cleared_invoice
+- payment_dump: Payments (payment_doc, payment_year, vendor, company_code, amount_local_ccy[TEXT], posting_date, clearing_date, cleared_invoice, payment_method, currency_key)
+  NOTE: date column is posting_date (NOT payment_date). NO purchasing_document column — join to invoices via: payment_dump.cleared_invoice = po_invoice_dump.invoice_doc
+  Overdue payments query pattern:
+    SELECT inv.purchasing_document, inv.invoice_doc, inv.amount_local_ccy, inv.posting_date as invoice_date,
+           pay.posting_date as payment_date,
+           (CURRENT_DATE - inv.posting_date::date) as days_since_invoice
+    FROM po_invoice_dump inv
+    LEFT JOIN payment_dump pay ON pay.cleared_invoice = inv.invoice_doc
+    WHERE pay.payment_doc IS NULL AND (CURRENT_DATE - inv.posting_date::date) > 30
 - vendor_master: Vendors (vendor, name1, posting_block_cc, msme_flag)
 - pr_po_grn_invoice: P2P FACT TABLE (purchase_requisition, purchasing_document, vendor, vendor_name, company_code, po_net_value[REAL], grn_amount, invoice_amount, pr_to_po_days, po_to_grn_days, grn_to_invoice_days, invoice_to_payment_days, total_cycle_days, grn_posting_date, invoice_posting_date, is_maverick, capex_opex_flag)
   Use for cycle time analysis. ROUND requires ::numeric cast e.g. ROUND(AVG(pr_to_po_days::numeric),1)
