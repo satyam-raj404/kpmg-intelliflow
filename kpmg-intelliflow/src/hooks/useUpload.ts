@@ -21,7 +21,8 @@ export function useUpload() {
   // SSE progress listener
   useEffect(() => {
     if (!batchId) return;
-    const es = new EventSource("/api/stream");
+    const base = import.meta.env.VITE_API_BASE_URL ?? "";
+    const es = new EventSource(`${base}/api/stream`);
     esRef.current = es;
     es.addEventListener("message", (e) => {
       try {
