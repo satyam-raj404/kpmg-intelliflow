@@ -20,6 +20,9 @@ import {
   LogOut,
   RefreshCw,
   Sparkles,
+  Bell,
+  ChevronDown,
+  Building2,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
@@ -43,6 +46,7 @@ const dashboards: NavItem[] = [
   { label: "Leadership", to: "/leadership", icon: Crown },
   { label: "Vendor Performance", to: "/vendors", icon: Users },
   { label: "Utilization", to: "/utilization", icon: Activity },
+  { label: "Profit Centers", to: "/profit-center", icon: Building2 },
 ];
 
 const operations: NavItem[] = [
@@ -143,19 +147,49 @@ function SidebarAlerts() {
       {/* Clickable header — toggles expand */}
       <button
         onClick={() => setExpanded(v => !v)}
-        className="w-full px-3 py-1.5 bg-sidebar-accent/30 border-b border-sidebar-border/40 flex items-center justify-between hover:bg-sidebar-accent/50 transition-colors"
+        className={cn(
+          "w-full px-3 py-2 border-b border-sidebar-border/40 flex items-center justify-between transition-all duration-200",
+          highCount > 0
+            ? "bg-danger/12 hover:bg-danger/20"
+            : medCount > 0
+              ? "bg-warning/10 hover:bg-warning/18"
+              : "bg-sidebar-accent/40 hover:bg-sidebar-accent/60",
+        )}
       >
-        <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-sidebar-foreground/40">Alert Center</span>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          <div className="relative shrink-0">
+            <Bell className={cn(
+              "h-3.5 w-3.5",
+              highCount > 0 ? "text-danger" : medCount > 0 ? "text-warning" : "text-sidebar-foreground/50",
+            )} />
+            {totalAlerts > 0 && (
+              <span className={cn(
+                "absolute -top-1 -right-1 h-2 w-2 rounded-full border border-sidebar",
+                highCount > 0 ? "bg-danger animate-pulse" : "bg-warning",
+              )} />
+            )}
+          </div>
+          <span className={cn(
+            "text-[11px] font-semibold uppercase tracking-[0.1em]",
+            highCount > 0 ? "text-danger" : medCount > 0 ? "text-warning" : "text-sidebar-foreground/70",
+          )}>
+            Alert Center
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
           {totalAlerts > 0 && (
-            <span className={`text-[8px] px-1 py-0.5 rounded font-bold ${
+            <span className={cn(
+              "text-[10px] px-1.5 py-0.5 rounded-full font-bold min-w-[18px] text-center leading-none",
               highCount > 0 ? "bg-danger/20 text-danger" :
-              medCount > 0  ? "bg-warning/20 text-warning" : "bg-accent/20 text-accent"
-            }`}>
+              medCount > 0  ? "bg-warning/20 text-warning" : "bg-accent/20 text-accent",
+            )}>
               {totalAlerts}
             </span>
           )}
-          <span className="text-[8px] text-sidebar-foreground/30">{expanded ? "▲" : "▼"}</span>
+          <ChevronDown className={cn(
+            "h-3.5 w-3.5 text-sidebar-foreground/40 transition-transform duration-200",
+            expanded && "rotate-180",
+          )} />
         </div>
       </button>
 
@@ -280,13 +314,13 @@ export function Sidebar() {
 
   return (
     <aside className="w-56 shrink-0 bg-sidebar text-sidebar-foreground flex flex-col h-screen sticky top-0">
-      <div className="h-16 px-4 flex items-center gap-2.5 border-b border-sidebar-border">
+      <Link to="/login" className="h-16 px-4 flex items-center gap-2.5 border-b border-sidebar-border hover:bg-sidebar-accent/10 transition-colors">
         <Logo variant="white" size={20} />
         <div className="min-w-0">
           <div className="text-[13px] font-semibold text-sidebar-foreground tracking-tight font-heading leading-tight">IntelliSource</div>
           <div className="text-[9px] text-sidebar-foreground/45 tracking-wide leading-tight">Procurement Optimization</div>
         </div>
-      </div>
+      </Link>
 
       <div className="flex-1 overflow-y-auto py-4">
         <Section title="Dashboards" items={dashboards} />

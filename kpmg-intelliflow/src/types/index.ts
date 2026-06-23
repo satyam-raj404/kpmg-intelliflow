@@ -6,7 +6,13 @@ export type Role =
   | "Finance User"
   | "Compliance Officer"
   | "CXO"
-  | "Admin";
+  | "Admin"
+  | "Leadership"
+  | "Partner"
+  | "Consultant"
+  | "Manager"
+  | "Director"
+  | "Associate Director";
 
 export type RiskTier = "Low" | "Medium" | "High";
 export type ComplianceStatus = "Compliant" | "Under Review" | "Non-Compliant";

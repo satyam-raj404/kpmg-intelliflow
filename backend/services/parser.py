@@ -4,6 +4,7 @@ import re
 from typing import Tuple
 
 import pandas as pd
+from dateutil import parser as _dateparser
 
 # Minimum signature columns required per dataset to auto-detect type
 DATASET_SIGNATURES: dict[str, list[str]] = {
@@ -159,17 +160,27 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _parse_date_str(val: str) -> str | None:
+    """Parse a single date string to YYYY-MM-DD, return None on failure."""
+    if not val or val in ("nan", "NaN", "NULL", "None", ""):
+        return None
+    v = str(val).strip()
+    try:
+        # YYYYMMDD compact
+        clean = v.replace("-", "")
+        if clean.isdigit() and len(clean) == 8:
+            return f"{clean[:4]}-{clean[4:6]}-{clean[6:8]}"
+        return _dateparser.parse(v, dayfirst=False).strftime("%Y-%m-%d")
+    except Exception:
+        return None
+
+
 def _normalize_dates(df: pd.DataFrame) -> pd.DataFrame:
     date_pat = re.compile(r"(date|_on$|_at$)")
     for col in df.columns:
         if date_pat.search(col) and df[col].dtype == object:
             try:
-                sample = df[col].dropna().iloc[0] if not df[col].dropna().empty else ""
-                # Handle YYYYMMDD compact format
-                if str(sample).replace("-", "").isdigit() and len(str(sample).replace("-", "")) == 8:
-                    df[col] = pd.to_datetime(df[col], format="%Y%m%d", errors="coerce").dt.strftime("%Y-%m-%d")
-                else:
-                    df[col] = pd.to_datetime(df[col], errors="coerce").dt.strftime("%Y-%m-%d")
+                df[col] = df[col].map(_parse_date_str)
             except Exception:
                 pass
     return df
@@ -179,16 +190,23 @@ def _compute_due_date(df: pd.DataFrame) -> pd.DataFrame:
     """If baseline_date and days_1 are present, (re)calculate due_date."""
     if "baseline_date" in df.columns and "days_1" in df.columns:
         try:
-            bd = pd.to_datetime(df["baseline_date"], errors="coerce")
-            days = pd.to_numeric(df["days_1"], errors="coerce").fillna(30).astype(int)
-            computed = bd + pd.to_timedelta(days, unit="D")
-            # Only fill missing/null due_dates — don't overwrite SAP-provided values
-            if "due_date" not in df.columns or df["due_date"].isna().any():
-                if "due_date" not in df.columns:
-                    df["due_date"] = computed.dt.strftime("%Y-%m-%d")
-                else:
-                    mask = df["due_date"].isna() | (df["due_date"].astype(str).str.strip() == "")
-                    df.loc[mask, "due_date"] = computed[mask].dt.strftime("%Y-%m-%d")
+            from datetime import timedelta
+            def _add_days(row):
+                bd = row["baseline_date"]
+                if not bd:
+                    return None
+                try:
+                    days = int(float(row["days_1"])) if row.get("days_1") else 30
+                    base = _dateparser.parse(str(bd))
+                    return (base + timedelta(days=days)).strftime("%Y-%m-%d")
+                except Exception:
+                    return None
+
+            if "due_date" not in df.columns or df["due_date"].isna().all():
+                df["due_date"] = df.apply(_add_days, axis=1)
+            else:
+                mask = df["due_date"].isna() | (df["due_date"].astype(str).str.strip() == "")
+                df.loc[mask, "due_date"] = df[mask].apply(_add_days, axis=1)
         except Exception:
             pass
     return df

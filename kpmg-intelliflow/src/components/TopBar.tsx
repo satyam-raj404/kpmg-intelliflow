@@ -1,7 +1,7 @@
 import { Search, ChevronDown, LogOut, User as UserIcon, Sun, Moon, Contrast, ALargeSmall } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "@tanstack/react-router";
-import { useApp, ROLES, roleInitials } from "@/context/AppContext";
+import { useApp, ROLES, roleInitials, DEFAULT_PROFILE } from "@/context/AppContext";
 import { useTheme, type FontSize } from "@/hooks/useTheme";
 import {
   DropdownMenu,
@@ -30,7 +30,7 @@ function fireLogout(user: { name: string; email: string }, role: string) {
 }
 
 export function TopBar() {
-  const { role, setRole, period, setPeriod, user } = useApp();
+  const { role, setRole, period, setPeriod, user, setUser } = useApp();
   const navigate = useNavigate();
   const { theme, toggle, fontSize, setFontSize, contrast, toggleContrast } = useTheme();
 
@@ -160,7 +160,15 @@ export function TopBar() {
           <DropdownMenuItem onClick={() => navigate({ to: "/profile" })}>
             <UserIcon className="h-3.5 w-3.5 mr-2" /> Profile
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => { fireLogout(user, role); navigate({ to: "/dashboard" }); }}>
+          <DropdownMenuItem
+            onClick={() => {
+              fireLogout(user, role);
+              setUser(DEFAULT_PROFILE);
+              setRole("Procurement Manager");
+              localStorage.removeItem("intellisource_user_profile");
+              navigate({ to: "/login" });
+            }}
+          >
             <LogOut className="h-3.5 w-3.5 mr-2" /> Sign out
           </DropdownMenuItem>
         </DropdownMenuContent>

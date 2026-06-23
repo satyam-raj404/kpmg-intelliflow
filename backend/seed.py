@@ -90,9 +90,15 @@ LICENSE_TOOLS = [
 
 for tool, total, active, annual, renewal, mg in LICENSE_TOOLS:
     conn.execute("""
-        INSERT OR REPLACE INTO license_usage
+        INSERT INTO license_usage
             (tool_name, total_licenses, active_users, annual_cost_inr, renewal_date, material_group)
         VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT (tool_name) DO UPDATE SET
+            total_licenses  = EXCLUDED.total_licenses,
+            active_users    = EXCLUDED.active_users,
+            annual_cost_inr = EXCLUDED.annual_cost_inr,
+            renewal_date    = EXCLUDED.renewal_date,
+            material_group  = EXCLUDED.material_group
     """, (tool, total, active, annual, renewal, mg))
 print("[seed] License usage data seeded.")
 

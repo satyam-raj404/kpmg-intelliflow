@@ -32,7 +32,7 @@ interface AppContextValue {
   clearHistory: () => void;
 }
 
-const DEFAULT_PROFILE: UserProfile = {
+export const DEFAULT_PROFILE: UserProfile = {
   name: "Demo User",
   email: "demo@kpmg.com",
   jobTitle: "Procurement Analyst",
@@ -141,6 +141,12 @@ export const ROLES: Role[] = [
   "Compliance Officer",
   "CXO",
   "Admin",
+  "Leadership",
+  "Partner",
+  "Consultant",
+  "Manager",
+  "Director",
+  "Associate Director",
 ];
 
 export const DEMO_PERSONAS: Record<Role, UserProfile> = {
@@ -191,6 +197,54 @@ export const DEMO_PERSONAS: Record<Role, UserProfile> = {
     department: "IT",
     phone: "+91 80000 12345",
     avatarColor: "#6366f1",
+  },
+  "Leadership": {
+    name: "Sunita Rao",
+    email: "sunita.rao@kpmg.com",
+    jobTitle: "Leadership",
+    department: "Executive",
+    phone: "+91 77000 11111",
+    avatarColor: "#00338D",
+  },
+  "Partner": {
+    name: "Deepak Kapoor",
+    email: "deepak.kapoor@kpmg.com",
+    jobTitle: "Partner",
+    department: "Advisory",
+    phone: "+91 99001 22333",
+    avatarColor: "#009FDA",
+  },
+  "Consultant": {
+    name: "Meena Iyer",
+    email: "meena.iyer@kpmg.com",
+    jobTitle: "Consultant",
+    department: "Advisory",
+    phone: "+91 88001 44555",
+    avatarColor: "#00A3A1",
+  },
+  "Manager": {
+    name: "Rohan Das",
+    email: "rohan.das@kpmg.com",
+    jobTitle: "Manager",
+    department: "Operations",
+    phone: "+91 77002 55666",
+    avatarColor: "#470A68",
+  },
+  "Director": {
+    name: "Kavitha Pillai",
+    email: "kavitha.pillai@kpmg.com",
+    jobTitle: "Director",
+    department: "Strategy",
+    phone: "+91 66003 77888",
+    avatarColor: "#009A44",
+  },
+  "Associate Director": {
+    name: "Sanjay Bhat",
+    email: "sanjay.bhat@kpmg.com",
+    jobTitle: "Associate Director",
+    department: "Finance",
+    phone: "+91 55004 99000",
+    avatarColor: "#F5A623",
   },
 };
 

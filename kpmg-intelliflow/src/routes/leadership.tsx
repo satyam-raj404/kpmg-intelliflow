@@ -15,10 +15,13 @@ import {
   Line,
 } from "recharts";
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Settings2, CheckCircle } from "lucide-react";
+import { Settings2, CheckCircle, FileCheck2, Package, PackageCheck, FileText, Banknote, AlertTriangle, Store, FileX2, Copy, ShieldAlert, type LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
+import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { KpiCard } from "@/components/KpiCard";
 import { SectionCard } from "@/components/SectionCard";
 import { StatusPill } from "@/components/StatusPill";
@@ -669,6 +672,149 @@ function InvoiceVsPayment() {
 
 // ── Summary Counts Panel ───────────────────────────────────────────────────
 
+type SummaryTone = "success" | "info" | "warning" | "danger";
+
+interface CountItem {
+  label: string;
+  key: string;
+  tone: SummaryTone;
+  Icon: LucideIcon;
+}
+
+const TILE_PALETTE: Record<SummaryTone, {
+  bg: string;
+  borderL: string;
+  iconCls: string;
+  alertValCls: string;
+}> = {
+  success: { bg: "bg-success/6",  borderL: "border-l-success",  iconCls: "text-success", alertValCls: "text-success" },
+  info:    { bg: "bg-accent/6",   borderL: "border-l-accent",   iconCls: "text-accent",  alertValCls: "text-accent" },
+  warning: { bg: "bg-warning/6",  borderL: "border-l-warning",  iconCls: "text-warning", alertValCls: "text-[#A56500]" },
+  danger:  { bg: "bg-danger/6",   borderL: "border-l-danger",   iconCls: "text-danger",  alertValCls: "text-danger" },
+};
+
+const HEALTH_ITEMS: CountItem[] = [
+  { label: "Approved PRs",    key: "approved_pr",    tone: "success", Icon: FileCheck2 },
+  { label: "Approved POs",    key: "approved_po",    tone: "success", Icon: Package },
+  { label: "GRN Lines",       key: "grn_lines",      tone: "info",    Icon: PackageCheck },
+  { label: "Invoice Lines",   key: "invoice_lines",  tone: "info",    Icon: FileText },
+  { label: "Payments",        key: "payments",       tone: "success", Icon: Banknote },
+];
+
+const RISK_ITEMS: CountItem[] = [
+  { label: "POs Without PR",       key: "po_without_pr",      tone: "danger",  Icon: AlertTriangle },
+  { label: "One-Time Vendors",     key: "one_time_vendors",   tone: "warning", Icon: Store },
+  { label: "POs Without Contract", key: "po_no_contract",     tone: "warning", Icon: FileX2 },
+  { label: "Duplicate Invoices",   key: "duplicate_invoices", tone: "danger",  Icon: Copy },
+  { label: "SOD Conflicts",        key: "sod_conflicts",      tone: "danger",  Icon: ShieldAlert },
+];
+
+interface SummaryDetail {
+  key: string;
+  columns: string[];
+  rows: string[][];
+  count: number;
+}
+
+function CountTile({ item, counts, delay, company }: {
+  item: CountItem;
+  counts: Record<string, number>;
+  delay: number;
+  company: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const { data: detail, isLoading: detailLoading } = useQuery({
+    queryKey: ["summary-detail", item.key, company],
+    queryFn: () => apiFetch<SummaryDetail>(`/summary-detail/${item.key}?company_code=${company}`),
+    enabled: open,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const val = counts[item.key];
+  const palette = TILE_PALETTE[item.tone];
+  const isRisk = item.tone === "danger" || item.tone === "warning";
+  const hasAlert = isRisk && val != null && val > 0;
+  const { Icon } = item;
+
+  return (
+    <HoverCard open={open} onOpenChange={setOpen} openDelay={400} closeDelay={150}>
+      <HoverCardTrigger asChild>
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay }}
+          className={cn(
+            "rounded-lg p-3 border border-border/40 border-l-2 flex flex-col gap-1 transition-colors cursor-default",
+            palette.bg,
+            palette.borderL,
+          )}
+        >
+          <div className="flex items-center gap-1.5">
+            <Icon className={cn("h-3 w-3 shrink-0", palette.iconCls)} />
+            <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground truncate">{item.label}</span>
+          </div>
+          <div className={cn(
+            "text-[24px] font-bold font-tabular leading-none mt-1",
+            hasAlert ? palette.alertValCls : "text-foreground",
+          )}>
+            {val ?? "—"}
+          </div>
+          <div className="mt-0.5 h-[18px] flex items-center">
+            {hasAlert && (
+              <StatusPill tone={item.tone} className="text-[10px] leading-none px-1.5 py-0.5">Review</StatusPill>
+            )}
+          </div>
+        </motion.div>
+      </HoverCardTrigger>
+      <HoverCardContent side="top" align="start" sideOffset={6} className="w-[500px] p-0 overflow-hidden">
+        <div className="px-3 py-2 border-b border-border flex items-center justify-between bg-secondary/30">
+          <div className="flex items-center gap-2">
+            <Icon className={cn("h-3.5 w-3.5", palette.iconCls)} />
+            <span className="text-[13px] font-semibold">{item.label}</span>
+          </div>
+          {detail && (
+            <span className="text-[11px] text-muted-foreground tabular-nums">{detail.count} rows</span>
+          )}
+        </div>
+        <div className="max-h-[260px] overflow-auto">
+          {detailLoading ? (
+            <div className="flex items-center justify-center h-24 text-muted-foreground text-sm">Loading…</div>
+          ) : !detail || detail.rows.length === 0 ? (
+            <div className="flex items-center justify-center h-24 text-muted-foreground text-sm">No data available</div>
+          ) : (
+            <table className="w-full text-[11px] border-separate border-spacing-0">
+              <thead className="sticky top-0">
+                <tr>
+                  {detail.columns.map((col) => (
+                    <th key={col} className="px-2.5 py-1.5 text-left font-semibold text-muted-foreground whitespace-nowrap bg-secondary/60 border-b border-border">
+                      {col}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {detail.rows.map((row, ri) => (
+                  <tr key={ri} className={ri % 2 === 0 ? "bg-background" : "bg-secondary/20"}>
+                    {row.map((cell, ci) => (
+                      <td key={ci} className="px-2.5 py-1 text-foreground font-tabular max-w-[140px] overflow-hidden text-ellipsis whitespace-nowrap">
+                        {cell || "—"}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <div className="px-3 py-1.5 border-t border-border bg-secondary/30">
+          <span className="text-[10px] text-muted-foreground">Showing up to 15 most recent rows</span>
+        </div>
+      </HoverCardContent>
+    </HoverCard>
+  );
+}
+
 function SummaryCountsPanel({ company }: { company: string }) {
   const { data: kpiData, isLoading } = useKpi("leadership", company);
   const countKpi = kpiData?.kpis.find((k) => k.kpi_code === "SUMMARY_COUNTS");
@@ -678,38 +824,49 @@ function SummaryCountsPanel({ company }: { company: string }) {
     try { counts = JSON.parse(countKpi.value_text); } catch {}
   }
 
-  const items = [
-    { label: "Approved PRs",       key: "approved_pr",      tone: "success" as const },
-    { label: "Approved POs",       key: "approved_po",      tone: "success" as const },
-    { label: "GRN Lines",          key: "grn_lines",        tone: "info"    as const },
-    { label: "Invoice Lines",      key: "invoice_lines",    tone: "info"    as const },
-    { label: "Payments",           key: "payments",         tone: "success" as const },
-    { label: "POs Without PR",     key: "po_without_pr",    tone: "danger"  as const },
-    { label: "One-Time Vendors",   key: "one_time_vendors",  tone: "warning" as const },
-    { label: "POs Without Contract", key: "po_no_contract",  tone: "warning" as const },
-    { label: "Duplicate Invoices", key: "duplicate_invoices", tone: "danger" as const },
-    { label: "SOD Conflicts",      key: "sod_conflicts",     tone: "danger" as const },
-  ];
+  const alertCount = RISK_ITEMS.filter(item => (counts[item.key] ?? 0) > 0).length;
 
   return (
-    <SectionCard title="P2P Summary Counts" subtitle="Current data snapshot">
+    <SectionCard
+      title="P2P Summary Counts"
+      subtitle="Current data snapshot"
+      actions={
+        alertCount > 0 ? (
+          <span className="flex items-center gap-1 text-[11px] font-medium text-danger bg-danger/8 px-2 py-0.5 rounded-full">
+            <AlertTriangle className="h-3 w-3" />
+            {alertCount} flagged
+          </span>
+        ) : undefined
+      }
+    >
       {isLoading ? (
         <div className="h-40 flex items-center justify-center text-muted-foreground text-sm">Loading…</div>
       ) : Object.keys(counts).length === 0 ? (
         <div className="h-40 flex items-center justify-center text-muted-foreground text-sm">Upload P2P data to view counts</div>
       ) : (
-        <div className="grid grid-cols-4 gap-3 mt-1">
-          {items.map((item) => (
-            <div key={item.key} className="bg-secondary/40 rounded-lg p-3">
-              <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-0.5">{item.label}</div>
-              <div className="text-[22px] font-semibold font-tabular">
-                {counts[item.key] ?? "—"}
-              </div>
-              {item.key === "po_without_pr" && (counts[item.key] ?? 0) > 0 && (
-                <StatusPill tone="danger" className="mt-1">Review</StatusPill>
-              )}
+        <div className="flex flex-col gap-4 mt-1">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/50">Pipeline Health</span>
+              <div className="flex-1 h-px bg-border/50" />
             </div>
-          ))}
+            <div className="grid grid-cols-5 gap-2">
+              {HEALTH_ITEMS.map((item, i) => (
+                <CountTile key={item.key} item={item} counts={counts} delay={i * 0.04} company={company} />
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/50">Risk & Exceptions</span>
+              <div className="flex-1 h-px bg-border/50" />
+            </div>
+            <div className="grid grid-cols-5 gap-2">
+              {RISK_ITEMS.map((item, i) => (
+                <CountTile key={item.key} item={item} counts={counts} delay={0.2 + i * 0.04} company={company} />
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </SectionCard>

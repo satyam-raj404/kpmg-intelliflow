@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Check } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useApp, ROLES } from "@/context/AppContext";
+import { apiFetch } from "@/api/client";
 import type { Role } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -22,10 +23,17 @@ const ROLE_DESCRIPTIONS: Record<Role, string> = {
     "Compliance Center, ABAC checks, breach history, audit trail and rule library.",
   CXO: "Leadership dashboard with portfolio-level KPIs, strategic risk and cost savings.",
   Admin: "Full administrative access — user management, audit logs and platform settings.",
+  Leadership: "Executive-level P2P summary, pipeline health, risk indicators and cost savings.",
+  Partner: "Advisory partner view — portfolio summary, delivery KPIs and compliance status.",
+  Consultant: "Consultant workspace — assigned project dashboards and vendor performance.",
+  Manager: "Operational manager view — team utilization, PO status and approval queues.",
+  Director: "Director-level overview — strategic metrics, risk posture and budget tracking.",
+  "Associate Director":
+    "Associate Director view — cross-project KPIs, vendor analysis and pipeline health.",
 };
 
 function Signup() {
-  const { setRole } = useApp();
+  const { setRole, setUser } = useApp();
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -33,8 +41,9 @@ function Signup() {
   const [confirm, setConfirm] = useState("");
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     if (!name || !email || !password) {
@@ -53,8 +62,31 @@ function Signup() {
       setError("Please select a role to determine your access level.");
       return;
     }
-    setRole(selectedRole);
-    navigate({ to: "/dashboard" });
+    setLoading(true);
+    try {
+      const data = await apiFetch<{ user_id: string; email: string; full_name: string; role: string }>(
+        "/auth/register",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, full_name: name, role: selectedRole, password }),
+        },
+      );
+      setUser({
+        name: data.full_name,
+        email: data.email,
+        jobTitle: data.role,
+        department: "",
+        phone: "",
+        avatarColor: "#00338D",
+      });
+      setRole(data.role as Role);
+      navigate({ to: "/dashboard" });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Registration failed");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -200,9 +232,10 @@ function Signup() {
 
             <button
               type="submit"
-              className="w-full h-10 rounded bg-primary text-primary-foreground font-semibold hover:bg-primary-dark"
+              disabled={loading}
+              className="w-full h-10 rounded bg-primary text-primary-foreground font-semibold hover:bg-primary-dark disabled:opacity-60"
             >
-              Create account
+              {loading ? "Creating account…" : "Create account"}
             </button>
           </form>
 

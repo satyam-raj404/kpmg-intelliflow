@@ -14,6 +14,7 @@ import { Route as VendorRepoRouteImport } from './routes/vendor-repo'
 import { Route as UtilizationRouteImport } from './routes/utilization'
 import { Route as UploadRouteImport } from './routes/upload'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as ProfitCenterRouteImport } from './routes/profit-center'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as P2pRouteImport } from './routes/p2p'
 import { Route as LoginRouteImport } from './routes/login'
@@ -51,6 +52,11 @@ const UploadRoute = UploadRouteImport.update({
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfitCenterRoute = ProfitCenterRouteImport.update({
+  id: '/profit-center',
+  path: '/profit-center',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfileRoute = ProfileRouteImport.update({
@@ -130,6 +136,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/p2p': typeof P2pRoute
   '/profile': typeof ProfileRoute
+  '/profit-center': typeof ProfitCenterRoute
   '/signup': typeof SignupRoute
   '/upload': typeof UploadRoute
   '/utilization': typeof UtilizationRoute
@@ -150,6 +157,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/p2p': typeof P2pRoute
   '/profile': typeof ProfileRoute
+  '/profit-center': typeof ProfitCenterRoute
   '/signup': typeof SignupRoute
   '/upload': typeof UploadRoute
   '/utilization': typeof UtilizationRoute
@@ -171,6 +179,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/p2p': typeof P2pRoute
   '/profile': typeof ProfileRoute
+  '/profit-center': typeof ProfitCenterRoute
   '/signup': typeof SignupRoute
   '/upload': typeof UploadRoute
   '/utilization': typeof UtilizationRoute
@@ -193,6 +202,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/p2p'
     | '/profile'
+    | '/profit-center'
     | '/signup'
     | '/upload'
     | '/utilization'
@@ -213,6 +223,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/p2p'
     | '/profile'
+    | '/profit-center'
     | '/signup'
     | '/upload'
     | '/utilization'
@@ -233,6 +244,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/p2p'
     | '/profile'
+    | '/profit-center'
     | '/signup'
     | '/upload'
     | '/utilization'
@@ -254,6 +266,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   P2pRoute: typeof P2pRoute
   ProfileRoute: typeof ProfileRoute
+  ProfitCenterRoute: typeof ProfitCenterRoute
   SignupRoute: typeof SignupRoute
   UploadRoute: typeof UploadRoute
   UtilizationRoute: typeof UtilizationRoute
@@ -299,6 +312,13 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profit-center': {
+      id: '/profit-center'
+      path: '/profit-center'
+      fullPath: '/profit-center'
+      preLoaderRoute: typeof ProfitCenterRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profile': {
@@ -406,6 +426,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   P2pRoute: P2pRoute,
   ProfileRoute: ProfileRoute,
+  ProfitCenterRoute: ProfitCenterRoute,
   SignupRoute: SignupRoute,
   UploadRoute: UploadRoute,
   UtilizationRoute: UtilizationRoute,

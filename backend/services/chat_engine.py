@@ -1,4 +1,4 @@
-"""Groq agentic loop — NL question → tool calls → final answer."""
+"""OpenRouter agentic loop — NL question → tool calls → final answer."""
 import json
 import os
 import re
@@ -16,9 +16,9 @@ from services.chat_tools import (
     get_p2p_stage_summary,
 )
 
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
-GROQ_URL    = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL  = "llama-3.3-70b-versatile"
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+OPENROUTER_MODEL = "openai/gpt-4o"
 
 SYSTEM_PROMPT = """You are IntelliSource AI — KPMG P2P procurement analytics assistant with LIVE PostgreSQL database access.
 
@@ -145,11 +145,11 @@ def _execute_tool(name: str, arguments: dict) -> Any:
     return {"error": f"Unknown tool: {name}"}
 
 
-def _groq_call(messages: list, force_tool: bool = False, no_tools: bool = False) -> dict:
+def _openrouter_call(messages: list, force_tool: bool = False, no_tools: bool = False) -> dict:
     body: dict = {
-        "model": GROQ_MODEL,
+        "model": OPENROUTER_MODEL,
         "messages": messages,
-        "max_tokens": 4096,
+        "max_tokens": 2048,
         "temperature": 0.1,
     }
     if not no_tools:
@@ -157,13 +157,13 @@ def _groq_call(messages: list, force_tool: bool = False, no_tools: bool = False)
         body["tool_choice"] = "required" if force_tool else "auto"
     payload = json.dumps(body).encode()
     req = urllib.request.Request(
-        GROQ_URL,
+        OPENROUTER_URL,
         data=payload,
         headers={
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {GROQ_API_KEY}",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "application/json",
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "HTTP-Referer": "https://intellisource.kpmg.com",
+            "X-Title": "IntelliSource P2P",
         },
         method="POST",
     )
@@ -171,44 +171,46 @@ def _groq_call(messages: list, force_tool: bool = False, no_tools: bool = False)
         with urllib.request.urlopen(req, timeout=90) as resp:
             return json.loads(resp.read())
     except urllib.error.HTTPError as e:
-        body = e.read().decode()
-        try:
-            err = json.loads(body)
-            code = err.get("error", {}).get("code", "")
-            if code == "tool_use_failed":
-                raw = err.get("error", {}).get("failed_generation", "")
-                match = re.search(r"<function=(\w+)\s*(\{.*?\})[^<]*</function>", raw, re.DOTALL)
-                if match:
-                    fn_name = match.group(1)
-                    fn_args = json.loads(match.group(2))
-                    fake_id = "recovered_0"
-                    return {
-                        "choices": [{
-                            "finish_reason": "tool_calls",
-                            "message": {
-                                "role": "assistant",
-                                "content": None,
-                                "tool_calls": [{
-                                    "id": fake_id,
-                                    "type": "function",
-                                    "function": {
-                                        "name": fn_name,
-                                        "arguments": json.dumps(fn_args),
-                                    },
-                                }],
-                            },
-                        }]
-                    }
-        except (json.JSONDecodeError, AttributeError):
-            pass
-        try:
-            err = json.loads(body)
-            if err.get("error", {}).get("type") == "tokens" and e.code == 429:
-                time.sleep(15)
-                return _groq_call(messages, force_tool, no_tools)
-        except (json.JSONDecodeError, AttributeError):
-            pass
-        raise RuntimeError(f"Groq API error {e.code}: {body}")
+        err_body = e.read().decode()
+        if e.code == 429:
+            time.sleep(15)
+            return _openrouter_call(messages, force_tool, no_tools)
+        raise RuntimeError(f"OpenRouter API error {e.code}: {err_body}")
+
+
+def _enforce_limit(sql: str, limit: int = 20) -> str:
+    """Inject LIMIT clause if SQL has none, preventing massive result sets."""
+    stripped = sql.strip().rstrip(";")
+    if not re.search(r"\bLIMIT\b", stripped, re.IGNORECASE):
+        stripped += f" LIMIT {limit}"
+    return stripped
+
+
+def _compress_result(result: Any, max_rows: int = 20) -> str:
+    """
+    Compress tool result to stay within context window.
+    - Lists: keep top max_rows, report total omitted.
+    - Dicts: truncate long string values.
+    - Fallback: hard cap at 3000 chars.
+    """
+    if isinstance(result, list):
+        total = len(result)
+        trimmed = result[:max_rows]
+        out = json.dumps(trimmed, default=str)
+        if total > max_rows:
+            out += f"\n[TRUNCATED: showing {max_rows} of {total} rows. Ask for specific filters to see more.]"
+        return out
+    if isinstance(result, dict):
+        compressed: dict = {}
+        for k, v in result.items():
+            if isinstance(v, str) and len(v) > 400:
+                compressed[k] = v[:400] + "…"
+            elif isinstance(v, list) and len(v) > max_rows:
+                compressed[k] = v[:max_rows] + [f"…{len(v) - max_rows} more"]
+            else:
+                compressed[k] = v
+        return json.dumps(compressed, default=str)
+    return json.dumps(result, default=str)[:3000]
 
 
 def run_chat(user_message: str, history: list[dict]) -> dict:
@@ -222,7 +224,7 @@ def run_chat(user_message: str, history: list[dict]) -> dict:
 
     for iteration in range(MAX_ITERATIONS):
         force_synthesize = iteration == MAX_ITERATIONS - 1
-        response = _groq_call(messages, no_tools=force_synthesize)
+        response = _openrouter_call(messages, no_tools=force_synthesize)
         choice = response["choices"][0]
         finish = choice.get("finish_reason", "stop")
         msg = choice["message"]
@@ -235,8 +237,11 @@ def run_chat(user_message: str, history: list[dict]) -> dict:
                 fn_args = json.loads(tc["function"]["arguments"] or "{}")
                 tools_used.append(fn_name)
                 try:
+                    # Enforce LIMIT on raw SQL to prevent huge result sets
+                    if fn_name == "query_database" and "sql" in fn_args:
+                        fn_args["sql"] = _enforce_limit(fn_args["sql"])
                     result = _execute_tool(fn_name, fn_args)
-                    result_str = json.dumps(result, default=str)[:8000]
+                    result_str = _compress_result(result)
                 except Exception as exc:
                     result_str = json.dumps({"error": str(exc)})
                 tool_results.append({

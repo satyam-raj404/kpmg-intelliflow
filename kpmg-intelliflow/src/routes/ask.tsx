@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Bot, User, Loader2, Trash2, Zap, Search, TrendingUp, AlertTriangle, Package } from "lucide-react";
+import { Send, Bot, User, Loader2, Trash2, Zap, Search, TrendingUp, AlertTriangle, Package, Clock, CreditCard, Building2, ShieldAlert, FileCheck, BadgeAlert, Users, BarChart2 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
@@ -21,10 +21,56 @@ interface Message {
 }
 
 const QUICK_PROMPTS = [
-  { icon: TrendingUp, label: "Procurement summary", text: "Give me a summary of this month's procurement activity and key KPIs." },
-  { icon: Search, label: "Top vendors by spend", text: "Which vendors have the highest spend? Show top 10." },
-  { icon: AlertTriangle, label: "Anomalies overview", text: "What are all the procurement anomalies detected and their risk levels?" },
-  { icon: Package, label: "P2P cycle times", text: "What is the average cycle time at each P2P stage (PR → PO → GRN → Invoice → Payment)?" },
+  {
+    icon: TrendingUp,
+    label: "Spend Summary",
+    text: "What is the total procurement spend this month broken down by company code and CAPEX vs OPEX? Show top spending categories.",
+  },
+  {
+    icon: AlertTriangle,
+    label: "Anomaly Risk Report",
+    text: "Give me a full anomaly risk report — split POs, retro POs, price variances, no-GRN cases, and deleted-after-GRN. Include PO numbers.",
+  },
+  {
+    icon: Users,
+    label: "Top Vendors by Spend",
+    text: "Who are the top 10 vendors by spend this year? Show their PO count, total value, and payment status.",
+  },
+  {
+    icon: Package,
+    label: "P2P Cycle Times",
+    text: "What is the average cycle time at each P2P stage: PR to PO, PO to GRN, GRN to Invoice, Invoice to Payment? Which stage has the most delays?",
+  },
+  {
+    icon: Clock,
+    label: "PR to PO Backlog",
+    text: "Show all open purchase requisitions that have not yet been converted to a PO. How many days have they been pending? Which departments have the highest backlog?",
+  },
+  {
+    icon: CreditCard,
+    label: "Overdue Payments",
+    text: "Which vendors have invoices pending payment beyond 30 days? Show the invoice amounts, due dates, and total overdue value by vendor.",
+  },
+  {
+    icon: Building2,
+    label: "Budget vs Actual",
+    text: "Compare actual CAPEX and OPEX spend against the defined budget for each profit center. Flag any profit centers that are over budget.",
+  },
+  {
+    icon: ShieldAlert,
+    label: "Maverick Buying",
+    text: "Show all maverick buying incidents — POs raised without a valid purchase requisition. Which departments and vendors are involved and what is the total value?",
+  },
+  {
+    icon: FileCheck,
+    label: "GRN Pending POs",
+    text: "Show all active POs where goods receipt (GRN) has not yet been posted. How long have these POs been open and what is the total open value?",
+  },
+  {
+    icon: BadgeAlert,
+    label: "MSME Compliance",
+    text: "Which MSME-registered vendors have payment delays beyond 45 days? Are we compliant with MSMED Act payment timelines? Show total overdue amount.",
+  },
 ];
 
 function ToolBadge({ name }: { name: string }) {
@@ -347,25 +393,31 @@ function AskIntelliSource() {
 
           {/* Quick prompts — show only when just the welcome message is present */}
           {messages.length === 1 && (
-            <div className="grid grid-cols-2 gap-2 pt-2">
-              {QUICK_PROMPTS.map((p) => {
-                const Icon = p.icon;
-                return (
-                  <button
-                    key={p.label}
-                    onClick={() => send(p.text)}
-                    className="flex items-start gap-2.5 p-3 rounded-xl border border-border bg-card hover:border-primary/40 hover:bg-primary/5 text-left transition-all group"
-                  >
-                    <div className="h-6 w-6 rounded-md bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
-                      <Icon className="h-3 w-3 text-primary" />
-                    </div>
-                    <div>
-                      <div className="text-[12px] font-medium text-foreground">{p.label}</div>
-                      <div className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">{p.text}</div>
-                    </div>
-                  </button>
-                );
-              })}
+            <div className="pt-2 space-y-2">
+              <p className="text-[10px] text-muted-foreground/50 uppercase tracking-widest font-medium px-1">Top project questions</p>
+              <div className="grid grid-cols-2 gap-2">
+                {QUICK_PROMPTS.map((p, idx) => {
+                  const Icon = p.icon;
+                  return (
+                    <button
+                      key={p.label}
+                      onClick={() => send(p.text)}
+                      className="flex items-start gap-2.5 p-3 rounded-xl border border-border bg-card hover:border-primary/40 hover:bg-primary/5 text-left transition-all group"
+                    >
+                      <div className="h-6 w-6 rounded-md bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors mt-0.5">
+                        <Icon className="h-3 w-3 text-primary" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[9px] text-muted-foreground/40 font-mono">#{idx + 1}</span>
+                          <div className="text-[12px] font-medium text-foreground">{p.label}</div>
+                        </div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">{p.text}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
 

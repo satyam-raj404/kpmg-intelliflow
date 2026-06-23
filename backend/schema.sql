@@ -449,13 +449,22 @@ ON CONFLICT (config_key) DO NOTHING;
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS users (
-    user_id     TEXT PRIMARY KEY,
-    email       TEXT NOT NULL UNIQUE,
-    full_name   TEXT NOT NULL,
-    role        TEXT NOT NULL DEFAULT 'procurement_manager',
-    is_active   INTEGER DEFAULT 1,
-    created_at  TEXT DEFAULT NOW()::TEXT
+    user_id    TEXT PRIMARY KEY,
+    email      TEXT NOT NULL UNIQUE,
+    full_name  TEXT NOT NULL,
+    role       TEXT NOT NULL DEFAULT 'Procurement Manager',
+    password   TEXT,
+    is_active  INTEGER DEFAULT 1,
+    created_by TEXT DEFAULT 'admin',
+    created_at TEXT DEFAULT NOW()::TEXT
 );
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS created_by TEXT DEFAULT 'admin';
+
+INSERT INTO users (user_id, email, full_name, role, password, is_active, created_by)
+VALUES ('00000000-0000-0000-0000-000000000001', 'admin', 'System Admin', 'Admin', '12345678', 1, 'system')
+ON CONFLICT (user_id) DO UPDATE SET email = EXCLUDED.email, password = EXCLUDED.password, role = EXCLUDED.role;
 
 CREATE TABLE IF NOT EXISTS actions (
     action_id           SERIAL PRIMARY KEY,
@@ -588,3 +597,55 @@ CREATE TABLE IF NOT EXISTS pc_budget (
     UNIQUE(profit_center, fiscal_year, budget_type)
 );
 CREATE INDEX IF NOT EXISTS idx_pcb_pc      ON pc_budget(profit_center, fiscal_year);
+
+-- ── Profit Center Master: extra columns ───────────────────────────────────────
+ALTER TABLE profit_center_master ADD COLUMN IF NOT EXISTS default_capex_opex TEXT DEFAULT 'OPEX';
+ALTER TABLE profit_center_master ADD COLUMN IF NOT EXISTS dept_code          TEXT DEFAULT '';
+ALTER TABLE profit_center_master ADD COLUMN IF NOT EXISTS plant              TEXT DEFAULT '';
+ALTER TABLE profit_center_master ADD COLUMN IF NOT EXISTS capex_budget       REAL DEFAULT 0;
+ALTER TABLE profit_center_master ADD COLUMN IF NOT EXISTS opex_budget        REAL DEFAULT 0;
+ALTER TABLE profit_center_master ADD COLUMN IF NOT EXISTS material_group     TEXT DEFAULT '';
+
+-- ── Seed 40 standard profit centers ──────────────────────────────────────────
+INSERT INTO profit_center_master (profit_center, pc_name, company_code, dept_code, plant, material_group, default_capex_opex, bu_type, is_active) VALUES
+('1001-FAC-MUM','Facilities — Mumbai',      '1001','FAC','MNAL','9901','OPEX',  'FACILITIES',   1),
+('1001-FAC-DEL','Facilities — Delhi North', '1001','FAC','DELP','9901','OPEX',  'FACILITIES',   1),
+('1001-FAC-SDL','Facilities — South Delhi', '1001','FAC','SDPL','9901','OPEX',  'FACILITIES',   1),
+('1001-FAC-BLR','Facilities — Bengaluru',   '1001','FAC','BLRP','9901','OPEX',  'FACILITIES',   1),
+('1001-FAC-HYD','Facilities — Hyderabad',   '1001','FAC','HYDP','9901','OPEX',  'FACILITIES',   1),
+('1001-ENG-MUM','Engineering — Mumbai',     '1001','ENG','MNAL','9902','CAPEX', 'ENGINEERING',  1),
+('1001-ENG-DEL','Engineering — Delhi North','1001','ENG','DELP','9902','CAPEX', 'ENGINEERING',  1),
+('1001-ENG-SDL','Engineering — South Delhi','1001','ENG','SDPL','9902','CAPEX', 'ENGINEERING',  1),
+('1001-ENG-BLR','Engineering — Bengaluru',  '1001','ENG','BLRP','9902','CAPEX', 'ENGINEERING',  1),
+('1001-ENG-HYD','Engineering — Hyderabad',  '1001','ENG','HYDP','9902','CAPEX', 'ENGINEERING',  1),
+('1001-ADM-MUM','Admin & Office — Mumbai',  '1001','ADM','MNAL','9903','OPEX',  'ADMIN',        1),
+('1001-ADM-DEL','Admin & Office — Delhi',   '1001','ADM','DELP','9903','OPEX',  'ADMIN',        1),
+('1001-ADM-SDL','Admin & Office — S.Delhi', '1001','ADM','SDPL','9903','OPEX',  'ADMIN',        1),
+('1001-ADM-BLR','Admin & Office — BLR',     '1001','ADM','BLRP','9903','OPEX',  'ADMIN',        1),
+('1001-ADM-HYD','Admin & Office — HYD',     '1001','ADM','HYDP','9903','OPEX',  'ADMIN',        1),
+('1001-ITH-MUM','IT Hardware — Mumbai',     '1001','ITH','MNAL','9904','CAPEX', 'IT',           1),
+('1001-ITH-DEL','IT Hardware — Delhi',      '1001','ITH','DELP','9904','CAPEX', 'IT',           1),
+('1001-ITH-SDL','IT Hardware — S.Delhi',    '1001','ITH','SDPL','9904','CAPEX', 'IT',           1),
+('1001-ITH-BLR','IT Hardware — Bengaluru',  '1001','ITH','BLRP','9904','CAPEX', 'IT',           1),
+('1001-ITH-HYD','IT Hardware — Hyderabad',  '1001','ITH','HYDP','9904','CAPEX', 'IT',           1),
+('1001-ITS-MUM','IT Software — Mumbai',     '1001','ITS','MNAL','9905','OPEX',  'IT',           1),
+('1001-ITS-DEL','IT Software — Delhi',      '1001','ITS','DELP','9905','OPEX',  'IT',           1),
+('1001-ITS-SDL','IT Software — S.Delhi',    '1001','ITS','SDPL','9905','OPEX',  'IT',           1),
+('1001-ITS-BLR','IT Software — Bengaluru',  '1001','ITS','BLRP','9905','OPEX',  'IT',           1),
+('1001-ITS-HYD','IT Software — Hyderabad',  '1001','ITS','HYDP','9905','OPEX',  'IT',           1),
+('1001-STR-MUM','Strategy & Consulting — Mumbai', '1001','STR','MNAL','9906','OPEX','STRATEGY', 1),
+('1001-STR-DEL','Strategy & Consulting — Delhi',  '1001','STR','DELP','9906','OPEX','STRATEGY', 1),
+('1001-STR-SDL','Strategy & Consulting — SDL',    '1001','STR','SDPL','9906','OPEX','STRATEGY', 1),
+('1001-STR-BLR','Strategy & Consulting — BLR',    '1001','STR','BLRP','9906','OPEX','STRATEGY', 1),
+('1001-STR-HYD','Strategy & Consulting — HYD',    '1001','STR','HYDP','9906','OPEX','STRATEGY', 1),
+('1001-SCM-MUM','Supply Chain — Mumbai',    '1001','SCM','MNAL','9907','OPEX',  'SUPPLY_CHAIN', 1),
+('1001-SCM-DEL','Supply Chain — Delhi',     '1001','SCM','DELP','9907','OPEX',  'SUPPLY_CHAIN', 1),
+('1001-SCM-SDL','Supply Chain — S.Delhi',   '1001','SCM','SDPL','9907','OPEX',  'SUPPLY_CHAIN', 1),
+('1001-SCM-BLR','Supply Chain — Bengaluru', '1001','SCM','BLRP','9907','OPEX',  'SUPPLY_CHAIN', 1),
+('1001-SCM-HYD','Supply Chain — Hyderabad', '1001','SCM','HYDP','9907','OPEX',  'SUPPLY_CHAIN', 1),
+('1001-OPS-MUM','Operations — Mumbai',      '1001','OPS','MNAL','9908','OPEX',  'OPERATIONS',   1),
+('1001-OPS-DEL','Operations — Delhi',       '1001','OPS','DELP','9908','OPEX',  'OPERATIONS',   1),
+('1001-OPS-SDL','Operations — S.Delhi',     '1001','OPS','SDPL','9908','OPEX',  'OPERATIONS',   1),
+('1001-OPS-BLR','Operations — Bengaluru',   '1001','OPS','BLRP','9908','OPEX',  'OPERATIONS',   1),
+('1001-OPS-HYD','Operations — Hyderabad',   '1001','OPS','HYDP','9908','OPEX',  'OPERATIONS',   1)
+ON CONFLICT (profit_center) DO NOTHING;
