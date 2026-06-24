@@ -73,17 +73,25 @@ class _PGConnection:
         self._raw.rollback()
 
 
+def _new_connection() -> _PGConnection:
+    raw = psycopg.connect(DATABASE_URL)
+    raw.autocommit = False
+    return _PGConnection(raw)
+
+
 def get_connection() -> _PGConnection:
     if not hasattr(_local, "conn") or _local.conn is None:
-        raw = psycopg.connect(DATABASE_URL)
-        raw.autocommit = False
-        _local.conn = _PGConnection(raw)
+        _local.conn = _new_connection()
     else:
-        # Reset broken transaction from previous request on this thread
+        # Rollback any open transaction; reconnect if connection was closed (e.g. Neon idle timeout)
         try:
             _local.conn._raw.rollback()
         except Exception:
-            pass
+            try:
+                _local.conn._raw.close()
+            except Exception:
+                pass
+            _local.conn = _new_connection()
     return _local.conn
 
 

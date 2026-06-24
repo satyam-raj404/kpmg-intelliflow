@@ -192,6 +192,7 @@ def validate(
         valid_mask &= ~dupe_mask
 
         # 6b: Duplicates against existing DB data (warn only — allows re-upload)
+        # Single bulk fetch instead of N per-row queries (avoids N×latency on remote DBs)
         try:
             table_cols = [r[0] for r in conn.execute(
                 "SELECT column_name FROM information_schema.columns "
@@ -199,18 +200,21 @@ def validate(
                 "ORDER BY ordinal_position",
                 (dataset_type,)).fetchall()]
             if all(c in table_cols for c in comp_key_cols_present):
-                where_clause = " AND ".join(f"{c} = ?" for c in comp_key_cols_present)
+                col_list = ", ".join(comp_key_cols_present)
+                existing_rows = conn.execute(
+                    f"SELECT {col_list} FROM {dataset_type}"
+                ).fetchall()
+                existing_keys = {
+                    "|".join(str(r[c]) for c in comp_key_cols_present)
+                    for r in existing_rows
+                }
                 for idx in df[valid_mask].index:
-                    vals = [str(df.at[idx, c]) for c in comp_key_cols_present]
-                    existing = conn.execute(
-                        f"SELECT 1 FROM {dataset_type} WHERE {where_clause} LIMIT 1",
-                        vals
-                    ).fetchone()
-                    if existing:
+                    k = keys.at[idx]
+                    if k in existing_keys:
                         rejection_log.append({
                             "row": int(idx) + 2,
                             "field": "|".join(comp_key_cols_present),
-                            "reason": f"WARN: composite key '{keys.at[idx]}' already exists in DB — row accepted",
+                            "reason": f"WARN: composite key '{k}' already exists in DB — row accepted",
                             "warn_only": True,
                         })
         except Exception:
