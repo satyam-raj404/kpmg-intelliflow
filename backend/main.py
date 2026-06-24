@@ -24,10 +24,21 @@ from routers import upload, kpi, p2p, events, actions, auth, chat, profit_center
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    # Pre-warm 8 worker-thread DB connections so all early requests skip the ~2s cold-start
+    # Run seed in thread so it doesn't block event loop startup
     loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _run_seed)
+    # Pre-warm DB connections
     await asyncio.gather(*[loop.run_in_executor(None, get_connection) for _ in range(8)])
     yield
+
+
+def _run_seed() -> None:
+    """Load sample CSVs on first startup (idempotent — skips if data exists)."""
+    try:
+        import seed as _seed
+        _seed.main()
+    except Exception as exc:
+        print(f"[seed] startup seed error: {exc}")
 
 
 app = FastAPI(
