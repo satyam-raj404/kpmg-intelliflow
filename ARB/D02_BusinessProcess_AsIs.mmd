@@ -1,0 +1,66 @@
+flowchart TD
+    classDef sapStyle  fill:#FADBD8,stroke:#C0392B,color:#1A0808,stroke-width:2px
+    classDef procStyle fill:#D6EAF8,stroke:#1A5276,color:#0A2035,stroke-width:2px
+    classDef finStyle  fill:#D5F5E3,stroke:#1E6823,color:#0A2D0F,stroke-width:2px
+    classDef leadStyle fill:#EBD5F7,stroke:#512E5F,color:#200A2A,stroke-width:2px
+    classDef gapStyle  fill:#F8F9FA,stroke:#E74C3C,color:#C0392B,stroke-width:2px,stroke-dasharray:6 3
+
+    subgraph SAP["SAP ECC / S4HANA — Live Transaction System"]
+        S1["SAP MM / FI Modules\nPR · PO · GRN · Invoice · Payment"]
+        S2["Run Standard SAP Reports\nME2M · MB52 · FBL1N · ME80FN etc."]
+        S1 --> S2
+    end
+
+    subgraph PROC["Procurement Team"]
+        P1["Download Excel / PDF from SAP\nManual report extract — T+1 to T+5 delay"]
+        P2["Consolidate data across\nmultiple disconnected reports"]
+        P3["Build Excel pivot tables\nManual KPI calculation"]
+        P4["Email consolidated report\nto Finance and Leadership\nweekly / monthly cycle"]
+        P5["Issues identified only at\nmonth-end review or during audit"]
+        P1 --> P2 --> P3 --> P4
+    end
+
+    subgraph FIN["Finance / AP Team"]
+        F1["Pull FI module reports\nfor invoice and payment status"]
+        F2["Track CAPEX/OPEX in\nseparate shared spreadsheet\nManual classification"]
+        F3["Reconcile 3-way match\nmanually line by line"]
+        F1 --> F2 --> F3
+    end
+
+    subgraph VEND["Vendor Management"]
+        V1["Vendor performance tracked\nin disconnected spreadsheets\nNo central view"]
+        V2["MSME compliance not\nsystematically monitored"]
+    end
+
+    subgraph LEAD["Leadership / CXO"]
+        L1["Receive consolidated report\nvia email — T+5 to T+10 delay\nStale data at time of review"]
+        L2["No drill-down capability\nRequest further analysis from team\nadds another T+2 to T+5 delay"]
+        L3["Decisions made on\nincomplete / stale data"]
+        L1 --> L2 --> L3
+    end
+
+    subgraph GAPS["Process Gaps — Current State Pain Points"]
+        G1["No real-time P2P visibility\nAll data is retrospective"]
+        G2["Anomaly detection is reactive\nMaverick buys and Split POs found in audit only"]
+        G3["No centralised vendor health view\nSpend concentration unknown in real time"]
+        G4["CAPEX vs OPEX split\nrequires manual classification effort"]
+        G5["No natural language query\nSQL expertise required for ad-hoc analysis"]
+        G6["No SOD conflict monitoring\nAudit trail not easily searchable"]
+    end
+
+    S2 -->|"Manual extract"| P1
+    S2 -->|"FI reports"| F1
+    P4 --> L1
+    P5 -.->|"Pain point"| G2
+    P2 -.->|"Pain point"| G1
+    F2 -.->|"Pain point"| G4
+    V1 -.->|"Pain point"| G3
+    L2 -.->|"Pain point"| G5
+    P2 -.->|"Pain point"| G6
+
+    class S1,S2 sapStyle
+    class P1,P2,P3,P4,P5 procStyle
+    class F1,F2,F3 finStyle
+    class V1,V2 procStyle
+    class L1,L2,L3 leadStyle
+    class G1,G2,G3,G4,G5,G6 gapStyle

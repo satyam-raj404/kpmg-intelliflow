@@ -1,0 +1,47 @@
+flowchart LR
+    classDef compliant fill:#D5F5E3,stroke:#1E6823,color:#0A2D0F,stroke-width:2px
+    classDef partial   fill:#FDEBD0,stroke:#7D4E05,color:#3D1F03,stroke-width:2px
+    classDef noncmply  fill:#FADBD8,stroke:#C0392B,color:#1A0808,stroke-width:2px
+    classDef header    fill:#0D1F35,stroke:#0D1F35,color:#FFFFFF,stroke-width:0
+
+    subgraph INTELLISOURCE["IntelliSource — EA Principles Compliance Assessment"]
+
+        subgraph BA["Business Architecture"]
+            BA1["COMPLIANT — SINGLE CAPABILITY\nIntelliSource has one well-defined purpose:\nP2P procurement intelligence.\nNo scope creep into HR / Finance systems."]
+            BA2["COMPLIANT — UNIFIED ARCHITECTURE GOVERNANCE\nSubmitted to ARB for formal review.\nSolution architecture follows KPMG EA\nstandards and review process."]
+        end
+
+        subgraph IA["Information Architecture"]
+            IA1["COMPLIANT — DATA IS AN ASSET\nAll procurement data modelled in PostgreSQL\nwith defined retention policies:\n7 years transactional · 5 years audit logs.\nArchiving and CRUD policies documented."]
+        end
+
+        subgraph INTA["Integration Architecture"]
+            INT1["COMPLIANT — API FIRST\nAll backend functionality exposed via FastAPI REST.\nFrontend is a first-class API consumer.\nNo direct DB access from SPA."]
+            INT2["COMPLIANT — GOVERNED INTEGRATION\nSAP file-based CSV and OpenRouter REST\nare fully documented, controlled, and versioned.\nIntegration table in ARB Section 13."]
+            INT3["NON-COMPLIANT — LEVERAGE OFF-THE-SHELF INTEGRATION\nCustom FastAPI REST layer over integration middleware.\nJUSTIFICATION: SAP-specific 14-table data model\n+ 45 custom procurement KPIs cannot be expressed\nin standard off-the-shelf integration tools.\nCustom API required for full control and performance."]
+        end
+
+        subgraph APPA["Application Architecture"]
+            APP1["COMPLIANT — CONFIGURE DO NOT CUSTOMIZE\nKPI thresholds, company codes, high-value PO limits\nconfigurable via Admin Settings UI.\nNo code changes required for runtime config."]
+            APP2["PARTIAL — THINK MOBILITY FOR FRONT-END\nCurrent UI is desktop-first.\nShadcn/ui and Tailwind CSS support responsive layout.\nROADMAP: Transition 1 Jul-Sep 2026\nwill deliver full mobile-responsive views."]
+        end
+
+        subgraph TA["Technology Architecture"]
+            T1["COMPLIANT — VIRTUAL DEPLOYMENT PREFERRED\nFrontend on Vercel serverless CDN.\nBackend on Docker containers\nAzure Container Apps — Transition 1.\nNo bare-metal servers."]
+            T2["COMPLIANT — THINK CLOUD FIRST\nFrontend on Vercel cloud CDN.\nPostgreSQL: Neon serverless pilot\nAzure Database for PostgreSQL — Target.\nAll secrets in Azure Key Vault."]
+        end
+
+    end
+
+    subgraph LEGEND["Compliance Status Legend"]
+        LG1["8 of 10 Principles: COMPLIANT"]
+        LG2["1 of 10 Principles: PARTIAL — Transition 1 Roadmap"]
+        LG3["1 of 10 Principles: NON-COMPLIANT — Justified Exception"]
+    end
+
+    class BA1,BA2,INT1,INT2,IA1,APP1,T1,T2 compliant
+    class APP2 partial
+    class INT3 noncmply
+    class LG1 compliant
+    class LG2 partial
+    class LG3 noncmply

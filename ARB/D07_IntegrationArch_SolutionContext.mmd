@@ -1,0 +1,65 @@
+flowchart LR
+    classDef sapStyle    fill:#FADBD8,stroke:#C0392B,color:#1A0808,stroke-width:2px
+    classDef isStyle     fill:#E8F0FE,stroke:#1565C0,color:#0A1E4A,stroke-width:2px
+    classDef cloudStyle  fill:#D5F5E3,stroke:#1E6823,color:#0A2D0F,stroke-width:2px
+    classDef kpmgStyle   fill:#EBD5F7,stroke:#512E5F,color:#200A2A,stroke-width:2px
+    classDef futureStyle fill:#FEF9E7,stroke:#D4AC0D,color:#3D2B00,stroke-width:2px,stroke-dasharray:5 3
+    classDef dbStyle     fill:#F5EEF8,stroke:#512E5F,color:#2C0A3A,stroke-width:2px
+
+    subgraph KPMG_SYS["KPMG Internal Systems"]
+        SAP["SAP ECC / S4HANA\nOn-Premise ERP\nSource of truth for P2P data"]
+        AAD["Azure Active Directory\nKPMG Identity Provider\n12 Role Groups"]
+        SD["KPMG IT Service Desk\nTier 1-2 Support"]
+    end
+
+    subgraph IS["IntelliSource Platform"]
+        direction TB
+        IS_UP["Upload Module\nPOST /api/upload\nCSV validation + ETL"]
+        IS_KPI["KPI Engine\nGET /api/kpi\n45 pre-computed metrics"]
+        IS_CHAT["AI Chat Engine\nPOST /api/chat\nGPT-4o agentic loop"]
+        IS_AUTH["Auth Router\nPOST /api/auth/login\nRBAC + User CRUD"]
+        IS_SPA["React SPA\nDashboards + Upload Portal\nAI Assistant UI"]
+        IS_DB[("PostgreSQL\nNeon / Azure DB\n14 tables")]
+        IS_UP --> IS_DB
+        IS_KPI --> IS_DB
+        IS_AUTH --> IS_DB
+        IS_CHAT --> IS_DB
+    end
+
+    subgraph CLOUD["Cloud / External Services"]
+        OR["OpenRouter API\nopenrouter.ai\nGPT-4o — AI Model\nREST API — HTTPS/JSON"]
+        VCL["Vercel Edge CDN\nStatic SPA hosting\nAuto-deploy from GitHub"]
+        GH["GitHub\nSource code + CI/CD\nAuto-deploy on push to main"]
+    end
+
+    subgraph FUTURE["Target Architecture Integrations (Planned)"]
+        SAP_API["SAP BAPI / OData API\nReal-time data pull\nEliminates manual CSV step"]
+        AZ_SSO["Azure AD SSO\nOAuth 2.0 / SAML\nMFA via Conditional Access"]
+        AZ_ACA["Azure Container Apps\nDocker containerised backend"]
+        AZ_DB["Azure Database\nfor PostgreSQL Flexible Server"]
+    end
+
+    SAP  -->|"File-based — Batch CSV\n9 SAP table dumps\nManual export by admin"| IS_UP
+    AAD  -->|"OAuth 2.0 tokens — Target Arch\nRole group mapping"| IS_AUTH
+    SD   -->|"Escalation via GitHub Issues"| IS_SPA
+    IS_CHAT -->|"REST API HTTPS/JSON\nBEARER OPENROUTER_API_KEY"| OR
+    IS_SPA  -->|"CDN served static assets"| VCL
+    GH   -->|"main branch push triggers deploy"| VCL
+    GH   -->|"Docker image build + push to ACR"| AZ_ACA
+
+    SAP_API -.->|"Planned Target Arch"| IS_UP
+    AZ_SSO  -.->|"Planned Target Arch"| IS_AUTH
+    AZ_ACA  -.->|"Replaces current VM"| IS_SPA
+    AZ_DB   -.->|"Replaces Neon DB"| IS_DB
+
+    IS_SPA <-->|"REST API HTTPS/JSON"| IS_KPI
+    IS_SPA <-->|"REST API HTTPS/JSON"| IS_CHAT
+    IS_SPA <-->|"REST API HTTPS/JSON"| IS_AUTH
+    IS_SPA <-->|"REST API HTTPS/JSON"| IS_UP
+
+    class SAP sapStyle
+    class AAD,SD kpmgStyle
+    class IS_UP,IS_KPI,IS_CHAT,IS_AUTH,IS_SPA isStyle
+    class IS_DB dbStyle
+    class OR,VCL,GH cloudStyle
+    class SAP_API,AZ_SSO,AZ_ACA,AZ_DB futureStyle

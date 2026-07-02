@@ -1,0 +1,49 @@
+sequenceDiagram
+    actor User as KPMG User
+    participant SPA as React SPA
+    participant API as FastAPI /api/auth
+    participant DB as PostgreSQL users table
+    participant KV as Azure Key Vault
+    participant AAD as Azure AD
+
+    Note over User,AAD: BASELINE — Email + Password Auth (Current Pilot)
+
+    User->>SPA: Enter email + password on /login
+    SPA->>API: POST /api/auth/login { email, password }
+    API->>DB: SELECT user_id, full_name, role, password, is_active WHERE email = ?
+    DB-->>API: User row
+    API->>API: Pilot: plaintext compare password == db.password<br/>PRODUCTION: bcrypt.verify(password, db.password_hash) cost=12
+
+    alt Valid credentials AND is_active = true
+        API->>DB: INSERT INTO audit_log action=LOGIN
+        API-->>SPA: 200 OK { user_id, email, full_name, role }
+        SPA->>SPA: Store in React AppContext<br/>Pilot: localStorage<br/>PRODUCTION: in-memory only
+        SPA-->>User: Redirect to /dashboard
+    else Invalid credentials OR inactive account
+        API-->>SPA: 401 Unauthorized { detail: Invalid credentials }
+        SPA-->>User: Show error message
+    end
+
+    Note over User,AAD: PRODUCTION ADD-ON — JWT Token Issuance
+
+    API->>KV: Read JWT_SECRET_KEY via Managed Identity
+    KV-->>API: Secret value
+    API->>API: jwt.encode sub=user_id role=role exp=now+15min
+    API-->>SPA: access_token 15 min + refresh_token 7 days
+    SPA->>SPA: access_token in memory<br/>refresh_token in HttpOnly cookie
+
+    Note over User,AAD: TARGET ARCHITECTURE — Azure AD SSO + MFA
+
+    User->>SPA: Click Sign in with KPMG SSO
+    SPA->>AAD: Redirect to Azure AD OAuth 2.0 Authorization Code Flow<br/>scopes: openid profile email<br/>client_id from App Registration
+    AAD->>User: KPMG login page + MFA prompt via Conditional Access
+    User->>AAD: KPMG credentials + MFA token Authenticator App
+    AAD-->>SPA: Authorization Code short-lived
+    SPA->>API: POST /api/auth/sso { code, redirect_uri }
+    API->>AAD: POST token endpoint — exchange code for id_token + access_token
+    AAD-->>API: id_token JWT with email, name, AD groups
+    API->>API: Map AD group to IntelliSource role<br/>Upsert user record in PostgreSQL
+    API->>DB: INSERT INTO audit_log action=SSO_LOGIN
+    API->>KV: Read JWT_SECRET_KEY
+    API-->>SPA: IntelliSource JWT access_token 15 min<br/>refresh_token 7 days HttpOnly cookie
+    SPA-->>User: Redirect to /dashboard

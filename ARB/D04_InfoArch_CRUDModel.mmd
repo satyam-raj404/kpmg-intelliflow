@@ -1,0 +1,69 @@
+flowchart LR
+    classDef etlStyle  fill:#FDEBD0,stroke:#7D4E05,color:#3D1F03,stroke-width:2px
+    classDef apiStyle  fill:#E8F0FE,stroke:#1565C0,color:#0A1E4A,stroke-width:2px
+    classDef kpiStyle  fill:#D5F5E3,stroke:#1E6823,color:#0A2D0F,stroke-width:2px
+    classDef authStyle fill:#EBD5F7,stroke:#512E5F,color:#200A2A,stroke-width:2px
+    classDef dbStyle   fill:#F5EEF8,stroke:#512E5F,color:#2C0A3A,stroke-width:2px
+
+    subgraph WRITERS["Write Layer"]
+        ETL["ETL Pipeline\netl.py + fact_builder.py\n/api/upload"]
+        KE["KPI Engine\nkpi_engine.py\n/api/kpi/recompute"]
+        AE["Anomaly Engine\nprocess_mining.py"]
+        AUTH["Auth Router\n/api/auth"]
+    end
+
+    subgraph READERS["Read Layer"]
+        KPI_R["KPI Router\n/api/kpi"]
+        P2P_R["P2P Router\n/api/p2p"]
+        CHAT_R["AI Chat Engine\n/api/chat"]
+        AUDIT_R["Audit Reader\n/api/admin"]
+    end
+
+    subgraph TABLES["PostgreSQL Tables — C=Create  R=Read  U=Update  D=Delete"]
+        T1[("po_dump\nC R D")]
+        T2[("pr_dump\nC R D")]
+        T3[("grn_dump\nC R D")]
+        T4[("po_delivery_dump\nC R D")]
+        T5[("po_invoice_dump\nC R D")]
+        T6[("invoice_dump\nC R D")]
+        T7[("payment_dump\nC R D")]
+        T8[("vendor_master\nC R D")]
+        T9[("change_log\nC R D")]
+        T10[("pr_po_grn_invoice\nC R U")]
+        T11[("kpi_results\nC R U")]
+        T12[("process_mining_events\nC R U")]
+        T13[("users\nC R U D")]
+        T14[("audit_log\nC R")]
+    end
+
+    ETL  -->|"TRUNCATE + INSERT per upload"| T1
+    ETL  -->|"TRUNCATE + INSERT per upload"| T2
+    ETL  -->|"TRUNCATE + INSERT per upload"| T3
+    ETL  -->|"TRUNCATE + INSERT per upload"| T4
+    ETL  -->|"TRUNCATE + INSERT per upload"| T5
+    ETL  -->|"TRUNCATE + INSERT per upload"| T6
+    ETL  -->|"TRUNCATE + INSERT per upload"| T7
+    ETL  -->|"TRUNCATE + INSERT per upload"| T8
+    ETL  -->|"TRUNCATE + INSERT per upload"| T9
+    ETL  -->|"BUILD fact table"| T10
+    KE   -->|"UPSERT results"| T11
+    AE   -->|"UPSERT classifications"| T12
+    AUTH -->|"INSERT / UPDATE / DELETE"| T13
+    AUTH -->|"INSERT only"| T14
+
+    KPI_R  -->|"SELECT"| T11
+    P2P_R  -->|"SELECT"| T10
+    CHAT_R -->|"SELECT all tables"| T1
+    CHAT_R -->|"SELECT"| T2
+    CHAT_R -->|"SELECT"| T6
+    CHAT_R -->|"SELECT"| T7
+    CHAT_R -->|"SELECT"| T8
+    CHAT_R -->|"SELECT"| T10
+    CHAT_R -->|"SELECT"| T11
+    AUDIT_R -->|"SELECT"| T14
+    AUDIT_R -->|"SELECT"| T13
+
+    class ETL,KE,AE etlStyle
+    class AUTH authStyle
+    class KPI_R,P2P_R,CHAT_R,AUDIT_R apiStyle
+    class T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14 dbStyle

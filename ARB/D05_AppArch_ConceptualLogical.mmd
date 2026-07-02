@@ -1,0 +1,68 @@
+flowchart TD
+    classDef userStyle fill:#EBF5FB,stroke:#1565C0,color:#0A1E4A,stroke-width:2px
+    classDef presStyle fill:#D6EAF8,stroke:#1A5276,color:#0A2035,stroke-width:2px
+    classDef apiStyle  fill:#E8F0FE,stroke:#1565C0,color:#0A1E4A,stroke-width:2px
+    classDef svcStyle  fill:#D5F5E3,stroke:#1E6823,color:#0A2D0F,stroke-width:2px
+    classDef dbStyle   fill:#F5EEF8,stroke:#512E5F,color:#2C0A3A,stroke-width:2px
+    classDef extStyle  fill:#FADBD8,stroke:#C0392B,color:#1A0808,stroke-width:2px
+
+    subgraph LAYER0["Users — KPMG Internal Staff (12 Roles)"]
+        U1["Procurement Manager · Finance User · Compliance Officer"]
+        U2["CXO · Leadership · Partner · Director · Consultant"]
+        U3["Admin · Delivery Manager"]
+    end
+
+    subgraph LAYER1["Presentation Layer — React SPA (Vercel / Azure Static Web Apps)"]
+        PR1["TanStack Router v1 — File-based routes\n/dashboard · /financial · /leadership\n/vendors · /utilization · /upload · /ask"]
+        PR2["UI Components\nshadcn/ui + Radix UI + Tailwind CSS v3"]
+        PR3["State Management\nTanStack Query v5 — server state\nAppContext — auth · theme · company filter"]
+        PR4["Data Visualisation\nRecharts 2.x + Framer Motion"]
+    end
+
+    subgraph LAYER2["Application Layer — FastAPI REST API (Python 3.11 · Uvicorn)"]
+        AP1["/api/kpi — KPI Router"]
+        AP2["/api/upload — ETL Router"]
+        AP3["/api/auth — Auth Router"]
+        AP4["/api/p2p — P2P Router"]
+        AP5["/api/chat — AI Chat Router"]
+        AP6["/api/events — Anomaly Router"]
+        AP7["/api/actions — Actions Router"]
+    end
+
+    subgraph LAYER3["Service Layer — Business Logic"]
+        SV1["kpi_engine.py\n45 KPI computations across 5 dashboards"]
+        SV2["etl.py + fact_builder.py\nCSV parse · validate · load · P2P fact build"]
+        SV3["chat_engine.py\nGPT-4o agentic loop · 6 tool definitions"]
+        SV4["validator.py\nSchema validation · mandatory fields · dedup"]
+        SV5["anomaly_engine\n12 PO risk variant classifiers"]
+    end
+
+    subgraph LAYER4["Data Layer — PostgreSQL 15+ (Neon / Azure DB for PostgreSQL)"]
+        DB1[("Procurement\npo_dump · pr_dump")]
+        DB2[("Finance\ninvoice_dump · payment_dump\npo_invoice_dump")]
+        DB3[("Operations\ngrn_dump · po_delivery_dump")]
+        DB4[("Vendor\nvendor_master")]
+        DB5[("Analytics\nkpi_results · process_mining_events\npr_po_grn_invoice")]
+        DB6[("Platform\nusers · audit_log · change_log")]
+    end
+
+    subgraph EXTERNAL["External Systems"]
+        EXT1["SAP ECC / S4HANA\nOn-Premise ERP — File-based CSV export"]
+        EXT2["OpenRouter API\nopenrouter.ai — GPT-4o model"]
+        EXT3["Azure AD\nKPMG SSO — OAuth 2.0 / MFA (Target)"]
+    end
+
+    LAYER0 -->|"HTTPS Browser"| LAYER1
+    LAYER1 <-->|"REST API HTTPS/JSON"| LAYER2
+    LAYER2 --> LAYER3
+    LAYER3 <-->|"psycopg3 TLS port 5432"| LAYER4
+    EXT1   -->|"CSV batch upload"| AP2
+    AP5    <-->|"HTTPS — BEARER OPENROUTER_API_KEY"| EXT2
+    EXT3   -->|"OAuth 2.0 tokens (Target Arch)"| AP3
+
+    class U1,U2,U3 userStyle
+    class PR1,PR2,PR3,PR4 presStyle
+    class AP1,AP2,AP3,AP4,AP5,AP6,AP7 apiStyle
+    class SV1,SV2,SV3,SV4,SV5 svcStyle
+    class DB1,DB2,DB3,DB4,DB5,DB6 dbStyle
+    class EXT1,EXT2,EXT3 extStyle

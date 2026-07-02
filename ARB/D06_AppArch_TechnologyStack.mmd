@@ -1,0 +1,61 @@
+flowchart TD
+    classDef feStyle  fill:#D6EAF8,stroke:#1A5276,color:#0A2035,stroke-width:2px
+    classDef beStyle  fill:#D5F5E3,stroke:#1E6823,color:#0A2D0F,stroke-width:2px
+    classDef dbStyle  fill:#F5EEF8,stroke:#512E5F,color:#2C0A3A,stroke-width:2px
+    classDef aiStyle  fill:#EBD5F7,stroke:#512E5F,color:#200A2A,stroke-width:2px
+    classDef devStyle fill:#FDEBD0,stroke:#7D4E05,color:#3D1F03,stroke-width:2px
+    classDef azStyle  fill:#E8F0FE,stroke:#1565C0,color:#0A1E4A,stroke-width:2px
+    classDef connStyle fill:#FFFFFF,stroke:#888888,color:#333333,stroke-width:1px
+
+    subgraph FE["Frontend — Vercel / Azure Static Web Apps"]
+        FE1["TypeScript 5.x + React 18.x + Vite 5.x"]
+        FE2["TanStack Router v1 — file-based type-safe routes\nTanStack Query v5 — server state + cache"]
+        FE3["shadcn/ui + Radix UI + Tailwind CSS v3"]
+        FE4["Recharts 2.x + Framer Motion\nBun 1.x — Package Manager"]
+    end
+
+    subgraph BE["Backend — Azure Container Apps"]
+        BE1["Python 3.11+ · FastAPI · Uvicorn ASGI"]
+        BE2["psycopg3 3.x — PostgreSQL Adapter\nThread-local pool — 8 pre-warmed connections"]
+        BE3["openpyxl — Excel Generation\nhttpx — HTTP Client for OpenRouter calls"]
+    end
+
+    subgraph DB["Data Layer — Azure Database for PostgreSQL"]
+        DB1["PostgreSQL 15+ — 14 Application Tables"]
+        DB2["kpi_results — 45 pre-computed KPIs\npr_po_grn_invoice — P2P fact table"]
+        DB3["Pilot: Neon Serverless PostgreSQL\nTarget: Azure DB Flexible Server — 4 vCores / 64 GB"]
+    end
+
+    subgraph AI["AI Layer — OpenRouter API"]
+        AI1["OpenRouter API — openrouter.ai\nModel: GPT-4o — openai/gpt-4o"]
+        AI2["6 Tool Definitions:\nquery_database · get_kpis · find_document\nget_anomalies · get_vendor_info · get_p2p_stage_summary"]
+        AI3["Max 3 tool calls per response\nSynchronous agentic loop"]
+    end
+
+    subgraph DEV["DevOps — GitHub + Azure DevOps"]
+        DEV1["GitHub — Source Code + CI/CD\nkpmg-intelliflow repository"]
+        DEV2["Vercel — Frontend auto-deploy on push to main\nAzure Container Registry — Docker images"]
+        DEV3["GitHub Actions — CI pipeline\nauto-build + push + deploy on merge"]
+    end
+
+    subgraph AZURE["Azure Security and Operations"]
+        AZ1["Azure AD — SSO + MFA (Target Architecture)\nConditional Access Policies — 12 role groups"]
+        AZ2["Azure Key Vault — Secrets Management\nDATABASE_URL · OPENROUTER_API_KEY · JWT_SECRET"]
+        AZ3["Azure Application Gateway + WAF (OWASP rules)\nAzure Monitor + Application Insights — APM"]
+        AZ4["Azure Log Analytics — 5-year audit log retention\nAzure Alerts — email/Teams on error spike"]
+    end
+
+    FE  <-->|"REST API — HTTPS/JSON\nVITE_API_BASE_URL"| BE
+    BE  <-->|"psycopg3 — TLS port 5432"| DB
+    BE  <-->|"HTTPS — BEARER OPENROUTER_API_KEY"| AI
+    DEV -->|"Deploy frontend"| FE
+    DEV -->|"Deploy backend container"| BE
+    AZURE -->|"Secure + monitor"| BE
+    AZURE -->|"Protect + audit"| DB
+
+    class FE1,FE2,FE3,FE4 feStyle
+    class BE1,BE2,BE3 beStyle
+    class DB1,DB2,DB3 dbStyle
+    class AI1,AI2,AI3 aiStyle
+    class DEV1,DEV2,DEV3 devStyle
+    class AZ1,AZ2,AZ3,AZ4 azStyle
