@@ -1,72 +1,47 @@
-flowchart TD
-    classDef sapStyle   fill:#FADBD8,stroke:#C0392B,color:#1A0808,stroke-width:2px
-    classDef adminStyle fill:#FDEBD0,stroke:#7D4E05,color:#3D1F03,stroke-width:2px
-    classDef procStyle  fill:#D6EAF8,stroke:#1A5276,color:#0A2035,stroke-width:2px
-    classDef finStyle   fill:#D5F5E3,stroke:#1E6823,color:#0A2D0F,stroke-width:2px
-    classDef compStyle  fill:#FADBD8,stroke:#922B21,color:#1A0808,stroke-width:2px
-    classDef leadStyle  fill:#EBD5F7,stroke:#512E5F,color:#200A2A,stroke-width:2px
-    classDef decStyle   fill:#FEF9E7,stroke:#D4AC0D,color:#3D2B00,stroke-width:2px
+flowchart LR
+    classDef erpStyle   fill:#FADBD8,stroke:#C0392B,color:#1A0808,stroke-width:2px
+    classDef adminStyle fill:#FDEBD0,stroke:#B7770D,color:#3D1F03,stroke-width:2px
+    classDef platStyle  fill:#D6EAF8,stroke:#1A5276,color:#0A2035,stroke-width:2px
+    classDef userStyle  fill:#D5F5E3,stroke:#1E6823,color:#0A2D0F,stroke-width:2px
 
-    subgraph SAP["SAP ECC / S4HANA — Data Source"]
-        S1["Export 9 SAP table dumps as CSV\nPR · PO · GRN · Invoice · Payment\nVendor Master · Change Log · PO Delivery · PO Invoice"]
+    subgraph ERP["ERP System"]
+        S1["Export P2P Data\nas CSV"]
     end
 
-    subgraph ADMIN["IntelliSource Admin / Data Specialist"]
-        A1["Upload CSVs via\nIntelliSource Upload Portal"]
-        A2{"Schema and\nValidation Check"}
-        A3["ETL loads data into\nPostgreSQL — 10 tables"]
-        A4["KPI Engine computes\n45+ KPIs into kpi_results"]
-        A5["Anomaly Engine classifies\n12 PO risk variants"]
-        A6["Rejection Report\nshown to admin"]
+    subgraph ADMIN["Admin / Data Specialist"]
+        A1["Upload CSV\nvia Portal"]
+        A2{"Validate\n& Process"}
+        A3["Load to Database\n& Compute KPIs"]
         A1 --> A2
         A2 -->|Valid| A3
-        A2 -->|Invalid rows| A6
-        A3 --> A4
-        A3 --> A5
+        A2 -->|Rejected| A4["Rejection\nReport"]
     end
 
-    subgraph PROC["Procurement Manager"]
-        P1["Review Procurement Dashboard\nPO Value MTD · Active POs · Open PR Aging\nPO Approval Cycle · Amendment Rate"]
-        P2["Act on Anomaly Alerts\nMaverick Buys · Split POs · Deletions"]
-        P3["Monitor Vendor Performance\nDelivery Days · Compliance Rate"]
+    subgraph PLATFORM["IntelliSource Platform"]
+        P1["Procurement\nDashboard"]
+        P2["Finance\nDashboard"]
+        P3["Compliance\nAlerts"]
+        P4["Leadership\nDashboard"]
     end
 
-    subgraph FIN["Finance User / AP Team"]
-        F1["Review Financial Dashboard\nTotal Payments YTD · 3-Way Match Rate\nInvoice Processing Days · On-Time Payment Rate"]
-        F2["Monitor CAPEX vs OPEX Split\nUtilization Dashboard — 10 KPIs"]
+    subgraph USERS["Business Users"]
+        U1["Procurement\nManager"]
+        U2["Finance\nUser"]
+        U3["Compliance\nOfficer"]
+        U4["Leadership\n/ CXO"]
     end
 
-    subgraph COMP["Compliance Officer"]
-        C1["Review SOD Conflict Alerts\n4 SOD control scenarios"]
-        C2["Duplicate Invoice Detection\nAnomaly and Risk Report"]
-        C3["Escalate to Leadership\nif threshold exceeded"]
-    end
+    S1 -->|Batch CSV| A1
+    A3 --> P1
+    A3 --> P2
+    A3 --> P3
+    A3 --> P4
+    P1 --> U1
+    P2 --> U2
+    P3 --> U3
+    P4 --> U4
 
-    subgraph LEAD["Leadership / CXO"]
-        L1["Review Leadership Dashboard\nTotal Spend YTD · Maverick Rate\nVendor Concentration · Risk Score"]
-        L2["Query AI Assistant\nAsk IntelliSource — natural language\nqueries against live PostgreSQL"]
-        L3["Strategic P2P Decision"]
-    end
-
-    S1 -->|"Batch CSV download"| A1
-    A4 -->|"KPI Cards and Charts"| P1
-    A5 -->|"Anomaly Alert Center"| P2
-    A4 -->|"Vendor KPIs"| P3
-    A4 -->|"Financial KPIs"| F1
-    A4 -->|"CAPEX/OPEX KPIs"| F2
-    A5 -->|"SOD flag alerts"| C1
-    A5 -->|"Duplicate flags"| C2
-    C1 --> C3
-    C2 --> C3
-    A4 -->|"Executive KPIs"| L1
-    L1 -->|"Ad-hoc deep-dive"| L2
-    L1 --> L3
-    C3 -->|"Escalation report"| L3
-
-    class S1 sapStyle
-    class A1,A3,A4,A5,A6 adminStyle
-    class A2 decStyle
-    class P1,P2,P3 procStyle
-    class F1,F2 finStyle
-    class C1,C2,C3 compStyle
-    class L1,L2,L3 leadStyle
+    class S1 erpStyle
+    class A1,A2,A3,A4 adminStyle
+    class P1,P2,P3,P4 platStyle
+    class U1,U2,U3,U4 userStyle

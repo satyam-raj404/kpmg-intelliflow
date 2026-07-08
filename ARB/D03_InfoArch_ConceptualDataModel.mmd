@@ -1,180 +1,61 @@
 erDiagram
-    PR_DUMP {
-        text purchase_requisition PK
-        text item_of_requisition PK
-        text material_group
-        text material_description
-        real order_quantity
-        text delivery_date
-        text requisitioner
-        text release_status
-        text deletion_indicator
-        text company_code
+    PURCHASE_REQUISITION {
+        string id PK
+        string requisitioner
+        string material_group
+        date   delivery_date
     }
-
-    PO_DUMP {
-        text purchasing_document PK
-        text item PK
-        text vendor FK
-        real net_order_value
-        text document_date
-        text company_code
-        text plant
-        text material_group
-        text deletion_indicator
-        text capex_opex_flag
-        text purchase_requisition FK
-        text release_indicator
-        text created_by
+    PURCHASE_ORDER {
+        string id PK
+        string vendor FK
+        string pr_reference FK
+        decimal value
+        string status
     }
-
-    GRN_DUMP {
-        text material_document PK
-        text material_doc_item PK
-        text purchasing_document FK
-        text item FK
-        text movement_type
-        text posting_date
-        text entry_date
-        real quantity
-        real amount_local_ccy
-        text created_by
+    GOODS_RECEIPT {
+        string id PK
+        string po_reference FK
+        decimal quantity
+        date   posting_date
     }
-
-    PO_DELIVERY_DUMP {
-        text purchasing_document PK
-        text item PK
-        text schedule_line PK
-        text expected_delivery_date
-        real scheduled_quantity
-        text creation_date
-        text company_code
+    INVOICE {
+        string id PK
+        string vendor FK
+        string po_reference FK
+        decimal amount
+        date   due_date
     }
-
-    PO_INVOICE_DUMP {
-        text invoice_doc PK
-        text invoice_year PK
-        text invoice_doc_item PK
-        text purchasing_document FK
-        text item FK
-        text posting_date
-        real quantity
-        real amount_local_ccy
+    PAYMENT {
+        string id PK
+        string invoice_ref FK
+        decimal amount
+        date   clearing_date
     }
-
-    INVOICE_DUMP {
-        text invoice_doc PK
-        text invoice_year PK
-        text vendor FK
-        text document_type
-        text posting_date
-        text due_date
-        real amount_local_ccy
-        text clearing_doc
-        text reverse_invoice
-        text company_code
+    VENDOR {
+        string code PK
+        string name
+        string country
+        string msme_flag
+        string payment_terms
     }
-
-    PAYMENT_DUMP {
-        text payment_doc PK
-        text payment_year PK
-        text vendor FK
-        text posting_date
-        text clearing_date
-        text cleared_invoice FK
-        text payment_method
-        real amount_local_ccy
-        text company_code
+    P2P_ANALYTICS {
+        string po_reference PK
+        int    cycle_days
+        string anomaly_flags
+        string variant_class
     }
-
-    VENDOR_MASTER {
-        text vendor PK
-        text company_code PK
-        text vendor_name
-        text country
-        text city
-        text account_group
-        text central_purchasing_block
-        text payment_block
-        text msme_flag
-        text vendor_type
-    }
-
-    CHANGE_LOG {
-        text change_number PK
-        text table_name PK
-        text field_name PK
-        text object_class
-        text object_id
-        text username
-        text change_date
-        text change_indicator
-        text old_value
-        text new_value
-    }
-
-    PR_PO_GRN_INVOICE {
-        text purchase_requisition PK
-        text purchasing_document FK
-        text vendor FK
-        int pr_to_po_days
-        int po_to_grn_days
-        int grn_to_invoice_days
-        int total_cycle_days
-        int is_maverick
-        real pr_value
-        real po_net_price
-        text capex_opex_flag
-    }
-
     KPI_RESULTS {
-        text dashboard PK
-        text kpi_code PK
-        text company_code PK
-        text kpi_name
-        real value_numeric
-        text value_text
-        text unit
+        string dashboard PK
+        string kpi_code   PK
+        decimal value
         timestamp computed_at
     }
 
-    PROCESS_MINING_EVENTS {
-        text purchasing_document PK
-        text anomaly_flags
-        int anomaly_count
-        text variant_class
-        text company_code
-    }
-
-    USERS {
-        uuid user_id PK
-        text email
-        text full_name
-        text role
-        text password
-        boolean is_active
-        timestamp created_at
-    }
-
-    AUDIT_LOG {
-        uuid id PK
-        uuid user_id FK
-        text action
-        text entity_type
-        text details
-        timestamp created_at
-    }
-
-    PR_DUMP        ||--o{ PO_DUMP               : "PR referenced in PO"
-    PO_DUMP        ||--o{ GRN_DUMP              : "GRN posted against PO"
-    PO_DUMP        ||--o{ PO_DELIVERY_DUMP      : "Delivery schedule for PO"
-    PO_DUMP        ||--o{ PO_INVOICE_DUMP       : "Invoice matched to PO"
-    INVOICE_DUMP   ||--o{ PAYMENT_DUMP          : "Payment clears invoice"
-    VENDOR_MASTER  ||--o{ PO_DUMP               : "Vendor on PO"
-    VENDOR_MASTER  ||--o{ INVOICE_DUMP          : "Vendor submits invoice"
-    VENDOR_MASTER  ||--o{ PAYMENT_DUMP          : "Vendor receives payment"
-    PO_DUMP        ||--o{ CHANGE_LOG            : "PO amendments logged"
-    PR_DUMP        ||--o| PR_PO_GRN_INVOICE     : "PR in P2P fact"
-    PO_DUMP        ||--o| PR_PO_GRN_INVOICE     : "PO in P2P fact"
-    PO_DUMP        ||--o| PROCESS_MINING_EVENTS : "PO anomaly classification"
-    USERS          ||--o{ AUDIT_LOG             : "User actions logged"
+    PURCHASE_REQUISITION ||--o{ PURCHASE_ORDER    : "fulfilled by"
+    PURCHASE_ORDER       ||--o{ GOODS_RECEIPT      : "received via"
+    PURCHASE_ORDER       ||--o{ INVOICE            : "billed against"
+    INVOICE              ||--o{ PAYMENT            : "settled by"
+    VENDOR               ||--o{ PURCHASE_ORDER     : "fulfills"
+    VENDOR               ||--o{ INVOICE            : "submits"
+    PURCHASE_ORDER       ||--|| P2P_ANALYTICS      : "analyzed in"
+    P2P_ANALYTICS        ||--o{ KPI_RESULTS        : "aggregated into"

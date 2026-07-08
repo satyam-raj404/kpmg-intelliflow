@@ -41,3 +41,46 @@ export const fetchP2PEvents = (params?: { limit?: number; offset?: number; varia
   if (params?.variant_class) qs.set("variant_class", params.variant_class);
   return apiFetch<P2PEventsResponse>(`/p2p/events?${qs.toString()}`);
 };
+
+export interface VendorApiRow {
+  id: number;
+  vendor: string;
+  vendor_name: string;
+  vendor_address: string | null;
+  country: string | null;
+  city: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+  spoc_name: string | null;
+  tax_number_pan: string | null;
+  msme_flag: string | null;
+  payment_terms: string | null;
+  service_description: string | null;
+  added_by: string | null;
+  vendor_type: string | null;
+  uploaded_at: string | null;
+}
+
+export interface AddVendorPayload {
+  vendor_code: string;
+  vendor_name: string;
+  vendor_address: string;
+  country: string;
+  contact_phone: string;
+  contact_email: string;
+  spoc_name: string;
+  tax_number_pan: string;
+  added_by: string;
+  msme_flag: string;
+  payment_terms: string;
+  service_description: string;
+}
+
+export const fetchVendors = () => apiFetch<VendorApiRow[]>("/vendors");
+
+export const addVendor = (payload: AddVendorPayload) =>
+  apiFetch<VendorApiRow>("/vendors", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });

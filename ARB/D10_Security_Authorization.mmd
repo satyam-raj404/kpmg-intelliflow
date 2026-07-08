@@ -3,89 +3,43 @@ flowchart TD
     classDef gateStyle  fill:#FEF9E7,stroke:#D4AC0D,color:#3D2B00,stroke-width:2px
     classDef allowStyle fill:#D5F5E3,stroke:#1E6823,color:#0A2D0F,stroke-width:2px
     classDef denyStyle  fill:#FADBD8,stroke:#C0392B,color:#1A0808,stroke-width:2px
-    classDef routeStyle fill:#EBF5FB,stroke:#1565C0,color:#0A1E4A,stroke-width:2px
-    classDef apiStyle   fill:#E8F0FE,stroke:#1565C0,color:#0A1E4A,stroke-width:2px
     classDef auditStyle fill:#F5EEF8,stroke:#512E5F,color:#2C0A3A,stroke-width:2px
 
-    subgraph ROLES["Authenticated Users — 12 Roles"]
-        R_ADMIN["Admin"]
-        R_PROC["Procurement Manager"]
-        R_FIN["Finance User"]
-        R_COMP["Compliance Officer"]
-        R_CXO["CXO"]
-        R_LEAD["Leadership"]
-        R_PART["Partner"]
-        R_DIR["Director"]
-        R_ADIR["Associate Director"]
-        R_MGR["Manager"]
-        R_CONS["Consultant"]
-        R_DM["Delivery Manager"]
+    subgraph ROLES["Authenticated User Roles"]
+        R1["Admin"]
+        R2["Procurement · Finance\nCompliance · Delivery Manager"]
+        R3["Leadership · CXO · Partner\nDirector · Associate Director\nManager · Consultant"]
     end
 
-    subgraph GATE["Authorization Gate"]
-        JWT_CHECK{"Validate JWT\nRSA signature\nExpiry check\nRole claim extraction"}
-        ROUTE_CHECK{"Frontend Route Guard\nTanStack Router\nbeforeLoad hook"}
-        API_CHECK{"Backend API Middleware\nFastAPI Depends — Target Arch\nRole claim validation per endpoint"}
+    GATE{"Authorization\nRole Check"}
+
+    subgraph RESOURCES["Protected Resources"]
+        RES1["Data Upload\nAdmin Only"]
+        RES2["User Management\nAdmin Only"]
+        RES3["Procurement · Finance\nCompliance Dashboards\nAll Business Roles"]
+        RES4["Leadership Dashboard\nExec Roles + All"]
+        RES5["Vendor Repository\nP2P Analytics\nAll Roles"]
     end
 
-    subgraph FRONTEND_ROUTES["Protected Frontend Routes"]
-        RT_DASH["/dashboard — Procurement KPIs\nAll roles READ"]
-        RT_FIN["/financial — Financial KPIs\nAll roles READ"]
-        RT_LEAD["/leadership — Leadership KPIs\nAll roles READ"]
-        RT_VEND["/vendors — Vendor KPIs\nAll roles READ"]
-        RT_UTIL["/utilization — Utilization KPIs\nAll roles READ"]
-        RT_UPLOAD["/upload — CSV Data Upload\nAdmin ONLY"]
-        RT_ASK["/ask — AI Assistant\nAll roles"]
-        RT_ADMIN["/admin — User Management\nAdmin ONLY"]
-        RT_ACT["/actions — Remediation Tracker\nAdmin + Procurement + Compliance"]
-    end
+    DENY["403 Forbidden\nAccess Denied"]
 
-    subgraph API_PERMS["API Endpoint Permissions"]
-        AP1["GET /api/kpi/** — All roles"]
-        AP2["POST /api/upload — Admin ONLY"]
-        AP3["POST /api/kpi/recompute — Admin ONLY"]
-        AP4["GET /api/p2p/** — All roles"]
-        AP5["GET /api/events/** — Admin + Procurement + Compliance"]
-        AP6["POST /api/auth/users — Admin ONLY"]
-        AP7["PUT /api/auth/users/:id — Admin ONLY"]
-        AP8["POST /api/auth/users/:id/reset-password — Admin ONLY"]
-        AP9["POST /api/chat — All roles"]
-    end
+    AUDIT["Audit Log\nAll access events recorded\nTimestamp · User · Action"]
 
-    subgraph AUDIT["Audit Trail — audit_log table"]
-        AUD["All events logged:\nLOGIN · LOGOUT · ROLE_SWITCH\nUSER_CREATED · USER_UPDATED\nPASSWORD_RESET · DATA_UPLOAD\nTimestamp + user_id + action + details"]
-    end
+    ROLES --> GATE
+    GATE -->|"Permitted"| RESOURCES
+    GATE -->|"Denied"| DENY
 
-    ROLES --> JWT_CHECK
-    JWT_CHECK -->|"Valid JWT + role"| ROUTE_CHECK
-    JWT_CHECK -->|"Invalid or expired"| DENY["Redirect to /login\n401 Unauthorized"]
-    ROUTE_CHECK -->|"Role permitted"| FRONTEND_ROUTES
-    ROUTE_CHECK -->|"Role not permitted"| DENY403["403 Forbidden\nRedirect to /dashboard"]
-    FRONTEND_ROUTES --> API_CHECK
-    API_CHECK -->|"Role claim OK"| API_PERMS
-    API_CHECK -->|"Role claim denied"| DENY_API["403 Forbidden\ndash detail: Insufficient role"]
-    API_PERMS --> AUDIT
+    R1 -->|"Full Access"| RES1
+    R1 -->|"Full Access"| RES2
+    R2 -->|"Primary Access"| RES3
+    R3 -->|"Primary Access"| RES4
+    ROLES -->|"All Roles"| RES5
+
+    RESOURCES --> AUDIT
     DENY --> AUDIT
-    DENY403 --> AUDIT
 
-    R_ADMIN -->|"All access"| RT_UPLOAD
-    R_ADMIN -->|"All access"| RT_ADMIN
-    R_PROC  -->|"Primary"| RT_DASH
-    R_PROC  -->|"Primary"| RT_VEND
-    R_FIN   -->|"Primary"| RT_FIN
-    R_FIN   -->|"Primary"| RT_UTIL
-    R_COMP  -->|"Primary"| RT_VEND
-    R_COMP  -->|"Primary"| RT_LEAD
-    R_CXO   -->|"Executive"| RT_LEAD
-    R_LEAD  -->|"Executive"| RT_LEAD
-    R_PART  -->|"Executive"| RT_LEAD
-    R_DIR   -->|"Executive"| RT_LEAD
-    R_ADIR  -->|"Executive"| RT_LEAD
-    R_DM    -->|"Primary"| RT_UTIL
-
-    class R_ADMIN,R_PROC,R_FIN,R_COMP,R_CXO,R_LEAD,R_PART,R_DIR,R_ADIR,R_MGR,R_CONS,R_DM roleStyle
-    class JWT_CHECK,ROUTE_CHECK,API_CHECK gateStyle
-    class RT_DASH,RT_FIN,RT_LEAD,RT_VEND,RT_UTIL,RT_UPLOAD,RT_ASK,RT_ADMIN,RT_ACT routeStyle
-    class AP1,AP2,AP3,AP4,AP5,AP6,AP7,AP8,AP9 apiStyle
-    class AUD auditStyle
-    class DENY,DENY403,DENY_API denyStyle
+    class R1,R2,R3 roleStyle
+    class GATE gateStyle
+    class RES1,RES2,RES3,RES4,RES5 allowStyle
+    class DENY denyStyle
+    class AUDIT auditStyle

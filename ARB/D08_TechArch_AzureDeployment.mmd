@@ -4,82 +4,62 @@ flowchart TD
     classDef appStyle  fill:#D5F5E3,stroke:#1E6823,color:#0A2D0F,stroke-width:2px
     classDef dataStyle fill:#F5EEF8,stroke:#512E5F,color:#2C0A3A,stroke-width:2px
     classDef idStyle   fill:#EBD5F7,stroke:#512E5F,color:#200A2A,stroke-width:2px
-    classDef opsStyle  fill:#FDEBD0,stroke:#7D4E05,color:#3D1F03,stroke-width:2px
-    classDef extStyle  fill:#FADBD8,stroke:#C0392B,color:#1A0808,stroke-width:2px
+    classDef opsStyle  fill:#FDEBD0,stroke:#B7770D,color:#3D1F03,stroke-width:2px
     classDef ciStyle   fill:#FEF9E7,stroke:#D4AC0D,color:#3D2B00,stroke-width:2px
+    classDef extStyle  fill:#FADBD8,stroke:#C0392B,color:#1A0808,stroke-width:2px
 
-    subgraph INTERNET["Internet Zone"]
-        USR["KPMG Staff\nBrowser — Chrome / Edge / Firefox\n12 Roles · 20-50 concurrent users"]
-        SAP_OP["SAP Operator\nCSV export + manual upload"]
+    subgraph INTERNET["Internet"]
+        USR["KPMG Staff\nWeb Browser"]
+        SAP_OP["SAP Admin\nCSV Upload"]
     end
 
-    subgraph AZURE_EDGE["Azure Edge / CDN Layer"]
-        CDN["Azure Static Web Apps\nor Vercel Edge CDN\nReact SPA — JS / CSS / HTML\nGlobal CDN edge caching"]
-        AFD["Azure Front Door\nor Application Gateway\nSSL Termination · Load Balancing"]
-        WAF["Azure WAF Policy\nOWASP rule set\nDDoS Protection Basic"]
+    subgraph EDGE["Azure Edge"]
+        CDN["Static Web App\nReact SPA · CDN"]
+        AGW["Application Gateway\n+ WAF"]
     end
 
-    subgraph AZURE_APP["Azure Application Zone — Azure Container Apps"]
-        ACA_BE["FastAPI Container\nPython 3.11 · Uvicorn\nPort 8000 — internal only\nMin 1 replica · Max 5 replicas\nAuto-scale on CPU / RPS"]
-        ACR["Azure Container Registry\nDocker image store\n:latest · :release tags"]
+    subgraph APP_ZONE["Azure Application Zone"]
+        ACA["Container App\nFastAPI · Python"]
+        ACR["Container Registry"]
     end
 
-    subgraph AZURE_DATA["Azure Data Zone"]
-        PGDB["Azure Database for PostgreSQL\nFlexible Server — PostgreSQL 15+\nSKU: General Purpose 4 vCores\nStorage: 64 GB · Auto-grow\nTLS enforced · Private VNet endpoint\n14 tables · 5-20 GB per year"]
-        KV["Azure Key Vault\nSecrets: DATABASE_URL\nOPENROUTER_API_KEY\nJWT_SECRET_KEY\nKPMG_SSO_CLIENT_SECRET"]
-        BACKUP["Azure Blob Storage\nNightly pg_dump backups\nRetention: 7 years transactional\n5 years audit log"]
+    subgraph DATA_ZONE["Azure Data Zone"]
+        PG[("PostgreSQL\nFlexible Server")]
+        KV["Key Vault\nSecrets"]
     end
 
-    subgraph AZURE_ID["Azure Identity"]
-        AAD["Azure Active Directory\nKPMG Identity Provider\nUser directory — 12 role groups\nConditional Access + MFA"]
-        APPREG["App Registration\nIntelliSource OAuth 2.0 client\nclient_id · client_secret\nredirect_uri · OIDC scopes"]
+    subgraph IDENTITY["Azure Identity"]
+        AAD["Azure Active Directory\nSSO · MFA · RBAC"]
     end
 
-    subgraph AZURE_OPS["Azure Operations and Monitoring"]
-        MON["Azure Monitor\n+ Application Insights\nAPM · Request tracing\nDependency maps · Performance counters"]
-        LOG["Azure Log Analytics Workspace\nApp logs · Audit trail\nPostgreSQL slow queries\nAlert rules: RTO breach · error spike"]
-        ALERTS["Azure Alerts\nEmail / Teams notification\non P99 latency · error rate\nDB connection exhaustion"]
+    subgraph OPS["Azure Operations"]
+        MON["Azure Monitor\n+ App Insights"]
+        LOG["Log Analytics"]
     end
 
-    subgraph CICD["CI/CD Pipeline — GitHub Actions"]
-        GH["GitHub Repository\nkpmg-intelliflow · main branch"]
-        PIPE_FE["Frontend Pipeline\ngit push to Vercel auto-deploy\nor Azure Static Web Apps CI"]
-        PIPE_BE["Backend Pipeline\ndocker build · docker push ACR\naz containerapp update"]
+    subgraph CICD["CI / CD"]
+        GH["GitHub\nSource & Pipelines"]
     end
 
-    subgraph EXTERNAL["External Services"]
-        OR["OpenRouter API\nopenrouter.ai — GPT-4o\nOutbound HTTPS 443\nCommercial pay-per-use"]
-        SAP_SRC["SAP ECC / S4HANA\nOn-Premise\nCSV export — manual batch"]
-    end
-
-    USR    -->|"HTTPS 443 — SPA"| CDN
-    USR    -->|"HTTPS 443 — API calls"| AFD
-    SAP_OP -->|"CSV upload HTTPS POST /api/upload"| AFD
-    CDN    -->|"SPA calls backend"| AFD
-    AFD    --> WAF
-    WAF    -->|"Allowed traffic — HTTPS internal"| ACA_BE
-    ACA_BE <-->|"psycopg3 TLS port 5432 — Private VNet"| PGDB
-    ACA_BE -->|"Read secrets via Managed Identity"| KV
-    ACA_BE <-->|"HTTPS 443 BEARER token"| OR
-    AAD    <-->|"OAuth 2.0 id_token + access_token"| APPREG
-    APPREG -->|"JWT validation + role mapping"| ACA_BE
-    GH     --> PIPE_FE
-    GH     --> PIPE_BE
-    PIPE_BE -->|"Docker push"| ACR
-    ACR    -->|"Pull on revision deploy"| ACA_BE
-    PIPE_FE -->|"Deploy static assets"| CDN
-    ACA_BE -->|"Telemetry + traces"| MON
-    ACA_BE -->|"App logs"| LOG
-    PGDB   -->|"Query logs"| LOG
-    LOG    --> ALERTS
-    PGDB   -->|"Scheduled backup"| BACKUP
-    SAP_SRC -->|"Manual CSV export by admin"| SAP_OP
+    USR     -->|"HTTPS"| CDN
+    USR     -->|"HTTPS"| AGW
+    SAP_OP  -->|"CSV Upload · HTTPS"| AGW
+    CDN     --> AGW
+    AGW     -->|"Internal HTTPS"| ACA
+    ACA     <-->|"TLS · Port 5432"| PG
+    ACA     -->|"Managed Identity"| KV
+    AAD     -->|"OAuth 2.0 Tokens"| ACA
+    GH      -->|"Docker Push"| ACR
+    GH      -->|"Deploy SPA"| CDN
+    ACR     -->|"Image Pull"| ACA
+    ACA     --> MON
+    ACA     --> LOG
+    PG      --> LOG
 
     class USR,SAP_OP userStyle
-    class CDN,AFD,WAF edgeStyle
-    class ACA_BE,ACR appStyle
-    class PGDB,KV,BACKUP dataStyle
-    class AAD,APPREG idStyle
-    class MON,LOG,ALERTS opsStyle
-    class OR,SAP_SRC extStyle
-    class GH,PIPE_FE,PIPE_BE ciStyle
+    class CDN,AGW edgeStyle
+    class ACA,ACR appStyle
+    class PG,KV dataStyle
+    class AAD idStyle
+    class MON,LOG opsStyle
+    class GH ciStyle
