@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 from database import get_connection
+from services.audit import write_audit
 
 router = APIRouter()
 
@@ -223,4 +224,11 @@ def log_action(body: LogActionRequest):
         ),
     )
     conn.commit()
+    write_audit(
+        user_id=body.approver_email or "admin",
+        action="ACTION_LOGGED",
+        entity_type=body.doc_type or "DOC",
+        entity_id=body.doc_number or "",
+        details=f"vendor={body.vendor} changes={list(body.changes.keys())}",
+    )
     return {"ok": True, "message": "Action logged for approver review"}

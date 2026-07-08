@@ -214,8 +214,18 @@ def login(body: LoginBody):
         (body.email.lower().strip(),),
     ).fetchone()
     if not user:
+        conn.execute(
+            "INSERT INTO audit_log (user_id, action, entity_type, details) VALUES (?, ?, ?, ?)",
+            ("unknown", "LOGIN_FAILED", "SESSION", f"email={body.email.lower().strip()}"),
+        )
+        conn.commit()
         raise HTTPException(401, "Invalid email or password")
     if not user[4] or user[4] != body.password:
+        conn.execute(
+            "INSERT INTO audit_log (user_id, action, entity_type, details) VALUES (?, ?, ?, ?)",
+            (user[2], "LOGIN_FAILED", "SESSION", f"email={user[1]} role={user[3]}"),
+        )
+        conn.commit()
         raise HTTPException(401, "Invalid email or password")
     if not user[5]:
         raise HTTPException(403, "Account is deactivated")
@@ -225,3 +235,29 @@ def login(body: LoginBody):
     )
     conn.commit()
     return {"user_id": user[0], "email": user[1], "full_name": user[2], "role": user[3]}
+
+
+@router.get("/audit")
+def get_audit_log(limit: int = Query(default=100, le=500)):
+    conn = get_connection()
+    rows = conn.execute(
+        """
+        SELECT log_id, user_id, action, entity_type, entity_id, details, created_at
+        FROM audit_log
+        ORDER BY created_at DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+    return [
+        {
+            "id": r[0],
+            "user": r[1],
+            "action": r[2],
+            "entity": r[3],
+            "entity_id": r[4] or "",
+            "details": r[5] or "",
+            "timestamp": r[6],
+        }
+        for r in rows
+    ]

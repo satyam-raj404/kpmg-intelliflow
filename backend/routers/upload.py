@@ -8,6 +8,7 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from database import get_connection
 from services.etl import run_etl
+from services.audit import write_audit
 from routers.events import broadcast
 
 router = APIRouter()
@@ -23,6 +24,13 @@ def _etl_worker(file_bytes: bytes, filename: str, batch_id: str) -> None:
 
     try:
         run_etl(file_bytes, filename, batch_id, progress_cb=_progress)
+        write_audit(
+            user_id="admin",
+            action="DATA_UPLOAD",
+            entity_type="UPLOAD",
+            entity_id=batch_id,
+            details=f"file={filename}",
+        )
         broadcast({
             "type": "KPI_REFRESH",
             "batch_id": batch_id,
@@ -35,6 +43,13 @@ def _etl_worker(file_bytes: bytes, filename: str, batch_id: str) -> None:
             (str(exc), batch_id),
         )
         conn.commit()
+        write_audit(
+            user_id="admin",
+            action="UPLOAD_FAILED",
+            entity_type="UPLOAD",
+            entity_id=batch_id,
+            details=f"file={filename} error={str(exc)[:200]}",
+        )
         broadcast({"type": "UPLOAD_ERROR", "batch_id": batch_id, "error": str(exc)})
 
 

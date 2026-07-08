@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from database import get_connection
+from services.audit import write_audit
 
 router = APIRouter()
 
@@ -84,6 +85,13 @@ def create_profit_center(body: PCBody):
         conn.commit()
     except Exception as exc:
         raise HTTPException(409, f"PC already exists or DB error: {exc}")
+    write_audit(
+        user_id="admin",
+        action="PC_CREATED",
+        entity_type="PROFIT_CENTER",
+        entity_id=body.profit_center,
+        details=f"name={body.pc_name} company={body.company_code} type={body.default_capex_opex}",
+    )
     return {"ok": True, "profit_center": body.profit_center}
 
 
@@ -135,6 +143,13 @@ def update_profit_center(pc_code: str, body: PCUpdateBody):
                      (body.is_active, pc_code))
 
     conn.commit()
+    write_audit(
+        user_id="admin",
+        action="PC_UPDATED",
+        entity_type="PROFIT_CENTER",
+        entity_id=pc_code,
+        details=str({k: v for k, v in body.model_dump().items() if v is not None}),
+    )
     return {"ok": True}
 
 
@@ -143,4 +158,11 @@ def delete_profit_center(pc_code: str):
     conn = get_connection()
     conn.execute("UPDATE profit_center_master SET is_active = 0 WHERE profit_center = ?", (pc_code,))
     conn.commit()
+    write_audit(
+        user_id="admin",
+        action="PC_DELETED",
+        entity_type="PROFIT_CENTER",
+        entity_id=pc_code,
+        details="is_active set to 0",
+    )
     return {"ok": True}

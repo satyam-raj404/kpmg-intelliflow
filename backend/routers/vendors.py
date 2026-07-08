@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from database import get_connection
+from services.audit import write_audit
 
 router = APIRouter()
 
@@ -78,6 +79,13 @@ def add_vendor(body: AddVendorBody):
         ),
     )
     conn.commit()
+    write_audit(
+        user_id=body.added_by.strip() or "admin",
+        action="VENDOR_CREATED",
+        entity_type="VENDOR",
+        entity_id=body.vendor_code.strip(),
+        details=f"name={body.vendor_name.strip()} country={body.country.strip()} msme={body.msme_flag}",
+    )
 
     row = conn.execute(
         "SELECT * FROM vendor_master WHERE vendor = ?", (body.vendor_code.strip(),)

@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from database import get_connection
 from services.kpi_engine import compute_all, compute_chart_data
+from services.audit import write_audit
 
 router = APIRouter()
 
@@ -207,5 +208,11 @@ def update_kpi_config(key: str, body: ConfigUpdate):
 
     # Re-compute all KPIs with the new threshold
     compute_all(conn)
-
+    write_audit(
+        user_id="admin",
+        action="KPI_CONFIG_UPDATED",
+        entity_type="KPI_CONFIG",
+        entity_id=key,
+        details=f"new_value={body.value}",
+    )
     return {"config_key": key, "config_value": body.value, "status": "updated"}

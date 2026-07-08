@@ -5,6 +5,7 @@ from typing import Optional
 import threading
 
 from services.chat_engine import run_chat
+from services.audit import write_audit
 
 router = APIRouter()
 
@@ -38,6 +39,13 @@ def chat(body: ChatRequest):
     with _sessions_lock:
         _sessions[sid] = result["new_history"]
 
+    write_audit(
+        user_id="user",
+        action="CHAT_QUERY",
+        entity_type="CHAT",
+        entity_id=sid,
+        details=f"q={body.message[:120]}",
+    )
     return {
         "reply": result["reply"],
         "tools_used": result["tools_used"],
