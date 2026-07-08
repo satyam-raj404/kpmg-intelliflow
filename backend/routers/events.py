@@ -9,6 +9,13 @@ from fastapi.responses import StreamingResponse
 router = APIRouter()
 
 _clients: list[asyncio.Queue] = []
+_loop: asyncio.AbstractEventLoop | None = None
+
+
+def set_event_loop(loop: asyncio.AbstractEventLoop) -> None:
+    """Store the main event loop so broadcast() can schedule work thread-safely."""
+    global _loop
+    _loop = loop
 
 
 async def _event_stream(queue: asyncio.Queue) -> AsyncGenerator[str, None]:
@@ -41,13 +48,23 @@ async def stream():
     )
 
 
+def _put_nowait_safe(q: asyncio.Queue, event: dict) -> None:
+    try:
+        q.put_nowait(event)
+    except Exception:
+        pass
+
+
 def broadcast(event: dict) -> None:
-    """Called from background ETL thread via asyncio.run_coroutine_threadsafe."""
-    for q in list(_clients):
-        try:
-            q.put_nowait(event)
-        except asyncio.QueueFull:
-            pass
+    """Thread-safe broadcast: schedule put_nowait on the main event loop."""
+    if not _clients:
+        return
+    if _loop is not None and _loop.is_running():
+        for q in list(_clients):
+            _loop.call_soon_threadsafe(_put_nowait_safe, q, event)
+    else:
+        for q in list(_clients):
+            _put_nowait_safe(q, event)
 
 
 async def broadcast_async(event: dict) -> None:

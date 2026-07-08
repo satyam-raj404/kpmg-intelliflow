@@ -23,9 +23,11 @@ from routers import upload, kpi, p2p, events, actions, auth, chat, profit_center
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from routers.events import set_event_loop
+    loop = asyncio.get_running_loop()
+    set_event_loop(loop)
     init_db()
     # Pre-warm DB connections
-    loop = asyncio.get_event_loop()
     await asyncio.gather(*[loop.run_in_executor(None, get_connection) for _ in range(8)])
     # Fire seed in background — does NOT block startup
     loop.run_in_executor(None, _run_seed)

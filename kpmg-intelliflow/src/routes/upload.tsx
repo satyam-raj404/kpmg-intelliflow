@@ -13,7 +13,7 @@ export const Route = createFileRoute("/upload")({
 
 const DATASET_GUIDE = [
   { name: "01 — Purchase Requisition", key: "pr_dump", columns: ["purchase_requisition", "item_of_requisition", "requisitioner", "valuation_price", "order_quantity", "delivery_date"] },
-  { name: "02 — Purchase Order",       key: "po_dump",  columns: ["purchasing_document", "item", "vendor", "vendor_name", "net_order_value", "net_order_price", "order_quantity"] },
+  { name: "02 — Purchase Order",       key: "po_dump",  columns: ["purchasing_document", "item", "vendor", "vendor_name", "net_order_value", "net_order_price", "order_quantity", "capex_opex_flag"] },
   { name: "03 — PO Delivery Schedule", key: "po_delivery_dump", columns: ["purchasing_document", "item", "schedule_line", "expected_delivery_date", "scheduled_quantity"] },
   { name: "04 — Goods Receipt (GRN)",  key: "grn_dump", columns: ["purchasing_document", "item", "material_document", "po_history_category", "movement_type", "debit_credit_ind"] },
   { name: "05 — PO Invoice",           key: "po_invoice_dump", columns: ["purchasing_document", "item", "invoice_doc", "invoice_year", "po_history_category", "debit_credit_ind"] },
@@ -21,6 +21,7 @@ const DATASET_GUIDE = [
   { name: "07 — Payment",              key: "payment_dump", columns: ["payment_doc", "payment_year", "vendor", "posting_date", "clearing_date", "cleared_invoice", "house_bank"] },
   { name: "08 — Vendor Master",        key: "vendor_master", columns: ["vendor", "vendor_name", "country", "city", "account_group", "central_purchasing_block"] },
   { name: "09 — Change Log",           key: "change_log", columns: ["object_class", "object_id", "change_number", "username", "change_date", "field_name", "change_indicator"] },
+  { name: "10 — Company / Plant Master", key: "company_plant_master", columns: ["company_code", "company_name", "purchasing_org", "plant", "plant_name"] },
 ];
 
 function UploadPage() {

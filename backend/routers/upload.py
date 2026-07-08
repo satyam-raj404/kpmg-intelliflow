@@ -4,7 +4,7 @@ import json
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from database import get_connection
 from services.etl import run_etl
@@ -18,8 +18,6 @@ ALLOWED_EXT = {".csv", ".xlsx", ".xls"}
 
 
 def _etl_worker(file_bytes: bytes, filename: str, batch_id: str) -> None:
-    loop = asyncio.new_event_loop()
-
     def _progress(pct: int, msg: str) -> None:
         broadcast({"type": "UPLOAD_PROGRESS", "batch_id": batch_id, "pct": pct, "message": msg})
 
@@ -38,13 +36,10 @@ def _etl_worker(file_bytes: bytes, filename: str, batch_id: str) -> None:
         )
         conn.commit()
         broadcast({"type": "UPLOAD_ERROR", "batch_id": batch_id, "error": str(exc)})
-    finally:
-        loop.close()
 
 
 @router.post("/upload")
 async def upload_file(
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
 ):
     filename = file.filename or "upload"
@@ -66,7 +61,7 @@ async def upload_file(
     )
     conn.commit()
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     loop.run_in_executor(_executor, _etl_worker, content, filename, batch_id)
 
     return {"batch_id": batch_id, "status": "PROCESSING"}
