@@ -256,15 +256,12 @@ CREATE INDEX IF NOT EXISTS idx_vm_vendor ON vendor_master(vendor);
 CREATE INDEX IF NOT EXISTS idx_vm_block  ON vendor_master(central_purchasing_block, payment_block);
 CREATE INDEX IF NOT EXISTS idx_vm_type   ON vendor_master(vendor_type);
 
--- Idempotent migrations: add columns introduced after initial schema
-DO $$ BEGIN
-  ALTER TABLE vendor_master ADD COLUMN IF NOT EXISTS vendor_address   TEXT;
-  ALTER TABLE vendor_master ADD COLUMN IF NOT EXISTS contact_phone    TEXT;
-  ALTER TABLE vendor_master ADD COLUMN IF NOT EXISTS contact_email    TEXT;
-  ALTER TABLE vendor_master ADD COLUMN IF NOT EXISTS spoc_name        TEXT;
-  ALTER TABLE vendor_master ADD COLUMN IF NOT EXISTS added_by         TEXT;
-  ALTER TABLE vendor_master ADD COLUMN IF NOT EXISTS service_description TEXT;
-END $$;
+ALTER TABLE vendor_master ADD COLUMN IF NOT EXISTS vendor_address      TEXT;
+ALTER TABLE vendor_master ADD COLUMN IF NOT EXISTS contact_phone       TEXT;
+ALTER TABLE vendor_master ADD COLUMN IF NOT EXISTS contact_email       TEXT;
+ALTER TABLE vendor_master ADD COLUMN IF NOT EXISTS spoc_name           TEXT;
+ALTER TABLE vendor_master ADD COLUMN IF NOT EXISTS added_by            TEXT;
+ALTER TABLE vendor_master ADD COLUMN IF NOT EXISTS service_description TEXT;
 
 
 CREATE TABLE IF NOT EXISTS change_log (
