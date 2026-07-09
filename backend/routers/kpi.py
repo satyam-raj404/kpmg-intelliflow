@@ -74,7 +74,7 @@ def _cc(company_code: str, alias: str = "") -> str:
 
 
 @router.get("/summary-detail/{key}")
-def get_summary_detail(key: str, company_code: str = Query(default="ALL")):
+def get_summary_detail(key: str, company_code: str = Query(default="ALL"), limit: int = Query(default=15, ge=1, le=200)):
     if key not in _VALID_SUMMARY_KEYS:
         raise HTTPException(404, f"Unknown summary key: '{key}'")
     if company_code != "ALL" and not re.match(r"^[A-Za-z0-9_\-]+$", company_code):
@@ -82,6 +82,8 @@ def get_summary_detail(key: str, company_code: str = Query(default="ALL")):
 
     cc = _cc(company_code)
     cc_po = _cc(company_code, "po")
+    cc_grn = _cc(company_code, "grn")
+    cc_inv = _cc(company_code, "i")
 
     queries: dict[str, tuple[str, list[str]]] = {
         "approved_pr": (
@@ -160,18 +162,49 @@ def get_summary_detail(key: str, company_code: str = Query(default="ALL")):
             ["Vendor", "Invoice Ref", "Amount (₹)", "Duplicates", "First Date"],
         ),
         "sod_conflicts": (
-            f"SELECT DISTINCT po.purchasing_document, po.vendor_name,"
-            f" po.created_by AS po_creator, grn.created_by AS grn_creator, po.document_date"
+            f"SELECT doc, sod_type, vendor, conflicting_user, date FROM ("
+            f" SELECT DISTINCT po.purchasing_document AS doc, 'PO-Release' AS sod_type,"
+            f"  COALESCE(po.vendor_name, po.vendor, '') AS vendor,"
+            f"  po.created_by AS conflicting_user, po.document_date AS date"
             f" FROM po_dump po"
-            f" JOIN grn_dump grn ON po.purchasing_document = grn.purchasing_document"
-            f" WHERE po.created_by IS NOT NULL AND po.created_by <> ''"
-            f" AND po.created_by = grn.created_by AND {cc_po}"
-            f" ORDER BY po.document_date DESC NULLS LAST LIMIT 15",
-            ["PO Number", "Vendor", "PO Creator", "GRN Creator", "Date"],
+            f" JOIN change_log cl ON cl.object_id = po.purchasing_document"
+            f" WHERE cl.object_class = 'EINKBELEG' AND cl.table_name = 'EKKO'"
+            f"  AND cl.field_name = 'FRGZU' AND cl.change_indicator IN ('E','U')"
+            f"  AND cl.new_value = 'X' AND cl.username = po.created_by"
+            f"  AND (po.deletion_indicator IS NULL OR po.deletion_indicator = '') AND {cc_po}"
+            f" UNION ALL"
+            f" SELECT DISTINCT po.purchasing_document, 'PO-GRN',"
+            f"  COALESCE(po.vendor_name, po.vendor, ''), po.created_by, po.document_date"
+            f" FROM po_dump po"
+            f" JOIN grn_dump grn ON grn.purchasing_document = po.purchasing_document AND grn.item = po.item"
+            f" WHERE po.created_by = grn.created_by"
+            f"  AND (po.deletion_indicator IS NULL OR po.deletion_indicator = '')"
+            f"  AND grn.debit_credit_ind = 'S' AND {cc_po}"
+            f" UNION ALL"
+            f" SELECT DISTINCT grn.purchasing_document, 'GRN-Invoice',"
+            f"  COALESCE(grn.vendor, ''), grn.created_by, grn.posting_date"
+            f" FROM grn_dump grn"
+            f" JOIN po_invoice_dump inv ON inv.purchasing_document = grn.purchasing_document AND inv.item = grn.item"
+            f" WHERE grn.created_by = inv.created_by"
+            f"  AND grn.debit_credit_ind = 'S' AND inv.debit_credit_ind = 'S' AND {cc_grn}"
+            f" UNION ALL"
+            f" SELECT DISTINCT i.invoice_doc, 'Invoice-Payment',"
+            f"  COALESCE(i.vendor, ''), i.created_by, i.posting_date"
+            f" FROM invoice_dump i"
+            f" JOIN payment_dump p ON p.company_code = i.company_code AND p.vendor = i.vendor AND p.cleared_invoice = i.invoice_doc"
+            f" WHERE i.created_by = p.created_by AND i.document_type IN ('RE','KR')"
+            f"  AND (i.reverse_invoice IS NULL OR i.reverse_invoice = '')"
+            f"  AND i.invoice_doc NOT IN ("
+            f"   SELECT DISTINCT reverse_invoice FROM invoice_dump"
+            f"   WHERE reverse_invoice IS NOT NULL AND reverse_invoice != ''"
+            f"  ) AND p.debit_credit_ind = 'S' AND {cc_inv}"
+            f") t ORDER BY date DESC NULLS LAST LIMIT 15",
+            ["Document", "SOD Type", "Vendor", "Conflicting User", "Date"],
         ),
     }
 
     sql, columns = queries[key]
+    sql = re.sub(r'LIMIT\s+\d+\s*$', f'LIMIT {limit}', sql.rstrip())
     conn = get_connection()
     try:
         rows = conn.execute(sql).fetchall()

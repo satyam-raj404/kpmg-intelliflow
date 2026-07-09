@@ -74,21 +74,66 @@ function CompanyFilter({ value, onChange }: { value: string; onChange: (v: strin
   );
 }
 
+function VendorFilter({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { data: rows = [] } = useQuery<DeletedPO[]>({
+    queryKey: ["po-deletions"],
+    queryFn: () => apiFetch<DeletedPO[]>("/p2p/po-deletions?limit=20"),
+    staleTime: 60_000,
+  });
+
+  // Build unique vendor list from already-fetched po-deletions data
+  const vendorMap = new Map<string, string>();
+  rows.forEach((r) => {
+    if (r.vendor && !vendorMap.has(r.vendor)) {
+      vendorMap.set(r.vendor, r.vendor_name ?? r.vendor);
+    }
+  });
+  const vendors = Array.from(vendorMap.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+
+  if (vendors.length === 0) return null;
+
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span className="text-muted-foreground font-medium">Vendor:</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="border border-border rounded-md px-2 py-1 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+      >
+        <option value="ALL">All Vendors</option>
+        {vendors.map(([code, name]) => (
+          <option key={code} value={code}>{name}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function ProcurementDashboard() {
   const [company, setCompany] = useState("ALL");
+  const [vendor, setVendor] = useState("ALL");
   usePrefetchKpiCompanies("procurement");
   const { containerRef, exportPdf, isExporting } = useDashboardExport("Procurement Dashboard", company);
+
+  const handleCompanyChange = (v: string) => {
+    setCompany(v);
+    setVendor("ALL");
+  };
+
   return (
     <AppShell>
       <div ref={containerRef}>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <PageHeader
             title="Procurement Dashboard"
             subtitle="Real-time visibility into PO activity, breaches, and operational priorities"
             onExportPdf={exportPdf}
             isExporting={isExporting}
           />
-          <CompanyFilter value={company} onChange={setCompany} />
+          <div className="flex items-center gap-3">
+            <VendorFilter value={vendor} onChange={setVendor} />
+            <CompanyFilter value={company} onChange={handleCompanyChange} />
+          </div>
         </div>
         <KpiRow company={company} />
         <div className="grid grid-cols-2 gap-4 mt-4">
@@ -96,7 +141,7 @@ function ProcurementDashboard() {
           <POCountAndMaverick />
         </div>
         <div className="mt-4">
-          <PODeletionMonitor />
+          <PODeletionMonitor selectedVendor={vendor} />
         </div>
         <div className="mt-4">
           <AlertCenter />
@@ -383,18 +428,25 @@ function AlertCenter() {
   );
 }
 
-function PODeletionMonitor() {
+function PODeletionMonitor({ selectedVendor }: { selectedVendor: string }) {
   const { data: rows = [], isLoading } = useQuery<DeletedPO[]>({
     queryKey: ["po-deletions"],
     queryFn: () => apiFetch<DeletedPO[]>("/p2p/po-deletions?limit=20"),
+    staleTime: 60_000,
   });
 
-  const totalValue = rows.reduce((s, r) => s + parseFloat(r.net_order_value || "0"), 0);
+  // Filter display only — KPI logic and fetch unchanged
+  const filtered = selectedVendor === "ALL" ? rows : rows.filter((r) => r.vendor === selectedVendor);
+  const totalValue = filtered.reduce((s, r) => s + parseFloat(r.net_order_value || "0"), 0);
+
+  const vendorLabel = selectedVendor !== "ALL"
+    ? ` · ${rows.find((r) => r.vendor === selectedVendor)?.vendor_name ?? selectedVendor}`
+    : "";
 
   return (
     <SectionCard
       title="PO Deletion Anomaly Monitor"
-      subtitle={`deletion_indicator = L · ${rows.length} deleted POs · ${formatINR(totalValue)} at risk`}
+      subtitle={`deletion_indicator = L · ${filtered.length} deleted POs${vendorLabel} · ${formatINR(totalValue)} at risk`}
       actions={
         rows.length > 0 ? (
           <StatusPill tone="danger" dot>Requires Review</StatusPill>
@@ -404,8 +456,10 @@ function PODeletionMonitor() {
     >
       {isLoading ? (
         <div className="p-6 text-center text-sm text-muted-foreground">Loading…</div>
-      ) : rows.length === 0 ? (
-        <div className="p-6 text-center text-sm text-muted-foreground">No deleted POs found</div>
+      ) : filtered.length === 0 ? (
+        <div className="p-6 text-center text-sm text-muted-foreground">
+          {selectedVendor === "ALL" ? "No deleted POs found" : "No deleted POs for selected vendor"}
+        </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-[12px]">
@@ -422,7 +476,7 @@ function PODeletionMonitor() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {rows.map((po) => {
+              {filtered.map((po) => {
                 const flags = po.anomaly_flags
                   ? po.anomaly_flags.split(",").map((f) => f.trim()).filter(Boolean)
                   : [];

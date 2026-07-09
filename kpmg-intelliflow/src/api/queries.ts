@@ -34,6 +34,23 @@ export const fetchLifecycle = () =>
 export const fetchAnomalies = () =>
   apiFetch<AnomalyCount[]>("/p2p/anomalies");
 
+export interface AnomalyDetailRow {
+  purchasing_document:  string;
+  vendor:               string | null;
+  purchase_requisition: string | null;
+  anomaly_flags:        string | null;
+  vendor_name:          string | null;
+  net_order_value:      number | null;
+  document_date:        string | null;
+  material_description: string | null;
+  material_group:       string | null;
+  company_code:         string | null;
+  created_by:           string | null;
+}
+
+export const fetchAnomalyDetail = (code: string, limit = 50) =>
+  apiFetch<AnomalyDetailRow[]>(`/p2p/anomaly-detail?code=${encodeURIComponent(code)}&limit=${limit}`);
+
 export const fetchP2PEvents = (params?: { limit?: number; offset?: number; variant_class?: string }) => {
   const qs = new URLSearchParams();
   if (params?.limit) qs.set("limit", String(params.limit));

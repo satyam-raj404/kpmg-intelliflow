@@ -52,31 +52,88 @@ function CompanyFilter({ value, onChange }: { value: string; onChange: (v: strin
   );
 }
 
+function VendorFilter({
+  company,
+  value,
+  onChange,
+}: {
+  company: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const { data: kpiData } = useKpi("vendor", company);
+
+  // Build vendor list from both JSON fields (delivery + spend) merged by vendor code
+  const vendorMap = new Map<string, string>();
+  for (const kpiCode of ["VENDOR_DELIVERY_DAYS", "TOP_VENDOR_SPEND"]) {
+    const kpi = kpiData?.kpis.find((k) => k.kpi_code === kpiCode);
+    if (kpi?.value_text) {
+      try {
+        const list: Array<{ vendor: string; name: string }> = JSON.parse(kpi.value_text);
+        list.forEach((v) => {
+          if (v.vendor && !vendorMap.has(v.vendor)) {
+            vendorMap.set(v.vendor, v.name ?? v.vendor);
+          }
+        });
+      } catch {}
+    }
+  }
+
+  const vendors = Array.from(vendorMap.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  if (vendors.length === 0) return null;
+
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span className="text-muted-foreground font-medium">Vendor:</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="border border-border rounded-md px-2 py-1 text-sm bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+      >
+        <option value="ALL">All Vendors</option>
+        {vendors.map(([code, name]) => (
+          <option key={code} value={code}>{name}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function VendorDashboard() {
   const [company, setCompany] = useState("ALL");
+  const [vendor, setVendor] = useState("ALL");
   usePrefetchKpiCompanies("vendor");
   const { containerRef, exportPdf, isExporting } = useDashboardExport("Vendor Performance", company);
+
+  // Reset vendor filter when company changes
+  const handleCompanyChange = (v: string) => {
+    setCompany(v);
+    setVendor("ALL");
+  };
 
   return (
     <AppShell>
       <div ref={containerRef}>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <PageHeader
             title="Vendor Performance"
             subtitle="Delivery, compliance, and spend concentration analytics"
             onExportPdf={exportPdf}
             isExporting={isExporting}
           />
-          <CompanyFilter value={company} onChange={setCompany} />
+          <div className="flex items-center gap-3">
+            <VendorFilter company={company} value={vendor} onChange={setVendor} />
+            <CompanyFilter value={company} onChange={handleCompanyChange} />
+          </div>
         </div>
         <KpiRow company={company} />
         <VendorHealthStats company={company} />
         <div className="grid grid-cols-2 gap-4 mt-4">
-          <VendorDeliveryChart company={company} />
+          <VendorDeliveryChart company={company} selectedVendor={vendor} />
           <ComplianceDonut />
         </div>
         <div className="grid grid-cols-2 gap-4 mt-4">
-          <TopVendors company={company} />
+          <TopVendors company={company} selectedVendor={vendor} />
           <VendorTypeChart />
         </div>
       </div>
@@ -167,7 +224,7 @@ function VendorHealthStats({ company }: { company: string }) {
   );
 }
 
-function VendorDeliveryChart({ company }: { company: string }) {
+function VendorDeliveryChart({ company, selectedVendor }: { company: string; selectedVendor: string }) {
   const { data: kpiData, isLoading } = useKpi("vendor", company);
   const kpi = kpiData?.kpis.find((k) => k.kpi_code === "VENDOR_DELIVERY_DAYS");
 
@@ -176,19 +233,28 @@ function VendorDeliveryChart({ company }: { company: string }) {
     try { vendors = JSON.parse(kpi.value_text).slice(0, 15); } catch {}
   }
 
-  const chartData = vendors.map((v) => ({
+  // Apply vendor filter — keep KPI source data untouched, filter display list only
+  const filtered = selectedVendor === "ALL" ? vendors : vendors.filter((v) => v.vendor === selectedVendor);
+
+  const chartData = filtered.map((v) => ({
     name: v.name.length > 20 ? v.name.slice(0, 20) + "…" : v.name,
     avg_days: v.avg_days,
     po_lines: v.po_lines,
   }));
 
+  const subtitle = selectedVendor === "ALL"
+    ? "Avg days: expected delivery → first GRN (−=early, +=late)"
+    : `Filtered: ${filtered[0]?.name ?? selectedVendor} · avg days: expected delivery → first GRN`;
+
   return (
-    <SectionCard title="Vendor Delivery Lead Time" subtitle="Avg days: expected delivery → first GRN (−=early, +=late)">
+    <SectionCard title="Vendor Delivery Lead Time" subtitle={subtitle}>
       <div className="h-64">
         {isLoading ? (
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Loading…</div>
         ) : chartData.length === 0 ? (
-          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Upload PO and GRN data to view</div>
+          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+            {selectedVendor === "ALL" ? "Upload PO and GRN data to view" : "No delivery data for selected vendor"}
+          </div>
         ) : (
           <ResponsiveContainer>
             <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 40, left: 110, bottom: 4 }}>
@@ -214,7 +280,7 @@ function VendorDeliveryChart({ company }: { company: string }) {
   );
 }
 
-function TopVendors({ company }: { company: string }) {
+function TopVendors({ company, selectedVendor }: { company: string; selectedVendor: string }) {
   const { data: kpiData, isLoading } = useKpi("vendor", company);
   const v6 = kpiData?.kpis.find((k) => k.kpi_code === "TOP_VENDOR_SPEND");
 
@@ -225,15 +291,22 @@ function TopVendors({ company }: { company: string }) {
     } catch {}
   }
 
-  const barData = vendors.map((v) => ({ name: v.name ?? v.vendor, spend: v.spend / 1_00_00_000 }));
+  // Apply vendor filter — filter display list only, KPI source data unchanged
+  const filtered = selectedVendor === "ALL" ? vendors : vendors.filter((v) => v.vendor === selectedVendor);
+  const barData = filtered.map((v) => ({ name: v.name ?? v.vendor, spend: v.spend / 1_00_00_000 }));
+
+  const title = selectedVendor === "ALL" ? "Top-10 Vendors by Spend" : "Vendor Spend";
+  const subtitle = selectedVendor === "ALL" ? "₹ Cr" : `${filtered[0]?.name ?? selectedVendor} · ₹ Cr`;
 
   return (
-    <SectionCard title="Top-10 Vendors by Spend" subtitle="₹ Cr">
+    <SectionCard title={title} subtitle={subtitle}>
       <div className="h-64">
         {isLoading ? (
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Loading…</div>
         ) : barData.length === 0 ? (
-          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Upload PO data to view vendor spend</div>
+          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+            {selectedVendor === "ALL" ? "Upload PO data to view vendor spend" : "No spend data for selected vendor"}
+          </div>
         ) : (
           <ResponsiveContainer>
             <BarChart data={barData} layout="vertical" margin={{ top: 4, right: 32, left: 100, bottom: 4 }}>

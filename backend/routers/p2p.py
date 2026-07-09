@@ -387,6 +387,75 @@ def get_anomalies():
     return result
 
 
+# ── /p2p/anomaly-detail ───────────────────────────────────────────────────────
+
+@router.get("/p2p/anomaly-detail")
+def get_anomaly_detail(
+    code:  str = Query(..., description="Anomaly code e.g. MAVERICK_BUY"),
+    limit: int = Query(default=50, le=200),
+):
+    if not code or len(code) > 60:
+        raise HTTPException(400, "Invalid anomaly code")
+
+    conn = get_connection()
+
+    # Step 1: get PO numbers with this anomaly from PME (indexed anomaly_flags LIKE)
+    pme_rows = conn.execute(
+        """
+        SELECT DISTINCT purchasing_document, vendor, purchase_requisition, anomaly_flags
+        FROM process_mining_events
+        WHERE anomaly_flags LIKE ?
+        LIMIT ?
+        """,
+        (f"%{code}%", limit),
+    ).fetchall()
+
+    if not pme_rows:
+        return []
+
+    # Step 2: look up PO details for those specific PO numbers (point lookups via index)
+    po_nums = list({r[0] for r in pme_rows if r[0]})
+    placeholders = ", ".join("?" * len(po_nums))
+    po_rows = conn.execute(
+        f"""
+        SELECT DISTINCT ON (purchasing_document)
+            purchasing_document,
+            COALESCE(vendor_name, vendor) AS vendor_name,
+            CAST(COALESCE(NULLIF(net_order_value,''),'0') AS REAL) AS net_order_value,
+            document_date,
+            material_description,
+            material_group,
+            company_code,
+            created_by
+        FROM po_dump
+        WHERE purchasing_document IN ({placeholders})
+        ORDER BY purchasing_document
+        """,
+        po_nums,
+    ).fetchall()
+
+    po_map = {r[0]: r for r in po_rows}
+
+    result = []
+    for pme in pme_rows:
+        po_num = pme[0]
+        po = po_map.get(po_num)
+        result.append({
+            "purchasing_document":  po_num,
+            "vendor":               pme[1],
+            "purchase_requisition": pme[2],
+            "anomaly_flags":        pme[3],
+            "vendor_name":          po[1] if po else None,
+            "net_order_value":      po[2] if po else None,
+            "document_date":        po[3] if po else None,
+            "material_description": po[4] if po else None,
+            "material_group":       po[5] if po else None,
+            "company_code":         po[6] if po else None,
+            "created_by":           po[7] if po else None,
+        })
+    return result
+
+
 # ── /p2p/find ─────────────────────────────────────────────────────────────────
 
 @router.get("/p2p/find")

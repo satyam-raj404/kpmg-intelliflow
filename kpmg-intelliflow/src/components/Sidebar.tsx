@@ -54,6 +54,7 @@ const operations: NavItem[] = [
   { label: "P2P Lifecycle", to: "/p2p", icon: Workflow },
   { label: "Vendor Repository", to: "/vendor-repo", icon: BookOpen },
   { label: "Log Action", to: "/actions", icon: ListTodo },
+  { label: "Alerts", to: "/alerts", icon: ShieldAlert },
   { label: "Data Upload", to: "/upload", icon: Upload },
   { label: "Activity History", to: "/history", icon: History },
 ];

@@ -23,6 +23,7 @@ import { Route as HistoryRouteImport } from './routes/history'
 import { Route as FinancialRouteImport } from './routes/financial'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AskRouteImport } from './routes/ask'
+import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as ActionsRouteImport } from './routes/actions'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
@@ -99,6 +100,11 @@ const AskRoute = AskRouteImport.update({
   path: '/ask',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AlertsRoute = AlertsRouteImport.update({
+  id: '/alerts',
+  path: '/alerts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ActionsRoute = ActionsRouteImport.update({
   id: '/actions',
   path: '/actions',
@@ -128,6 +134,7 @@ const AdminAuditRoute = AdminAuditRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/actions': typeof ActionsRoute
+  '/alerts': typeof AlertsRoute
   '/ask': typeof AskRoute
   '/dashboard': typeof DashboardRoute
   '/financial': typeof FinancialRoute
@@ -149,6 +156,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/actions': typeof ActionsRoute
+  '/alerts': typeof AlertsRoute
   '/ask': typeof AskRoute
   '/dashboard': typeof DashboardRoute
   '/financial': typeof FinancialRoute
@@ -171,6 +179,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/actions': typeof ActionsRoute
+  '/alerts': typeof AlertsRoute
   '/ask': typeof AskRoute
   '/dashboard': typeof DashboardRoute
   '/financial': typeof FinancialRoute
@@ -194,6 +203,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/actions'
+    | '/alerts'
     | '/ask'
     | '/dashboard'
     | '/financial'
@@ -215,6 +225,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/actions'
+    | '/alerts'
     | '/ask'
     | '/dashboard'
     | '/financial'
@@ -236,6 +247,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/actions'
+    | '/alerts'
     | '/ask'
     | '/dashboard'
     | '/financial'
@@ -258,6 +270,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ActionsRoute: typeof ActionsRoute
+  AlertsRoute: typeof AlertsRoute
   AskRoute: typeof AskRoute
   DashboardRoute: typeof DashboardRoute
   FinancialRoute: typeof FinancialRoute
@@ -377,6 +390,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AskRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/alerts': {
+      id: '/alerts'
+      path: '/alerts'
+      fullPath: '/alerts'
+      preLoaderRoute: typeof AlertsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/actions': {
       id: '/actions'
       path: '/actions'
@@ -418,6 +438,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActionsRoute: ActionsRoute,
+  AlertsRoute: AlertsRoute,
   AskRoute: AskRoute,
   DashboardRoute: DashboardRoute,
   FinancialRoute: FinancialRoute,

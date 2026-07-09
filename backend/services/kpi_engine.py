@@ -1273,10 +1273,9 @@ def _vendor(conn, FY, MTD, cc_cfg: str = "", company_code: str = "ALL"):
     except Exception:
         pass
 
-    # V3 — Vendor Delivery Lead Time: AVG(first GRN entry_date − PO delivery_date) per vendor
-    #   CTE grn_first: MIN(entry_date) per PO line (debit_credit_ind='S' = receipts only)
-    #   Join: po_dump + grn_first on purchasing_document + item (company via po.company_code)
-    #   Positive avg = late, negative = early/on-time; deleted POs excluded
+    # V3 — Vendor Delivery Lead Time: AVG(first GRN entry_date − expected_delivery_date)
+    #   Uses po_delivery_dump.expected_delivery_date (not po_dump.delivery_date which is often empty)
+    #   Positive = late, negative = early/on-time
     #   value_numeric = overall avg days; value_text = JSON vendor-wise list (top 25 by avg_days)
     try:
         v3_rows = conn.execute(f"""
@@ -1290,14 +1289,16 @@ def _vendor(conn, FY, MTD, cc_cfg: str = "", company_code: str = "ALL"):
             )
             SELECT po.vendor,
                    COALESCE(MIN(vm.vendor_name), MIN(po.vendor_name), po.vendor) AS vendor_name,
-                   ROUND(AVG((gf.first_grn_date::DATE - po.delivery_date::DATE)::FLOAT), 1) AS avg_days,
+                   ROUND(AVG((gf.first_grn_date::DATE - pd.expected_delivery_date::DATE)::FLOAT)::NUMERIC, 1) AS avg_days,
                    COUNT(*) AS po_lines
-            FROM po_dump po
-            JOIN grn_first gf ON gf.purchasing_document = po.purchasing_document
-                             AND gf.item               = po.item
+            FROM po_delivery_dump pd
+            JOIN grn_first gf ON gf.purchasing_document = pd.purchasing_document
+                              AND gf.item               = pd.item
+            JOIN po_dump po ON po.purchasing_document = pd.purchasing_document
+                           AND po.item               = pd.item
             LEFT JOIN vendor_master vm ON po.vendor = vm.vendor
-            WHERE (po.deletion_indicator IS NULL OR po.deletion_indicator NOT IN ('L','X'))
-              AND po.delivery_date IS NOT NULL AND po.delivery_date != ''
+            WHERE pd.expected_delivery_date IS NOT NULL AND pd.expected_delivery_date != ''
+              AND (po.deletion_indicator IS NULL OR po.deletion_indicator NOT IN ('L','X'))
               AND {_cc_sql}
             GROUP BY po.vendor
             ORDER BY avg_days DESC
@@ -1312,12 +1313,14 @@ def _vendor(conn, FY, MTD, cc_cfg: str = "", company_code: str = "ALL"):
                   AND entry_date IS NOT NULL AND entry_date != ''
                 GROUP BY purchasing_document, item
             )
-            SELECT ROUND(AVG((gf.first_grn_date::DATE - po.delivery_date::DATE)::FLOAT), 1)
-            FROM po_dump po
-            JOIN grn_first gf ON gf.purchasing_document = po.purchasing_document
-                             AND gf.item               = po.item
-            WHERE (po.deletion_indicator IS NULL OR po.deletion_indicator NOT IN ('L','X'))
-              AND po.delivery_date IS NOT NULL AND po.delivery_date != ''
+            SELECT ROUND(AVG((gf.first_grn_date::DATE - pd.expected_delivery_date::DATE)::FLOAT)::NUMERIC, 1)
+            FROM po_delivery_dump pd
+            JOIN grn_first gf ON gf.purchasing_document = pd.purchasing_document
+                              AND gf.item               = pd.item
+            JOIN po_dump po ON po.purchasing_document = pd.purchasing_document
+                           AND po.item               = pd.item
+            WHERE pd.expected_delivery_date IS NOT NULL AND pd.expected_delivery_date != ''
+              AND (po.deletion_indicator IS NULL OR po.deletion_indicator NOT IN ('L','X'))
               AND {_cc_sql}
         """).fetchone()
         v3_avg  = float(v3_overall[0]) if v3_overall and v3_overall[0] is not None else None

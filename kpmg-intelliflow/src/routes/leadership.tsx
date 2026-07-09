@@ -723,10 +723,15 @@ function CountTile({ item, counts, delay, company }: {
   company: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [limit, setLimit] = useState(15);
+
+  useEffect(() => {
+    if (!open) setLimit(15);
+  }, [open]);
 
   const { data: detail, isLoading: detailLoading } = useQuery({
-    queryKey: ["summary-detail", item.key, company],
-    queryFn: () => apiFetch<SummaryDetail>(`/summary-detail/${item.key}?company_code=${company}`),
+    queryKey: ["summary-detail", item.key, company, limit],
+    queryFn: () => apiFetch<SummaryDetail>(`/summary-detail/${item.key}?company_code=${company}&limit=${limit}`),
     enabled: open,
     staleTime: 5 * 60 * 1000,
   });
@@ -736,6 +741,7 @@ function CountTile({ item, counts, delay, company }: {
   const isRisk = item.tone === "danger" || item.tone === "warning";
   const hasAlert = isRisk && val != null && val > 0;
   const { Icon } = item;
+  const canLoadMore = !!detail && detail.count >= limit && limit < 200;
 
   return (
     <HoverCard open={open} onOpenChange={setOpen} openDelay={400} closeDelay={150}>
@@ -807,8 +813,18 @@ function CountTile({ item, counts, delay, company }: {
             </table>
           )}
         </div>
-        <div className="px-3 py-1.5 border-t border-border bg-secondary/30">
-          <span className="text-[10px] text-muted-foreground">Showing up to 15 most recent rows</span>
+        <div className="px-3 py-1.5 border-t border-border bg-secondary/30 flex items-center justify-between">
+          <span className="text-[10px] text-muted-foreground">
+            Showing {detail?.count ?? 0} of up to {limit} rows
+          </span>
+          {canLoadMore && (
+            <button
+              onClick={() => setLimit(200)}
+              className="text-[10px] font-medium text-primary hover:underline"
+            >
+              Load more (up to 200)
+            </button>
+          )}
         </div>
       </HoverCardContent>
     </HoverCard>

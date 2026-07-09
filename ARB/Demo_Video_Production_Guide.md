@@ -89,48 +89,39 @@ Design: KPMG Navy background · White "IntelliSource" in large bold · Blue unde
 
 ---
 
-**[Screen Recording A — Dashboard: 20 sec]**  
-Navigate to: `/dashboard` → Leadership dashboard  
-Hover over KPI tiles one by one.  
+**[Screen Recording A — All 5 Dashboards: 30 sec]**  
+Navigate rapidly: `/dashboard` → `/financial` → `/leadership` → `/vendors` → `/utilization`  
+Spend ~5–6 sec per dashboard. On each — pause briefly on the KPI row, scroll down slightly to show charts, then navigate to next.  
 
 > **NARRATOR:**  
-> The Leadership Dashboard gives your CFO a single-screen view — total spend, PO cycle time, invoice aging, CAPEX vs OPEX split — all computed live from your uploaded ERP data. Every number drills down.
+> IntelliSource delivers five role-specific dashboards — Procurement, Financial, Leadership, Vendor Performance, and Utilization — each computing live KPIs directly from your ERP data. Total spend, invoice aging, vendor compliance, CAPEX vs OPEX split — all in one place, updated the moment data is uploaded.
 
 ---
 
-**[Screen Recording B — P2P Tracker: 20 sec]**  
-Navigate to: `/p2p` → scroll through the process mining events table  
-Highlight a row with a long cycle time  
+**[Screen Recording B — Profit Center Management: 15 sec]**  
+Navigate to: `/profit-center`  
+Scroll through the profit center table — show PC codes, CAPEX/OPEX classification, budget vs. actuals columns. Hover on an Edit button briefly.  
 
 > **NARRATOR:**  
-> The P2P Tracker maps every transaction through its lifecycle — from Purchase Requisition to final payment. IntelliSource automatically flags bottlenecks — a PO stuck in approval for 18 days, an invoice pending 3 weeks past due date. AI surfaces the anomalies so your team doesn't have to hunt for them.
+> Profit Centers are managed directly within IntelliSource — mapped to departments, plants, and material groups, with CAPEX and OPEX classification automatically cascading across all PO data.
 
 ---
 
-**[Screen Recording C — Compliance / Actions: 20 sec]**  
-Navigate to: `/actions`  
-Show the actions list — highlight compliance breach items  
-
-> **NARRATOR:**  
-> Every compliance risk is tracked as an action item. ABAC violations, DOA bypasses, duplicate invoice flags — each one owned, prioritized, and tracked to closure. No more compliance misses falling through the cracks.
-
----
-
-**[Screen Recording D — Vendor Repository: 20 sec]**  
+**[Screen Recording C — Vendor Repository + Add Vendor: 20 sec]**  
 Navigate to: `/vendor-repo`  
-Click "Add Vendor" → the Sheet opens → show the form fields briefly → close without submitting  
+Show the grid of vendor cards briefly, then click "Add Vendor" → Sheet slides in → slowly scroll through the form fields (Vendor Code, Name, Address, PAN, MSME Flag, Payment Terms, SPOC, Service Description) → close without submitting.  
 
 > **NARRATOR:**  
-> The Vendor Repository is your centralized vendor master. Add vendors in seconds — capturing vendor code, PAN, MSME status, contact details, and payment terms — all in one place, instantly available across every dashboard.
+> The Vendor Repository is your centralized vendor master. New vendors can be onboarded in seconds — capturing code, PAN, MSME status, contact details, and payment terms — instantly available across every dashboard and report.
 
 ---
 
-**[Screen Recording E — Data Upload: 10 sec]**  
-Navigate to: `/upload`  
-Show the drag-and-drop zone and the Dataset Reference guide  
+**[Screen Recording D — P2P Lifecycle Tracker: 25 sec]**  
+Navigate to: `/p2p`  
+Show the funnel at the top — highlight the stage counts (PR → PO → GRN → Invoice → Payment). Scroll down to the process mining events table — pause on a row with anomaly flags highlighted in red/orange.  
 
 > **NARRATOR:**  
-> Data onboarding is zero-friction. Drop your ERP export — CSV or Excel — and IntelliSource auto-detects the dataset, validates every row, and refreshes all dashboards within seconds.
+> The P2P Lifecycle Tracker maps every transaction end-to-end — from Purchase Requisition to final payment. IntelliSource automatically detects bottlenecks and flags anomalies — a Maverick Buy, a payment made before GRN, a duplicate invoice — surfaced before they reach audit.
 
 ---
 
@@ -198,15 +189,14 @@ Prompt: *"KPMG-style professional logo reveal on deep navy background, clean, pr
 - Use **QuickTime Player** (Mac) → File → New Screen Recording → select browser window
 - Or use **OBS Studio** (free) for more control
 
-**Record these 5 clips separately:**
+**Record these 4 clips separately:**
 
-| Clip | Route | Duration | What to do |
-|------|-------|----------|------------|
-| A | `/dashboard` | ~25 sec | Slowly hover each KPI card, then click into one chart |
-| B | `/p2p` | ~25 sec | Scroll through event list, pause on a red/flagged row |
-| C | `/actions` | ~25 sec | Scroll actions list, hover a High priority compliance item |
-| D | `/vendor-repo` | ~25 sec | Click "Add Vendor", show form scrolling all fields, close |
-| E | `/upload` | ~15 sec | Hover over drop zone, pan to Dataset Reference guide |
+| Clip | Route(s) | Duration | What to do |
+|------|----------|----------|------------|
+| A | `/dashboard` → `/financial` → `/leadership` → `/vendors` → `/utilization` | ~35 sec | Navigate through all 5 dashboards, ~6 sec each — pause on KPI row, scroll to charts, move on |
+| B | `/profit-center` | ~20 sec | Scroll profit center table, show CAPEX/OPEX columns and budget vs actuals, hover Edit |
+| C | `/vendor-repo` | ~25 sec | Show vendor grid briefly, click "Add Vendor", scroll all form fields slowly, close sheet |
+| D | `/p2p` | ~30 sec | Show funnel stage counts at top, scroll to events table, pause on anomaly-flagged row |
 
 **After recording:**
 - Trim clips in QuickTime (Edit → Trim) to exact needed duration
@@ -222,7 +212,8 @@ Prompt: *"KPMG-style professional logo reveal on deep navy background, clean, pr
 ```
 [Clip1 Veo] [Clip2 Veo] [Clip3 Veo] [Clip4 Veo] [Clip5 Veo]
     → [Clip6 Veo] → [KPMG Brand Card]
-    → [ScreenRec A] → [ScreenRec B] → [ScreenRec C] → [ScreenRec D] → [ScreenRec E]
+    → [ScreenRec A: 5 Dashboards] → [ScreenRec B: Profit Centers]
+    → [ScreenRec C: Add Vendor] → [ScreenRec D: P2P Lifecycle]
     → [Clip7 Veo] → [Stat Cards] → [Clip8 Veo Logo]
 ```
 
