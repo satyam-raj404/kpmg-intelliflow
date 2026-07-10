@@ -72,7 +72,7 @@ function Login() {
           <p className="text-[14px] mt-3 text-sidebar-foreground/60 leading-relaxed">
             End-to-end P2P visibility across 487 vendors and ₹500+ Cr annual procurement.
           </p>
-          <div className="mt-10 pt-6 border-t border-sidebar-border grid grid-cols-3 gap-4">
+          <div className="mt-10 pt-6 border-t border-sidebar-border grid grid-cols-3 gap-4 hidden">
             {[
               { n: "8", l: "Activities" },
               { n: "38", l: "KPIs" },
