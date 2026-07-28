@@ -130,8 +130,7 @@ function UtilizationDashboard() {
         </div>
 
         {/* Charts row 2 */}
-        <div className="grid grid-cols-2 gap-4 mt-4">
-          <PlantBreakdown company={company} />
+        <div className="mt-4">
           <CategoryBreakdown type="CAPEX" company={company} dept={dept} />
         </div>
 

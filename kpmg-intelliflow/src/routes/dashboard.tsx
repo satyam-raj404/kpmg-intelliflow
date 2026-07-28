@@ -141,9 +141,6 @@ function ProcurementDashboard() {
           <POCountAndMaverick />
         </div>
         <div className="mt-4">
-          <PODeletionMonitor selectedVendor={vendor} />
-        </div>
-        <div className="mt-4">
           <AlertCenter />
         </div>
       </div>
