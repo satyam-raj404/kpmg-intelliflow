@@ -1,4 +1,4 @@
-"""Build IntelliSource_Presentation.pptx — minimal demo deck, screenshots-first."""
+"""IntelliSource_Presentation.pptx — 1 screenshot per slide, orange highlights, minimal text."""
 
 import os
 from pptx import Presentation
@@ -6,447 +6,417 @@ from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 
-KPMG_NAVY  = RGBColor(0x00, 0x33, 0x8D)
-KPMG_MED   = RGBColor(0x00, 0x5E, 0xB8)
-KPMG_LIGHT = RGBColor(0x00, 0x91, 0xDA)
-KPMG_TEAL  = RGBColor(0x00, 0x99, 0xA8)
-KPMG_GOLD  = RGBColor(0x8F, 0x73, 0x26)
-KPMG_RED   = RGBColor(0xBC, 0x20, 0x4B)
-KPMG_GRAY  = RGBColor(0x63, 0x66, 0x6A)
-WHITE      = RGBColor(0xFF, 0xFF, 0xFF)
-DARK_BG    = RGBColor(0x05, 0x18, 0x35)
+NAVY   = RGBColor(0x00, 0x33, 0x8D)
+MED    = RGBColor(0x00, 0x5E, 0xB8)
+LIGHT  = RGBColor(0x00, 0x91, 0xDA)
+GOLD   = RGBColor(0x8F, 0x73, 0x26)
+RED    = RGBColor(0xBC, 0x20, 0x4B)
+ORANGE = RGBColor(0xFF, 0x72, 0x00)
+WHITE  = RGBColor(0xFF, 0xFF, 0xFF)
+DARK   = RGBColor(0x05, 0x18, 0x35)
 
-SLIDE_W = Inches(13.33)
-SLIDE_H = Inches(7.5)
+W = Inches(13.33)
+H = Inches(7.5)
 
-SCREENSHOTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app_screenshots")
-_NNBSP = chr(0x202F)  # narrow no-break space in macOS screenshot filenames
+SS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app_screenshots")
+_NB = chr(0x202F)  # narrow no-break space macOS uses before AM/PM
 
-def ss(name):
-    fname = f"Screenshot 2026-07-08 at {name}.png".replace(" PM", f"{_NNBSP}PM").replace(" AM", f"{_NNBSP}AM")
-    return os.path.join(SCREENSHOTS, fname)
-
+def ss(t):
+    return os.path.join(SS_DIR,
+        f"Screenshot 2026-07-08 at {t}.png"
+        .replace(" PM", f"{_NB}PM").replace(" AM", f"{_NB}AM"))
 
 prs = Presentation()
-prs.slide_width  = SLIDE_W
-prs.slide_height = SLIDE_H
+prs.slide_width  = W
+prs.slide_height = H
 BLANK = prs.slide_layouts[6]
 
 
-# ── helpers ────────────────────────────────────────────────────────────────────
+# ── primitives ─────────────────────────────────────────────────────────────────
 
-def rect(slide, x, y, w, h, fill):
-    sh = slide.shapes.add_shape(1, x, y, w, h)
+def box(sl, x, y, w, h, fill):
+    sh = sl.shapes.add_shape(1, x, y, w, h)
     sh.line.fill.background()
     sh.fill.solid()
     sh.fill.fore_color.rgb = fill
     return sh
 
-
-def txt(slide, text, x, y, w, h, size=12, bold=False, color=WHITE,
-        align=PP_ALIGN.LEFT, italic=False):
-    tb = slide.shapes.add_textbox(x, y, w, h)
+def t(sl, text, x, y, w, h, sz=11, bold=False, col=WHITE,
+      align=PP_ALIGN.LEFT, italic=False):
+    tb = sl.shapes.add_textbox(x, y, w, h)
     tf = tb.text_frame
     tf.word_wrap = True
     p = tf.paragraphs[0]
     p.alignment = align
     r = p.add_run()
     r.text = text
-    r.font.size = Pt(size)
+    r.font.size = Pt(sz)
     r.font.bold = bold
     r.font.italic = italic
-    r.font.color.rgb = color
+    r.font.color.rgb = col
     r.font.name = "Calibri"
 
-
-def img(slide, path, x, y, w, h):
+def pic(sl, path, x, y, w, h):
     if os.path.exists(path):
-        slide.shapes.add_picture(path, x, y, w, h)
-    else:
-        rect(slide, x, y, w, h, KPMG_GRAY)
-        txt(slide, "screenshot", x + Inches(0.1), y + h / 2, w, Inches(0.3),
-            size=9, italic=True, color=WHITE)
+        sl.shapes.add_picture(path, x, y, w, h)
 
-
-def footer(slide, label=""):
-    rect(slide, 0, Inches(7.15), SLIDE_W, Inches(0.35), KPMG_NAVY)
-    if label:
-        txt(slide, label, Inches(0.2), Inches(7.17), Inches(10), Inches(0.28),
-            size=8, color=RGBColor(0xAA, 0xC4, 0xE8))
-    txt(slide, "KPMG  |  IntelliSource  |  CONFIDENTIAL",
-        Inches(9.5), Inches(7.17), Inches(3.7), Inches(0.28),
-        size=8, color=KPMG_GOLD, align=PP_ALIGN.RIGHT)
-
-
-def top_bar(slide, title, sub="", accent=KPMG_LIGHT):
-    rect(slide, 0, 0, SLIDE_W, Inches(0.72), KPMG_NAVY)
-    rect(slide, 0, 0, Inches(0.08), Inches(0.72), accent)
-    txt(slide, title, Inches(0.2), Inches(0.06), Inches(9), Inches(0.42),
-        size=22, bold=True, color=WHITE)
+def header(sl, title, sub=None):
+    """Slim KPMG top bar over screenshot."""
+    box(sl, 0, 0, W, Inches(0.5), NAVY)
+    box(sl, 0, 0, Inches(0.07), Inches(0.5), ORANGE)
+    t(sl, "KPMG  IntelliSource", Inches(0.15), Inches(0.06),
+      Inches(2.8), Inches(0.38), sz=11, bold=True, col=LIGHT)
+    t(sl, title, Inches(3.1), Inches(0.06), Inches(7.5), Inches(0.38),
+      sz=14, bold=True, col=WHITE, align=PP_ALIGN.CENTER)
     if sub:
-        txt(slide, sub, Inches(0.2), Inches(0.46), Inches(11), Inches(0.25),
-            size=10, color=KPMG_LIGHT)
+        t(sl, sub, Inches(10.8), Inches(0.06), Inches(2.4), Inches(0.38),
+          sz=9, col=RGBColor(0x88,0xAA,0xDD), align=PP_ALIGN.RIGHT)
+
+def footer_bar(sl):
+    box(sl, 0, Inches(7.18), W, Inches(0.32), NAVY)
+    t(sl, "CONFIDENTIAL  |  KPMG India  |  Q2 FY2024",
+      Inches(0.2), Inches(7.21), W - Inches(0.4), Inches(0.24),
+      sz=7.5, col=RGBColor(0x88,0xAA,0xDD), align=PP_ALIGN.RIGHT)
+
+def hi(sl, x, y, w, h, label=None, label_below=False):
+    """Orange outline highlight box + optional label tag."""
+    sh = sl.shapes.add_shape(1, x, y, w, h)
+    sh.fill.background()
+    sh.line.color.rgb = ORANGE
+    sh.line.width = Pt(2.5)
+    if label:
+        lw = Inches(max(1.4, len(label) * 0.105 + 0.3))
+        lh = Inches(0.27)
+        if label_below:
+            ly = y + h + Inches(0.04)
+        else:
+            ly = y - lh - Inches(0.04)
+            if ly < Inches(0.52):
+                ly = y + h + Inches(0.04)
+        box(sl, x, ly, lw, lh, ORANGE)
+        t(sl, f"  {label}", x, ly + Inches(0.02), lw, lh,
+          sz=8.5, bold=True, col=WHITE)
 
 
-def caption_strip(slide, lines, x, y, w, bg=KPMG_NAVY, text_color=WHITE):
-    """Thin caption box with 2-3 short bullet lines."""
-    h = Inches(0.28 * len(lines) + 0.2)
-    rect(slide, x, y, w, h, bg)
-    cy = y + Inches(0.1)
-    for line in lines:
-        txt(slide, f"  {line}", x, cy, w, Inches(0.26), size=9, color=text_color)
-        cy += Inches(0.28)
-    return h
-
-
-# ════════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════════════
 # SLIDE 1 — TITLE
-# ════════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════════════
 s = prs.slides.add_slide(BLANK)
-rect(s, 0, 0, SLIDE_W, SLIDE_H, KPMG_NAVY)
-rect(s, 0, 0, Inches(0.12), SLIDE_H, KPMG_LIGHT)
-rect(s, Inches(9.5), 0, Inches(3.83), Inches(7.5), KPMG_MED)
+box(s, 0, 0, W, H, DARK)
+box(s, 0, 0, Inches(0.1), H, ORANGE)
+box(s, Inches(9.4), 0, Inches(3.93), H, NAVY)
 
-# screenshot as visual on right
-img(s, ss("2.21.57 PM"), Inches(9.6), Inches(0.3), Inches(3.6), Inches(6.9))
+pic(s, ss("2.21.57 PM"), Inches(9.5), Inches(0.1), Inches(3.73), Inches(7.3))
 
-txt(s, "KPMG", Inches(0.3), Inches(0.5), Inches(5), Inches(0.8),
-    size=38, bold=True, color=WHITE)
-txt(s, "India  |  Procurement Advisory",
-    Inches(0.3), Inches(1.28), Inches(5.5), Inches(0.36),
-    size=13, color=KPMG_LIGHT)
+t(s, "KPMG", Inches(0.3), Inches(0.5), Inches(5), Inches(0.85),
+  sz=40, bold=True, col=WHITE)
+t(s, "India  |  Procurement Advisory",
+  Inches(0.3), Inches(1.35), Inches(6), Inches(0.35),
+  sz=13, col=LIGHT)
 
-rect(s, Inches(0.3), Inches(1.85), Inches(5.5), Inches(0.04), KPMG_GOLD)
+box(s, Inches(0.3), Inches(1.88), Inches(5.6), Inches(0.04), ORANGE)
 
-txt(s, "IntelliSource",
-    Inches(0.3), Inches(2.05), Inches(9.0), Inches(1.3),
-    size=56, bold=True, color=WHITE)
-txt(s, "SAP Procurement Intelligence Platform",
-    Inches(0.3), Inches(3.35), Inches(8.8), Inches(0.55),
-    size=20, color=KPMG_LIGHT)
+t(s, "IntelliSource",
+  Inches(0.3), Inches(2.05), Inches(9.0), Inches(1.2),
+  sz=58, bold=True, col=WHITE)
+t(s, "SAP Procurement Intelligence Platform",
+  Inches(0.3), Inches(3.25), Inches(8.8), Inches(0.5),
+  sz=19, col=LIGHT)
 
-rect(s, Inches(0.3), Inches(4.05), Inches(5.5), Inches(0.04), KPMG_LIGHT)
+box(s, Inches(0.3), Inches(3.9), Inches(5.6), Inches(0.04), LIGHT)
 
-kpis = [
-    "₹3,936 Cr  Spend Visibility",
-    "187  SOD Conflicts Detected",
-    "5  Role-Specific Dashboards",
-    "44.5 Days  End-to-End P2P",
+stats = [
+    "₹3,936 Cr  ·  Total Spend Visibility",
+    "187         ·  SOD Conflicts Detected",
+    "5            ·  Role-Specific Dashboards",
+    "44.5 days ·  End-to-End P2P Cycle",
 ]
-ky = Inches(4.25)
-for k in kpis:
-    txt(s, k, Inches(0.3), ky, Inches(8.8), Inches(0.38),
-        size=13, color=RGBColor(0xC0, 0xD8, 0xFF))
-    ky += Inches(0.44)
+cy = Inches(4.1)
+for s2 in stats:
+    t(s, s2, Inches(0.3), cy, Inches(8.8), Inches(0.38),
+      sz=13, col=RGBColor(0xAA,0xC8,0xFF))
+    cy += Inches(0.46)
 
-rect(s, 0, Inches(6.95), SLIDE_W, Inches(0.55), RGBColor(0x00, 0x28, 0x70))
-txt(s, "Application Demo  |  Q2 FY2024",
-    Inches(0.3), Inches(7.02), Inches(8), Inches(0.35),
-    size=10, color=WHITE)
-txt(s, "CONFIDENTIAL",
-    Inches(11.5), Inches(7.02), Inches(1.7), Inches(0.35),
-    size=10, bold=True, color=KPMG_GOLD, align=PP_ALIGN.RIGHT)
+box(s, 0, Inches(6.95), W, Inches(0.55), MED)
+t(s, "Application Demo  |  Q2 FY2024  |  All Companies",
+  Inches(0.3), Inches(7.02), Inches(9), Inches(0.38), sz=10, col=WHITE)
+t(s, "CONFIDENTIAL", Inches(11.0), Inches(7.02), Inches(2.2), Inches(0.38),
+  sz=10, bold=True, col=GOLD, align=PP_ALIGN.RIGHT)
 
 
-# ════════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════════════
 # SLIDE 2 — PROCUREMENT DASHBOARD
-# ════════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════════════
+# Screenshot 2940×1682. Full bleed → xscale=13.33/2940=0.004534, yscale=7.5/1682=0.004460
+# KPI row 1: y_px≈158-315 → y_in=0.71–1.40, x_px≈195-2938 → x_in=0.88-13.32
+# Cards are 4 wide → each ≈686px → 3.11 in
+# Card 3 (High-Value POs): x_px=195+2*686=1567 → x_in=7.10
+# Card 4 (Cycle Time):     x_px=195+3*686=2253 → x_in=10.21
+
 s = prs.slides.add_slide(BLANK)
-rect(s, 0, 0, SLIDE_W, SLIDE_H, WHITE)
-top_bar(s, "Procurement Dashboard", "PO Lifecycle · Maverick Spend · Cycle Time")
-footer(s, "Audience: Procurement Manager")
+pic(s, ss("2.20.51 PM"), 0, 0, W, H)
+header(s, "Procurement Dashboard", "Slide 1 of 2")
+footer_bar(s)
 
-# Full-width screenshot
-img(s, ss("2.20.51 PM"), Inches(0.15), Inches(0.78), Inches(9.65), Inches(6.25))
+hi(s, Inches(0.82), Inches(0.71), Inches(12.48), Inches(0.69),
+   label="KPI Overview")
+hi(s, Inches(6.98), Inches(0.71), Inches(3.11), Inches(0.69),
+   label="85 High-Value POs  >₹1 Cr", label_below=True)
+hi(s, Inches(0.82), Inches(1.47), Inches(6.25), Inches(0.58),
+   label="Maverick Spend & Deletion Alerts", label_below=True)
 
-# Right panel — KPI callouts
-rx = Inches(10.0)
-rw = Inches(3.15)
 
-rect(s, rx, Inches(0.78), rw, Inches(6.25), DARK_BG)
+# ══════════════════════════════════════════════════════════════════════════════
+# SLIDE 3 — FINANCIAL DASHBOARD  (KPI tiles)
+# ══════════════════════════════════════════════════════════════════════════════
+# Screenshot 2940×1682. KPI row y≈158-315
+# 5 cards → each ≈549px → 2.49 in
+# Card 2 (3-Way Match 84%): x=195+549=744 → x_in=3.37
+# Card 3 (Invoice Days 40.5): x=195+2*549=1293 → x_in=5.86
 
-kpi_blocks = [
-    ("₹71.13 Cr", "Total PO Value", KPMG_LIGHT),
-    ("74",        "Active POs",     KPMG_LIGHT),
-    ("85",        "High-Value POs\n(above ₹1 Cr)", KPMG_RED),
-    ("2.7 Days",  "Avg PO Cycle\nTime", RGBColor(0x00, 0xC8, 0x6E)),
-    ("19%",       "Maverick\nSpend Rate", RGBColor(0xFF, 0x8C, 0x00)),
+s = prs.slides.add_slide(BLANK)
+pic(s, ss("2.21.22 PM"), 0, 0, W, H)
+header(s, "Financial Dashboard — KPIs", "Slide 1 of 2")
+footer_bar(s)
+
+hi(s, Inches(3.28), Inches(0.71), Inches(2.52), Inches(0.69),
+   label="84%  3-Way Match  ← below 90% target")
+hi(s, Inches(5.80), Inches(0.71), Inches(2.52), Inches(0.69),
+   label="40.5 days  Avg Invoice Payment")
+hi(s, Inches(0.82), Inches(0.71), Inches(2.46), Inches(0.69),
+   label="₹958 Cr Payments YTD")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SLIDE 4 — FINANCIAL DASHBOARD  (charts continuation)
+# ══════════════════════════════════════════════════════════════════════════════
+# Screenshot 2940×1682. Shows Monthly Payments chart (left) + Payment Timing (right)
+# Charts area: y≈320-1100px → y_in=1.43-4.91
+# Monthly chart: x=180-1465px → x_in=0.82-6.64
+# Payment timing (right): x=1480-2940px → x_in=6.71-13.33
+
+s = prs.slides.add_slide(BLANK)
+pic(s, ss("2.21.34 PM"), 0, 0, W, H)
+header(s, "Financial Dashboard — Trends", "Slide 2 of 2")
+footer_bar(s)
+
+hi(s, Inches(0.82), Inches(1.5), Inches(5.82), Inches(3.7),
+   label="Monthly Payments Trend  ₹ Cr")
+hi(s, Inches(6.71), Inches(1.5), Inches(6.52), Inches(3.7),
+   label="Payment Timing Distribution")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SLIDE 5 — LEADERSHIP DASHBOARD  (P2P pipeline + KPIs)
+# ══════════════════════════════════════════════════════════════════════════════
+# Screenshot 2940×1688
+# P2P pipeline stages row: y≈58-220px → y_in=0.26-0.98
+# KPI tiles row: y≈225-390px → y_in=1.00-1.74
+# Risk panel (right): x≈1960-2938px, y≈225-1450px
+
+s = prs.slides.add_slide(BLANK)
+pic(s, ss("2.21.57 PM"), 0, 0, W, H)
+header(s, "Leadership Dashboard", "Slide 1 of 2")
+footer_bar(s)
+
+# P2P pipeline highlight
+hi(s, Inches(0.82), Inches(0.52), Inches(12.48), Inches(0.48),
+   label="P2P Pipeline  132 PR → 163 PO → 117 GRN → 106 Inv → 82 Payment",
+   label_below=True)
+# SOD Conflicts KPI tile (2nd of 4 KPI cards)
+hi(s, Inches(3.92), Inches(1.05), Inches(3.12), Inches(0.72),
+   label="187 SOD Conflicts  ← click to drill down")
+# Risk panel
+hi(s, Inches(8.88), Inches(1.05), Inches(4.35), Inches(5.8),
+   label="Risk Indicators Panel")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SLIDE 6 — LEADERSHIP DASHBOARD  (risk analytics continuation)
+# ══════════════════════════════════════════════════════════════════════════════
+# Screenshot 2940×1688. Shows CAPEX/OPEX ring + Monthly Spend Trend + Risk section
+# Monthly Spend chart (left): x=180-1455px, y=310-870px → x_in=0.82-6.60, y_in=1.38-3.87
+# CAPEX/OPEX ring (right): x=1470-2200px, y=310-870px → x_in=6.67-9.97
+# Risk indicators (far right): x=2215-2938px, y=310-1450px → x_in=10.04-13.33
+
+s = prs.slides.add_slide(BLANK)
+pic(s, ss("2.22.42 PM"), 0, 0, W, H)
+header(s, "Leadership — Risk Analytics", "Slide 2 of 2")
+footer_bar(s)
+
+hi(s, Inches(0.82), Inches(1.38), Inches(5.78), Inches(2.5),
+   label="Monthly Spend Trend  ₹ Cr")
+hi(s, Inches(6.67), Inches(1.38), Inches(3.30), Inches(2.5),
+   label="CAPEX 48.3%  ·  OPEX 51.7%")
+hi(s, Inches(10.04), Inches(0.52), Inches(3.28), Inches(6.5),
+   label="Live Risk Indicators", label_below=False)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SLIDE 7 — VENDOR PERFORMANCE DASHBOARD
+# ══════════════════════════════════════════════════════════════════════════════
+# Screenshot 2940×1682
+# KPI row 1 (4 cards): y≈160-315px → y_in=0.71-1.40
+#   Card 2 (Compliance 84.6%): x=195+686=881 → x_in=3.99, w=3.11
+#   Card 4 (Avg Delay 5.1d): x=195+3*686=2253 → x_in=10.21
+# KPI row 2 (3 cards): y≈328-455px → y_in=1.46-2.03
+#   Card 1 (Blocked 2): x=195-881 → x_in=0.88-3.99
+
+s = prs.slides.add_slide(BLANK)
+pic(s, ss("2.24.04 PM"), 0, 0, W, H)
+header(s, "Vendor Performance Dashboard", "Slide 1 of 2")
+footer_bar(s)
+
+hi(s, Inches(3.90), Inches(0.71), Inches(3.12), Inches(0.69),
+   label="84.6% Compliance  ← below 90% target")
+hi(s, Inches(0.82), Inches(1.46), Inches(3.12), Inches(0.57),
+   label="2 Blocked Vendors  ← review required")
+hi(s, Inches(10.12), Inches(0.71), Inches(3.12), Inches(0.69),
+   label="5.1d Avg Delivery Delay")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SLIDE 8 — VENDOR PERFORMANCE  (charts continuation)
+# ══════════════════════════════════════════════════════════════════════════════
+# Screenshot 2940×1688
+# Vendor Health Breakdown row: y≈115-230px → y_in=0.51-1.02
+# Top-10 Vendors chart (left): x=180-1465px, y=520-820px → x_in=0.82-6.64, y_in=2.31-3.65
+# Vendor Type Breakdown (right): x=1480-2940px, y=520-820px → x_in=6.71-13.33
+
+s = prs.slides.add_slide(BLANK)
+pic(s, ss("2.24.14 PM"), 0, 0, W, H)
+header(s, "Vendor Performance — Charts", "Slide 2 of 2")
+footer_bar(s)
+
+hi(s, Inches(0.82), Inches(0.52), Inches(12.48), Inches(0.52),
+   label="Vendor Health: 11 Active · 2 Non-Active · 10 Domestic · 2 MSME",
+   label_below=True)
+hi(s, Inches(0.82), Inches(2.2), Inches(5.82), Inches(3.5),
+   label="Top-10 Vendors by Spend  ₹ Cr")
+hi(s, Inches(6.71), Inches(2.2), Inches(6.52), Inches(3.5),
+   label="Vendor Type Breakdown")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SLIDE 9 — UTILIZATION / CAPEX-OPEX DASHBOARD
+# ══════════════════════════════════════════════════════════════════════════════
+# Screenshot 2940×1680
+# KPI row 1 (4 cards): y≈160-315px → y_in=0.71-1.40
+#   Card 1 (CAPEX ₹1899): x=195-881 → x_in=0.88-3.99
+#   Card 2 (OPEX ₹2036): x=881-1567 → x_in=3.99-7.10
+# Monthly CAPEX vs OPEX chart (left): x=180-1450px, y=385-700px → x_in=0.82-6.57, y_in=1.72-3.12
+# CAPEX vs OPEX split donut (right): x=1465-2938px, y=385-700px → x_in=6.64-13.32
+
+s = prs.slides.add_slide(BLANK)
+pic(s, ss("2.24.43 PM"), 0, 0, W, H)
+header(s, "CAPEX / OPEX Dashboard", "Utilization")
+footer_bar(s)
+
+hi(s, Inches(0.82), Inches(0.71), Inches(3.11), Inches(0.69),
+   label="CAPEX  ₹1,899.80 Cr  (48.3%)")
+hi(s, Inches(3.93), Inches(0.71), Inches(3.12), Inches(0.69),
+   label="OPEX  ₹2,036.54 Cr  (51.7%)")
+hi(s, Inches(0.82), Inches(1.72), Inches(5.75), Inches(3.0),
+   label="Monthly CAPEX vs OPEX Trend")
+hi(s, Inches(6.64), Inches(1.72), Inches(6.68), Inches(3.0),
+   label="Total Split  ₹3,936 Cr")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SLIDE 10 — P2P LIFECYCLE TRACKER
+# ══════════════════════════════════════════════════════════════════════════════
+# Screenshot 2940×1680
+# P2P stage boxes row: y≈248-425px → y_in=1.10-1.89
+#   7 boxes from x=195-1095px... wait they span full width
+#   Actually from screenshot they span x=195-2935px (the full main area)
+#   7 boxes each ≈ 392px → 1.78 in
+#   Stage 5 (GRN 117 - yellow = slow): x=195+4*392=1763 → x_in=7.99
+# Summary KPIs below stages: y≈455-560px → y_in=2.03-2.50
+# Monthly P2P Funnel chart: y≈575-840px → y_in=2.56-3.74
+
+s = prs.slides.add_slide(BLANK)
+pic(s, ss("2.26.10 PM"), 0, 0, W, H)
+header(s, "P2P Lifecycle Tracker", "End-to-End Procure-to-Pay")
+footer_bar(s)
+
+# Full stage funnel row
+hi(s, Inches(0.82), Inches(1.10), Inches(12.48), Inches(0.79),
+   label="PR 132 → PO Approved 158 → GRN 117 → Invoice 106 → Payment 82")
+# GRN stage specifically (bottleneck indicator)
+hi(s, Inches(7.99), Inches(1.10), Inches(1.78), Inches(0.79),
+   label="GRN Bottleneck  33.9d  PO→GRN", label_below=True)
+# Summary metrics bar
+hi(s, Inches(0.82), Inches(2.07), Inches(12.48), Inches(0.44),
+   label="Summary: 163 cases · 44.5d cycle · 31 Maverick POs", label_below=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SLIDE 11 — DATA UPLOAD
+# ══════════════════════════════════════════════════════════════════════════════
+# Screenshot 2940×1684
+# Upload drag-drop zone: x=240-1042px, y=245-428px → x_in=1.09-4.72, y_in=1.09-1.91
+# Dataset Reference panel (right): x=1060-2930px, y=185-1550px → x_in=4.81-13.29
+
+s = prs.slides.add_slide(BLANK)
+pic(s, ss("2.26.49 PM"), 0, 0, W, H)
+header(s, "Data Upload", "SAP CSV/Excel → IntelliSource → All Dashboards Live")
+footer_bar(s)
+
+hi(s, Inches(1.05), Inches(1.09), Inches(3.68), Inches(0.84),
+   label="Drop CSV from SAP  ·  Auto-detected  ·  Max 50 MB")
+hi(s, Inches(4.81), Inches(0.85), Inches(8.42), Inches(6.15),
+   label="6 Dataset Types: PR · PO · Delivery · GRN · Invoice · Payment",
+   label_below=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SLIDE 12 — THANK YOU
+# ══════════════════════════════════════════════════════════════════════════════
+s = prs.slides.add_slide(BLANK)
+box(s, 0, 0, W, H, DARK)
+box(s, 0, 0, Inches(0.1), H, ORANGE)
+box(s, Inches(9.5), 0, Inches(3.83), H, NAVY)
+pic(s, ss("2.26.10 PM"), Inches(9.6), Inches(0.1), Inches(3.63), Inches(7.3))
+
+t(s, "KPMG", Inches(0.3), Inches(0.55),
+  Inches(5), Inches(0.85), sz=40, bold=True, col=WHITE)
+t(s, "India  |  Procurement Advisory",
+  Inches(0.3), Inches(1.38), Inches(6), Inches(0.35), sz=13, col=LIGHT)
+
+box(s, Inches(0.3), Inches(1.88), Inches(5.6), Inches(0.04), ORANGE)
+
+t(s, "Thank You", Inches(0.3), Inches(2.05), Inches(9.0), Inches(1.1),
+  sz=52, bold=True, col=WHITE)
+t(s, "IntelliSource  —  P2P Intelligence, Powered by KPMG",
+  Inches(0.3), Inches(3.15), Inches(9.0), Inches(0.48), sz=16, col=LIGHT)
+
+box(s, Inches(0.3), Inches(3.8), Inches(5.6), Inches(0.04), LIGHT)
+
+nxt = [
+    ("Week 1", "Data readiness check  —  SAP export access"),
+    ("Week 2", "Pilot upload  —  single company code"),
+    ("Week 3", "Stakeholder walkthrough  —  live demo"),
+    ("Week 4", "Go / No-Go  —  full deployment"),
 ]
-ky = Inches(1.0)
-for val, label, color in kpi_blocks:
-    txt(s, val, rx + Inches(0.18), ky, rw - Inches(0.25), Inches(0.5),
-        size=22, bold=True, color=color)
-    txt(s, label, rx + Inches(0.18), ky + Inches(0.5), rw - Inches(0.25), Inches(0.42),
-        size=9.5, color=RGBColor(0xAA, 0xC4, 0xE8))
-    rect(s, rx + Inches(0.18), ky + Inches(0.95), rw - Inches(0.36), Inches(0.02),
-         RGBColor(0x1A, 0x35, 0x65))
-    ky += Inches(1.12)
+cy = Inches(4.0)
+for wk, desc in nxt:
+    box(s, Inches(0.3), cy, Inches(1.0), Inches(0.4), ORANGE)
+    t(s, wk, Inches(0.3), cy + Inches(0.08), Inches(1.0), Inches(0.28),
+      sz=10, bold=True, col=WHITE, align=PP_ALIGN.CENTER)
+    t(s, desc, Inches(1.5), cy + Inches(0.08), Inches(7.7), Inches(0.28),
+      sz=11, col=RGBColor(0xBB, 0xD4, 0xFF))
+    cy += Inches(0.54)
+
+t(s, "getdev24@gmail.com",
+  Inches(0.3), Inches(6.2), Inches(6), Inches(0.35), sz=12, col=GOLD)
+
+box(s, 0, Inches(6.95), W, Inches(0.55), MED)
+t(s, "KPMG India  |  Procurement Advisory  |  CONFIDENTIAL",
+  Inches(0.3), Inches(7.02), Inches(12.5), Inches(0.38), sz=10, col=WHITE)
 
 
-# ════════════════════════════════════════════════════════════════════════════════
-# SLIDE 3 — FINANCIAL DASHBOARD
-# ════════════════════════════════════════════════════════════════════════════════
-s = prs.slides.add_slide(BLANK)
-rect(s, 0, 0, SLIDE_W, SLIDE_H, WHITE)
-top_bar(s, "Financial Dashboard", "Payments · 3-Way Match · Duplicate Detection · Invoice Aging",
-        accent=KPMG_MED)
-footer(s, "Audience: Finance Controller")
-
-# Two screenshots stacked
-img(s, ss("2.21.22 PM"), Inches(0.15), Inches(0.78), Inches(9.65), Inches(3.0))
-img(s, ss("2.21.34 PM"), Inches(0.15), Inches(3.85), Inches(9.65), Inches(3.1))
-
-rx = Inches(10.0)
-rw = Inches(3.15)
-rect(s, rx, Inches(0.78), rw, Inches(6.17), DARK_BG)
-
-kpi_blocks = [
-    ("₹958 Cr",  "Total Payments\nYTD",         KPMG_LIGHT),
-    ("84%",      "3-Way Match\nRate",             RGBColor(0xFF, 0x8C, 0x00)),
-    ("40.5 Days","Avg Invoice\nPayment Days",     KPMG_LIGHT),
-    ("Live",     "Duplicate Invoice\nDetection",  KPMG_RED),
-]
-ky = Inches(1.0)
-for val, label, color in kpi_blocks:
-    txt(s, val, rx + Inches(0.18), ky, rw - Inches(0.25), Inches(0.5),
-        size=22, bold=True, color=color)
-    txt(s, label, rx + Inches(0.18), ky + Inches(0.5), rw - Inches(0.25), Inches(0.42),
-        size=9.5, color=RGBColor(0xAA, 0xC4, 0xE8))
-    rect(s, rx + Inches(0.18), ky + Inches(0.95), rw - Inches(0.36), Inches(0.02),
-         RGBColor(0x1A, 0x35, 0x65))
-    ky += Inches(1.12)
-
-
-# ════════════════════════════════════════════════════════════════════════════════
-# SLIDE 4 — LEADERSHIP DASHBOARD  (SOD focus)
-# ════════════════════════════════════════════════════════════════════════════════
-s = prs.slides.add_slide(BLANK)
-rect(s, 0, 0, SLIDE_W, SLIDE_H, WHITE)
-top_bar(s, "Leadership Dashboard", "Board View · SOD Conflicts · Risk Indicators · Strategic Spend",
-        accent=KPMG_RED)
-footer(s, "Audience: CFO · CPO · Board")
-
-img(s, ss("2.21.57 PM"), Inches(0.15), Inches(0.78), Inches(9.65), Inches(3.05))
-img(s, ss("2.22.42 PM"), Inches(0.15), Inches(3.9), Inches(9.65), Inches(3.05))
-
-rx = Inches(10.0)
-rw = Inches(3.15)
-rect(s, rx, Inches(0.78), rw, Inches(6.17), DARK_BG)
-
-kpi_blocks = [
-    ("₹3,936 Cr", "Total Spend\nAll Companies",    KPMG_LIGHT),
-    ("187",       "SOD Conflicts\n4 Control Points", KPMG_RED),
-    ("19%",       "Maverick\nSpend Rate",            RGBColor(0xFF, 0x8C, 0x00)),
-    ("44.5 Days", "End-to-End\nP2P Cycle",           KPMG_LIGHT),
-    ("85 POs",    "High-Value POs\n> ₹1 Cr",         KPMG_GOLD),
-]
-ky = Inches(0.95)
-for val, label, color in kpi_blocks:
-    txt(s, val, rx + Inches(0.18), ky, rw - Inches(0.25), Inches(0.46),
-        size=19, bold=True, color=color)
-    txt(s, label, rx + Inches(0.18), ky + Inches(0.46), rw - Inches(0.25), Inches(0.38),
-        size=9, color=RGBColor(0xAA, 0xC4, 0xE8))
-    rect(s, rx + Inches(0.18), ky + Inches(0.87), rw - Inches(0.36), Inches(0.02),
-         RGBColor(0x1A, 0x35, 0x65))
-    ky += Inches(1.0)
-
-
-# ════════════════════════════════════════════════════════════════════════════════
-# SLIDE 5 — SOD CONFLICTS  (dark, impact slide)
-# ════════════════════════════════════════════════════════════════════════════════
-s = prs.slides.add_slide(BLANK)
-rect(s, 0, 0, SLIDE_W, SLIDE_H, DARK_BG)
-rect(s, 0, 0, Inches(0.1), SLIDE_H, KPMG_RED)
-footer(s)
-
-txt(s, "Segregation of Duty Conflicts",
-    Inches(0.25), Inches(0.18), Inches(12), Inches(0.6),
-    size=30, bold=True, color=WHITE)
-txt(s, "Automatically detected by IntelliSource — invisible in SAP standard reporting",
-    Inches(0.25), Inches(0.75), Inches(12), Inches(0.32),
-    size=12, italic=True, color=KPMG_LIGHT)
-rect(s, Inches(0.25), Inches(1.12), Inches(12.85), Inches(0.03), KPMG_RED)
-
-# Big number
-rect(s, Inches(0.25), Inches(1.3), Inches(3.5), Inches(2.5), KPMG_RED)
-txt(s, "187", Inches(0.25), Inches(1.38), Inches(3.5), Inches(1.7),
-    size=90, bold=True, color=WHITE, align=PP_ALIGN.CENTER)
-txt(s, "SOD Violations\nDetected — First Upload",
-    Inches(0.25), Inches(2.95), Inches(3.5), Inches(0.75),
-    size=12, bold=True, color=WHITE, align=PP_ALIGN.CENTER)
-
-# 4 SOD types
-sods = [
-    ("PO Create  →  PO Release",    "Same user created and approved the purchase order"),
-    ("PO Create  →  GRN Post",      "Same user raised PO and posted the goods receipt"),
-    ("GRN Post  →  Invoice Post",   "Same user received goods and created vendor invoice"),
-    ("Invoice Post  →  Payment",    "Same user posted invoice and cleared the payment  ← highest risk"),
-]
-cy = Inches(1.45)
-for title, desc in sods:
-    rect(s, Inches(4.1), cy, Inches(9.0), Inches(0.9), RGBColor(0x0A, 0x22, 0x48))
-    rect(s, Inches(4.1), cy, Inches(0.06), Inches(0.9), KPMG_RED)
-    txt(s, title, Inches(4.3), cy + Inches(0.08), Inches(8.6), Inches(0.35),
-        size=12, bold=True, color=WHITE)
-    txt(s, desc, Inches(4.3), cy + Inches(0.48), Inches(8.6), Inches(0.35),
-        size=10, color=RGBColor(0x90, 0xB8, 0xE8))
-    cy += Inches(1.05)
-
-txt(s, "Popup shows: Document  ·  SOD Type  ·  Vendor  ·  User  ·  Date  ·  Export to Excel",
-    Inches(0.25), Inches(5.85), Inches(12.85), Inches(0.35),
-    size=10, color=KPMG_GOLD, italic=True)
-
-
-# ════════════════════════════════════════════════════════════════════════════════
-# SLIDE 6 — VENDOR PERFORMANCE + UTILIZATION  (split)
-# ════════════════════════════════════════════════════════════════════════════════
-s = prs.slides.add_slide(BLANK)
-rect(s, 0, 0, SLIDE_W, SLIDE_H, WHITE)
-top_bar(s, "Vendor Performance  &  CAPEX / OPEX Dashboard",
-        "Compliance · Lead Time · Spend Split · Department Breakdown",
-        accent=KPMG_TEAL)
-footer(s)
-
-# Left: Vendor Performance
-txt(s, "Vendor Performance", Inches(0.15), Inches(0.82), Inches(6.3), Inches(0.3),
-    size=10, bold=True, color=KPMG_GRAY)
-img(s, ss("2.24.04 PM"), Inches(0.15), Inches(1.12), Inches(6.3), Inches(2.7))
-img(s, ss("2.24.14 PM"), Inches(0.15), Inches(3.9), Inches(6.3), Inches(2.7))
-
-# Right: Utilization
-txt(s, "CAPEX / OPEX (Utilization)", Inches(6.7), Inches(0.82), Inches(6.45), Inches(0.3),
-    size=10, bold=True, color=KPMG_GRAY)
-img(s, ss("2.24.43 PM"), Inches(6.7), Inches(1.12), Inches(6.45), Inches(2.7))
-img(s, ss("2.24.54 PM"), Inches(6.7), Inches(3.9), Inches(6.45), Inches(2.7))
-
-# Divider
-rect(s, Inches(6.58), Inches(0.82), Inches(0.03), Inches(5.8), KPMG_LIGHT)
-
-# Bottom caption bar
-rect(s, 0, Inches(6.65), SLIDE_W, Inches(0.46), KPMG_NAVY)
-caps = [
-    "11 Active Vendors  ·  84.6% Compliance  ·  2 Blocked  ·  5.1d Avg Delivery Delay",
-    "CAPEX ₹1,899 Cr (48.3%)  ·  OPEX ₹2,036 Cr (51.7%)  ·  39 Profit Centres  ·  97.4% Delivery Utilisation",
-]
-txt(s, caps[0], Inches(0.2), Inches(6.68), Inches(6.3), Inches(0.22),
-    size=9, color=KPMG_LIGHT)
-txt(s, caps[1], Inches(6.75), Inches(6.68), Inches(6.4), Inches(0.22),
-    size=9, color=KPMG_LIGHT)
-
-
-# ════════════════════════════════════════════════════════════════════════════════
-# SLIDE 7 — P2P LIFECYCLE TRACKER + PROFIT CENTERS
-# ════════════════════════════════════════════════════════════════════════════════
-s = prs.slides.add_slide(BLANK)
-rect(s, 0, 0, SLIDE_W, SLIDE_H, WHITE)
-top_bar(s, "P2P Lifecycle Tracker  &  Profit Centers",
-        "End-to-End Procure-to-Pay · Stage Health · 39 Active Profit Centers",
-        accent=KPMG_MED)
-footer(s)
-
-# Left: P2P Tracker — full height
-img(s, ss("2.26.10 PM"), Inches(0.15), Inches(0.82), Inches(8.0), Inches(5.95))
-
-# Right: Profit Centers + caption
-img(s, ss("2.25.30 PM"), Inches(8.3), Inches(0.82), Inches(4.85), Inches(4.0))
-
-rect(s, Inches(8.3), Inches(4.88), Inches(4.85), Inches(1.89), DARK_BG)
-pc_lines = [
-    "39 Active Profit Centers",
-    "CAPEX ₹1,941 Cr  ·  OPEX ₹2,021 Cr",
-    "Total Portfolio: ₹3,962 Cr",
-    "Filter by department · drill to PO line",
-]
-cy = Inches(5.05)
-for line in pc_lines:
-    txt(s, f"▸  {line}", Inches(8.45), cy, Inches(4.55), Inches(0.3),
-        size=10, color=RGBColor(0xB0, 0xC8, 0xFF))
-    cy += Inches(0.35)
-
-# P2P funnel caption
-rect(s, Inches(0.15), Inches(6.72), Inches(8.0), Inches(0.35), KPMG_NAVY)
-txt(s, "132 PRs  →  163 POs  →  117 GRNs  →  106 Invoices  →  82 Payments  ·  Avg 44.5 Days",
-    Inches(0.25), Inches(6.75), Inches(7.8), Inches(0.28), size=9, color=KPMG_LIGHT)
-
-
-# ════════════════════════════════════════════════════════════════════════════════
-# SLIDE 8 — OPERATIONS  (Vendor Repo + Data Upload)
-# ════════════════════════════════════════════════════════════════════════════════
-s = prs.slides.add_slide(BLANK)
-rect(s, 0, 0, SLIDE_W, SLIDE_H, WHITE)
-top_bar(s, "Operations",
-        "Vendor Repository · Data Upload · User Management · Activity History",
-        accent=KPMG_TEAL)
-footer(s)
-
-# 4 screenshots in 2×2 grid
-img(s, ss("2.26.31 PM"), Inches(0.15), Inches(0.82), Inches(6.5), Inches(3.2))
-img(s, ss("2.26.49 PM"), Inches(6.75), Inches(0.82), Inches(6.4), Inches(3.2))
-img(s, ss("2.26.58 PM"), Inches(0.15), Inches(4.1), Inches(6.5), Inches(3.0))
-img(s, ss("2.27.24 PM"), Inches(6.75), Inches(4.1), Inches(6.4), Inches(3.0))
-
-# Labels
-for label, x, y in [
-    ("Vendor Repository — 13 vendors, searchable catalog", Inches(0.15), Inches(0.82)),
-    ("Data Upload — CSV/Excel, auto-detect, live refresh",  Inches(6.75), Inches(0.82)),
-    ("Activity History — upload & download audit trail",    Inches(0.15), Inches(4.1)),
-    ("User Management — role-based access control",         Inches(6.75), Inches(4.1)),
-]:
-    rect(s, x, y, Inches(6.45) if x < Inches(5) else Inches(6.4), Inches(0.3), KPMG_NAVY)
-    txt(s, label, x + Inches(0.12), y + Inches(0.04), Inches(6.2), Inches(0.24),
-        size=9, bold=True, color=WHITE)
-
-
-# ════════════════════════════════════════════════════════════════════════════════
-# SLIDE 9 — THANK YOU / NEXT STEPS
-# ════════════════════════════════════════════════════════════════════════════════
-s = prs.slides.add_slide(BLANK)
-rect(s, 0, 0, SLIDE_W, SLIDE_H, KPMG_NAVY)
-rect(s, 0, 0, Inches(0.12), SLIDE_H, KPMG_LIGHT)
-rect(s, Inches(9.8), 0, Inches(3.53), SLIDE_H, KPMG_MED)
-
-# Right: app screenshot
-img(s, ss("2.26.10 PM"), Inches(9.9), Inches(0.3), Inches(3.3), Inches(6.8))
-
-txt(s, "KPMG", Inches(0.3), Inches(0.5), Inches(4), Inches(0.8),
-    size=38, bold=True, color=WHITE)
-rect(s, Inches(0.3), Inches(1.55), Inches(5.5), Inches(0.04), KPMG_GOLD)
-
-txt(s, "Thank You", Inches(0.3), Inches(1.75), Inches(9.3), Inches(1.1),
-    size=52, bold=True, color=WHITE)
-txt(s, "IntelliSource — Procurement Intelligence, Powered by KPMG",
-    Inches(0.3), Inches(2.85), Inches(9.2), Inches(0.5),
-    size=16, color=KPMG_LIGHT)
-
-rect(s, Inches(0.3), Inches(3.5), Inches(5.5), Inches(0.04), KPMG_LIGHT)
-
-steps = [
-    ("Week 1", "Data readiness — SAP export access"),
-    ("Week 2", "Pilot upload — single company code"),
-    ("Week 3", "Stakeholder walkthrough — live demo"),
-    ("Week 4", "Go / No-Go — full deployment"),
-]
-cy = Inches(3.72)
-for wk, desc in steps:
-    rect(s, Inches(0.3), cy, Inches(1.1), Inches(0.42), KPMG_RED)
-    txt(s, wk, Inches(0.3), cy + Inches(0.08), Inches(1.1), Inches(0.3),
-        size=10, bold=True, color=WHITE, align=PP_ALIGN.CENTER)
-    txt(s, desc, Inches(1.55), cy + Inches(0.08), Inches(7.5), Inches(0.3),
-        size=11, color=RGBColor(0xC0, 0xD8, 0xFF))
-    cy += Inches(0.56)
-
-txt(s, "getdev24@gmail.com",
-    Inches(0.3), Inches(6.05), Inches(8), Inches(0.35),
-    size=12, color=KPMG_GOLD)
-
-rect(s, 0, Inches(6.95), SLIDE_W, Inches(0.55), RGBColor(0x00, 0x28, 0x70))
-txt(s, "KPMG India  |  Procurement Advisory  |  CONFIDENTIAL",
-    Inches(0.3), Inches(7.02), Inches(12.5), Inches(0.35),
-    size=10, color=WHITE)
-
-
-# ── Save ───────────────────────────────────────────────────────────────────────
+# ── save ───────────────────────────────────────────────────────────────────────
 out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "IntelliSource_Presentation.pptx")
 prs.save(out)
-print(f"Saved: {out}")
-print(f"Slides: {len(prs.slides)}")
+print(f"Saved  {out}")
+print(f"Slides {len(prs.slides)}")
