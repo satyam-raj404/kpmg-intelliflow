@@ -22,6 +22,7 @@ flowchart LR
         P2["Finance\nDashboard"]
         P3["Compliance\nAlerts"]
         P4["Leadership\nDashboard"]
+        P5["Ask IntelliSource\nAI Assistant"]
     end
 
     subgraph USERS["Business Users"]
@@ -31,17 +32,25 @@ flowchart LR
         U4["Leadership\n/ CXO"]
     end
 
+    AI["Azure OpenAI\nGPT-4o"]
+
     S1 -->|Batch CSV| A1
     A3 --> P1
     A3 --> P2
     A3 --> P3
     A3 --> P4
+    A3 --> P5
     P1 --> U1
     P2 --> U2
     P3 --> U3
     P4 --> U4
+    U1 -->|"Natural-language question"| P5
+    U4 -->|"Natural-language question"| P5
+    P5 <-->|"Grounded on live data"| AI
+    P5 -->|"Answer with citations"| U1
 
     class S1 erpStyle
     class A1,A2,A3,A4 adminStyle
-    class P1,P2,P3,P4 platStyle
+    class P1,P2,P3,P4,P5 platStyle
     class U1,U2,U3,U4 userStyle
+    class AI erpStyle

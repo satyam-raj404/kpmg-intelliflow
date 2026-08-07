@@ -32,6 +32,10 @@ flowchart TD
         AAD["Azure Active Directory\nSSO · MFA · RBAC"]
     end
 
+    subgraph AI_ZONE["Azure AI Zone"]
+        AOAI["Azure OpenAI\nGPT-4o · Private Endpoint"]
+    end
+
     subgraph OPS["Azure Operations"]
         MON["Azure Monitor\n+ App Insights"]
         LOG["Log Analytics"]
@@ -48,6 +52,7 @@ flowchart TD
     AGW     -->|"Internal HTTPS"| ACA
     ACA     <-->|"TLS · Port 5432"| PG
     ACA     -->|"Managed Identity"| KV
+    ACA     <-->|"HTTPS · Private Link"| AOAI
     AAD     -->|"OAuth 2.0 Tokens"| ACA
     GH      -->|"Docker Push"| ACR
     GH      -->|"Deploy SPA"| CDN
@@ -61,5 +66,6 @@ flowchart TD
     class ACA,ACR appStyle
     class PG,KV dataStyle
     class AAD idStyle
+    class AOAI extStyle
     class MON,LOG opsStyle
     class GH ciStyle

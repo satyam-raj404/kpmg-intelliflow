@@ -8,11 +8,13 @@ flowchart LR
     SAP["SAP ERP\nOn-Premise"]
     AAD["Azure Active\nDirectory"]
     USERS["KPMG Staff\nBrowser"]
+    AOAI["Azure OpenAI\nGPT-4o Service"]
 
     subgraph INT["Integration Patterns"]
         FILE["File-Based\nCSV Upload"]
         API["API-Based\nOAuth 2.0"]
         WEB["Web\nHTTPS"]
+        LLMAPI["AI-Based\nHTTPS/JSON · Private Link"]
     end
 
     IS["IntelliSource\nPlatform"]
@@ -23,9 +25,12 @@ flowchart LR
     API   -->|"Auth Token"| IS
     USERS -->|"Dashboard Access"| WEB
     WEB   -->|"REST API Calls"| IS
+    IS    -->|"NL question + tool schema"| LLMAPI
+    LLMAPI <-->|"Tool calls / grounded answer"| AOAI
 
     class SAP srcStyle
     class AAD idStyle
     class USERS userStyle
-    class FILE,API,WEB intStyle
+    class AOAI srcStyle
+    class FILE,API,WEB,LLMAPI intStyle
     class IS platStyle

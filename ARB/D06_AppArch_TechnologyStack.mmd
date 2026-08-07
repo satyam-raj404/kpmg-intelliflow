@@ -29,6 +29,13 @@ flowchart TD
         DB_S["Azure Key Vault\n(Secrets)"]
     end
 
+    subgraph COL_AI["AI Layer — Ask IntelliSource"]
+        AI_M["Azure OpenAI · GPT-4o"]
+        AI_P["Agentic Tool-Calling\n(6 read-only tools)"]
+        AI_G["Live PostgreSQL Grounding\n(no data used for training)"]
+        AI_S2["Private Link · KPMG Tenant"]
+    end
+
     subgraph COL_DEV["DevOps"]
         DEV_S["GitHub"]
         DEV_C["GitHub Actions"]
@@ -39,10 +46,12 @@ flowchart TD
     HDR --> COL_FE
     HDR --> COL_BE
     HDR --> COL_DB
+    HDR --> COL_AI
     HDR --> COL_DEV
 
     class HDR hdrStyle
     class FE_L,FE_F,FE_U,FE_S,FE_H feStyle
     class BE_L,BE_F,BE_D,BE_L2,BE_H beStyle
     class DB_A,DB_H,DB_S dbStyle
+    class AI_M,AI_P,AI_G,AI_S2 beStyle
     class DEV_S,DEV_C,DEV_R,DEV_M devStyle

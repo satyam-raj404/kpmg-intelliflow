@@ -20,6 +20,7 @@ flowchart TD
         AUTH_S["Auth\nService"]
         VEND_S["Vendor\nService"]
         P2P_S["P2P\nAnalytics"]
+        AI_S["AI Assistant\nAsk IntelliSource\n(agentic tool-calling)"]
     end
 
     subgraph DATA["Data Layer\nAzure Database for PostgreSQL"]
@@ -27,14 +28,17 @@ flowchart TD
     end
 
     EXT["SAP ERP\nFile-based CSV Export"]
+    LLM["Azure OpenAI\nGPT-4o (KPMG tenant)"]
 
     U    -->|"HTTPS — Browser"| SPA
     SPA  <-->|"REST API · HTTPS/JSON"| APP
     APP  <-->|"SQL · TLS port 5432"| DATA
     EXT  -->|"CSV Upload"| ETL_S
+    AI_S -->|"read-only SQL tools"| DATA
+    AI_S <-->|"HTTPS/JSON · Private Link"| LLM
 
     class U userStyle
     class SPA presStyle
-    class KPI_S,ETL_S,AUTH_S,VEND_S,P2P_S appStyle
+    class KPI_S,ETL_S,AUTH_S,VEND_S,P2P_S,AI_S appStyle
     class DB dataStyle
-    class EXT extStyle
+    class EXT,LLM extStyle
