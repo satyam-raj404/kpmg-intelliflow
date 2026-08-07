@@ -67,6 +67,7 @@ SAP_ALIASES: dict[str, str] = {
     "frgdt":         "release_date",
     "frgke":         "release_indicator",
     "frgrl":         "release_strategy",
+    "konnr":         "contract_number",
 
     # ── PO header fields ──
     "bukrs":         "company_code",

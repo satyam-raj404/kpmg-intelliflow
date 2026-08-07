@@ -33,6 +33,11 @@ def run_etl(
     _progress(40, f"Loading {rows_accepted} rows into {dataset_type}…")
     load(valid_df, dataset_type, conn, batch_id)
 
+    if dataset_type == "po_dump":
+        _progress(48, "Running contract number check…")
+        from services.contract_check import run_contract_check
+        run_contract_check(conn)
+
     _progress(55, "Rebuilding entity hierarchy…")
     build_entity_hierarchy(conn)
 

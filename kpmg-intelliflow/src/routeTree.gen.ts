@@ -22,6 +22,7 @@ import { Route as LeadershipRouteImport } from './routes/leadership'
 import { Route as HistoryRouteImport } from './routes/history'
 import { Route as FinancialRouteImport } from './routes/financial'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as ContractCenterRouteImport } from './routes/contract-center'
 import { Route as AskRouteImport } from './routes/ask'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as ActionsRouteImport } from './routes/actions'
@@ -95,6 +96,11 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ContractCenterRoute = ContractCenterRouteImport.update({
+  id: '/contract-center',
+  path: '/contract-center',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AskRoute = AskRouteImport.update({
   id: '/ask',
   path: '/ask',
@@ -136,6 +142,7 @@ export interface FileRoutesByFullPath {
   '/actions': typeof ActionsRoute
   '/alerts': typeof AlertsRoute
   '/ask': typeof AskRoute
+  '/contract-center': typeof ContractCenterRoute
   '/dashboard': typeof DashboardRoute
   '/financial': typeof FinancialRoute
   '/history': typeof HistoryRoute
@@ -158,6 +165,7 @@ export interface FileRoutesByTo {
   '/actions': typeof ActionsRoute
   '/alerts': typeof AlertsRoute
   '/ask': typeof AskRoute
+  '/contract-center': typeof ContractCenterRoute
   '/dashboard': typeof DashboardRoute
   '/financial': typeof FinancialRoute
   '/history': typeof HistoryRoute
@@ -181,6 +189,7 @@ export interface FileRoutesById {
   '/actions': typeof ActionsRoute
   '/alerts': typeof AlertsRoute
   '/ask': typeof AskRoute
+  '/contract-center': typeof ContractCenterRoute
   '/dashboard': typeof DashboardRoute
   '/financial': typeof FinancialRoute
   '/history': typeof HistoryRoute
@@ -205,6 +214,7 @@ export interface FileRouteTypes {
     | '/actions'
     | '/alerts'
     | '/ask'
+    | '/contract-center'
     | '/dashboard'
     | '/financial'
     | '/history'
@@ -227,6 +237,7 @@ export interface FileRouteTypes {
     | '/actions'
     | '/alerts'
     | '/ask'
+    | '/contract-center'
     | '/dashboard'
     | '/financial'
     | '/history'
@@ -249,6 +260,7 @@ export interface FileRouteTypes {
     | '/actions'
     | '/alerts'
     | '/ask'
+    | '/contract-center'
     | '/dashboard'
     | '/financial'
     | '/history'
@@ -272,6 +284,7 @@ export interface RootRouteChildren {
   ActionsRoute: typeof ActionsRoute
   AlertsRoute: typeof AlertsRoute
   AskRoute: typeof AskRoute
+  ContractCenterRoute: typeof ContractCenterRoute
   DashboardRoute: typeof DashboardRoute
   FinancialRoute: typeof FinancialRoute
   HistoryRoute: typeof HistoryRoute
@@ -383,6 +396,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/contract-center': {
+      id: '/contract-center'
+      path: '/contract-center'
+      fullPath: '/contract-center'
+      preLoaderRoute: typeof ContractCenterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/ask': {
       id: '/ask'
       path: '/ask'
@@ -440,6 +460,7 @@ const rootRouteChildren: RootRouteChildren = {
   ActionsRoute: ActionsRoute,
   AlertsRoute: AlertsRoute,
   AskRoute: AskRoute,
+  ContractCenterRoute: ContractCenterRoute,
   DashboardRoute: DashboardRoute,
   FinancialRoute: FinancialRoute,
   HistoryRoute: HistoryRoute,

@@ -656,3 +656,30 @@ INSERT INTO profit_center_master (profit_center, pc_name, company_code, dept_cod
 ('1001-OPS-BLR','Operations — Bengaluru',   '1001','OPS','BLRP','9908','OPEX',  'OPERATIONS',   1),
 ('1001-OPS-HYD','Operations — Hyderabad',   '1001','OPS','HYDP','9908','OPEX',  'OPERATIONS',   1)
 ON CONFLICT (profit_center) DO NOTHING;
+
+-- ── Contract Center ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS contract_master (
+    id                SERIAL PRIMARY KEY,
+    contract_number   TEXT NOT NULL UNIQUE,
+    contract_name     TEXT NOT NULL,
+    vendor            TEXT DEFAULT '',
+    vendor_name       TEXT DEFAULT '',
+    company_code      TEXT DEFAULT '1001',
+    contract_type     TEXT DEFAULT 'SERVICE',
+    contract_value    REAL DEFAULT 0,
+    currency_key      TEXT DEFAULT 'INR',
+    start_date        TEXT DEFAULT '',
+    end_date          TEXT DEFAULT '',
+    status            TEXT DEFAULT 'ACTIVE',
+    owner             TEXT DEFAULT '',
+    is_active         INTEGER DEFAULT 1,
+    created_by        TEXT DEFAULT 'admin',
+    created_at        TEXT DEFAULT NOW()::TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_contract_num ON contract_master(contract_number);
+CREATE INDEX IF NOT EXISTS idx_contract_co  ON contract_master(company_code);
+
+-- contract_check verdict on po_dump: MATCHED / UNMATCHED / NO_CONTRACT
+ALTER TABLE po_dump ADD COLUMN IF NOT EXISTS contract_check TEXT DEFAULT '';
+CREATE INDEX IF NOT EXISTS idx_po_contract_num   ON po_dump(contract_number);
+CREATE INDEX IF NOT EXISTS idx_po_contract_check ON po_dump(contract_check);

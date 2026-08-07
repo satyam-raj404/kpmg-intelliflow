@@ -23,6 +23,7 @@ import {
   Bell,
   ChevronDown,
   Building2,
+  FileCheck2,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
@@ -53,6 +54,7 @@ const operations: NavItem[] = [
   { label: "Ask IntelliSource", to: "/ask", icon: Sparkles },
   { label: "P2P Lifecycle", to: "/p2p", icon: Workflow },
   { label: "Vendor Repository", to: "/vendor-repo", icon: BookOpen },
+  { label: "Contract Center", to: "/contract-center", icon: FileCheck2 },
   { label: "Log Action", to: "/actions", icon: ListTodo },
   { label: "Alerts", to: "/alerts", icon: ShieldAlert },
   { label: "Data Upload", to: "/upload", icon: Upload },
