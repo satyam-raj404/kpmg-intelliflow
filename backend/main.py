@@ -18,7 +18,7 @@ if _env_file.exists():
                 os.environ.setdefault(_k.strip(), _v.strip())
 
 from database import init_db, get_connection
-from routers import upload, kpi, p2p, events, actions, auth, chat, profit_center, vendors, contract_center
+from routers import upload, kpi, p2p, events, actions, auth, chat, profit_center, vendors, contract_center, prompt_library
 
 
 @asynccontextmanager
@@ -79,6 +79,7 @@ app.include_router(chat.router,          prefix="/api")
 app.include_router(profit_center.router, prefix="/api")
 app.include_router(vendors.router,      prefix="/api")
 app.include_router(contract_center.router, prefix="/api")
+app.include_router(prompt_library.router,  prefix="/api")
 
 
 @app.get("/api/health")

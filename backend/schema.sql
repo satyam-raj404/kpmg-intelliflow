@@ -683,3 +683,55 @@ CREATE INDEX IF NOT EXISTS idx_contract_co  ON contract_master(company_code);
 ALTER TABLE po_dump ADD COLUMN IF NOT EXISTS contract_check TEXT DEFAULT '';
 CREATE INDEX IF NOT EXISTS idx_po_contract_num   ON po_dump(contract_number);
 CREATE INDEX IF NOT EXISTS idx_po_contract_check ON po_dump(contract_check);
+
+-- ── Ask IntelliSource: Prompt Library ──────────────────────────────────────────
+-- App metadata (not harness data) — lives in the main app DB, not the
+-- read-only harness plane.
+CREATE TABLE IF NOT EXISTS prompt_library (
+    id             SERIAL PRIMARY KEY,
+    name           TEXT NOT NULL UNIQUE,
+    category       TEXT NOT NULL DEFAULT 'General',
+    prompt_text    TEXT NOT NULL,
+    params_json    TEXT DEFAULT '[]',   -- [{"key":"company_code","label":"Company Code","default":"ALL"}]
+    created_by     TEXT DEFAULT 'admin',
+    is_shared      INTEGER DEFAULT 1,
+    use_count      INTEGER DEFAULT 0,
+    created_at     TEXT DEFAULT NOW()::TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_promptlib_category ON prompt_library(category);
+CREATE INDEX IF NOT EXISTS idx_promptlib_shared    ON prompt_library(is_shared);
+
+-- ── Ask IntelliSource: conversation persistence ────────────────────────────────
+CREATE TABLE IF NOT EXISTS chat_sessions (
+    session_id     TEXT PRIMARY KEY,
+    title          TEXT DEFAULT 'New conversation',
+    created_by     TEXT DEFAULT 'user',
+    created_at     TEXT DEFAULT NOW()::TEXT,
+    updated_at     TEXT DEFAULT NOW()::TEXT
+);
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id             SERIAL PRIMARY KEY,
+    session_id     TEXT NOT NULL,
+    role           TEXT NOT NULL,       -- user | assistant
+    content        TEXT NOT NULL,
+    tools_used     TEXT DEFAULT '',     -- comma-separated
+    artifacts      TEXT DEFAULT '[]',   -- JSON array of {id,type,filename,url} so resumed history shows download cards
+    created_at     TEXT DEFAULT NOW()::TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_chatmsg_session ON chat_messages(session_id, id);
+ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS artifacts TEXT DEFAULT '[]';
+
+-- Seed the original 10 quick-prompt library entries (idempotent — matched on name).
+INSERT INTO prompt_library (name, category, prompt_text, is_shared) VALUES
+('Spend Summary', 'Spend', 'What is the total procurement spend this month broken down by company code and CAPEX vs OPEX? Show top spending categories.', 1),
+('Anomaly Risk Report', 'Risk', 'Give me a full anomaly risk report — split POs, retro POs, price variances, no-GRN cases, and deleted-after-GRN. Include PO numbers.', 1),
+('Top Vendors by Spend', 'Vendor', 'Who are the top 10 vendors by spend this year? Show their PO count, total value, and payment status.', 1),
+('P2P Cycle Times', 'P2P', 'What is the average cycle time at each P2P stage: PR to PO, PO to GRN, GRN to Invoice, Invoice to Payment? Which stage has the most delays?', 1),
+('PR to PO Backlog', 'P2P', 'Show all open purchase requisitions that have not yet been converted to a PO. How many days have they been pending? Which departments have the highest backlog?', 1),
+('Overdue Payments', 'Spend', 'Which vendors have invoices pending payment beyond 30 days? Show the invoice amounts, due dates, and total overdue value by vendor.', 1),
+('Budget vs Actual', 'Spend', 'Compare actual CAPEX and OPEX spend against the defined budget for each profit center. Flag any profit centers that are over budget.', 1),
+('Maverick Buying', 'Risk', 'Show all maverick buying incidents — POs raised without a valid purchase requisition. Which departments and vendors are involved and what is the total value?', 1),
+('GRN Pending POs', 'P2P', 'Show all active POs where goods receipt (GRN) has not yet been posted. How long have these POs been open and what is the total open value?', 1),
+('MSME Compliance', 'Compliance', 'Which MSME-registered vendors have payment delays beyond 45 days? Are we compliant with MSMED Act payment timelines? Show total overdue amount.', 1)
+ON CONFLICT (name) DO NOTHING;

@@ -6,3 +6,9 @@ openpyxl==3.1.5
 pydantic==2.8.2
 python-dateutil==2.9.0
 psycopg[binary]>=3.2
+
+# Ask IntelliSource harness — analysis, charts, reports
+matplotlib>=3.9
+reportlab>=4.2
+python-pptx>=1.0.2
+XlsxWriter>=3.2

@@ -47,7 +47,11 @@ class _PGConnection:
         self._raw.row_factory = _hybrid_factory
 
     def execute(self, sql: str, params=None):
-        clean_sql = sql.replace("?", "%s")
+        # Only translate ? -> %s placeholders when there are actual params to bind.
+        # A blind replace() also mangles any literal "?" inside string values
+        # (e.g. seeded text containing a question mark) when a statement is run
+        # with no params at all — as every schema.sql DDL/seed statement is.
+        clean_sql = sql.replace("?", "%s") if params else sql
         # Use savepoint so a single failed statement doesn't abort the whole transaction
         try:
             self._raw.execute("SAVEPOINT _sp")

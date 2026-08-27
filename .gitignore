@@ -9,3 +9,4 @@ __pycache__
 .~lock*
 .vite
 General_P2P_data/
+backend/_artifacts/

@@ -28,6 +28,11 @@ export default defineConfig({
       "/api": {
         target: "http://localhost:8001",
         changeOrigin: true,
+        // Report/chart requests on the free 120B model can take 100s+; without an
+        // explicit timeout the proxy can drop the socket mid-request -> the browser
+        // sees "Failed to fetch". 5 min gives ample headroom.
+        timeout: 300000,
+        proxyTimeout: 300000,
       },
     },
   },
