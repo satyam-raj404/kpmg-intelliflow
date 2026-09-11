@@ -12,7 +12,13 @@
 #   4. Starts the Vite frontend on :8080
 #   5. Health-checks both and confirms the DB is reachable
 #
-# Stop everything:  ./start.sh stop     (or: lsof -ti:8001,8080 | xargs kill -9)
+# Commands:
+#   ./start.sh          set up + launch everything, health-check, copy app URL
+#   ./start.sh stop     stop backend + frontend
+#   ./start.sh logs     show recent backend+frontend logs AND copy them
+#
+# On any failure it names the step, shows the log tail, and copies a full
+# error report to the clipboard so it can be pasted straight into a bug report.
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -24,11 +30,62 @@ ENV_FILE="$ROOT/.env"
 BLOG="/tmp/intl_backend.log"
 FLOG="/tmp/intl_frontend.log"
 
+# ── helpers: clipboard + display + error handling ────────────────────────────
+# clip: copy stdin to the clipboard on macOS / Linux / WSL; no-op if none exist.
+clip() {
+  if   command -v pbcopy   >/dev/null 2>&1; then pbcopy
+  elif command -v xclip    >/dev/null 2>&1; then xclip -selection clipboard
+  elif command -v xsel     >/dev/null 2>&1; then xsel --clipboard --input
+  elif command -v clip.exe >/dev/null 2>&1; then clip.exe
+  else cat >/dev/null; return 1; fi
+}
+
+# copy_show: print text AND copy it to the clipboard (noting whether it worked).
+copy_show() {
+  local text="$1"
+  printf '%s\n' "$text"
+  if printf '%s' "$text" | clip 2>/dev/null; then echo "  ↳ copied to clipboard"; fi
+}
+
+# collect_logs: recent backend + frontend log tails as one string.
+collect_logs() {
+  local out=""
+  [[ -f "$BLOG" ]] && out+=$'--- backend  (tail) ---\n'"$(tail -n 30 "$BLOG" 2>/dev/null)"$'\n\n'
+  [[ -f "$FLOG" ]] && out+=$'--- frontend (tail) ---\n'"$(tail -n 30 "$FLOG" 2>/dev/null)"
+  [[ -z "$out" ]] && out="(no logs yet)"
+  printf '%s' "$out"
+}
+
+# ERR trap: on any unhandled failure, name the step, show + copy a report.
+STEP="startup"
+on_error() {
+  local line="$1"
+  echo
+  echo "✗ start.sh failed — step: ${STEP} (line ${line})"
+  local report
+  report="start.sh failure
+step : ${STEP}
+line : ${line}
+
+$(collect_logs)"
+  echo "────────────── error report ──────────────"
+  copy_show "$report"
+  echo "───────────────────────────────────────────"
+  exit 1
+}
+trap 'on_error $LINENO' ERR
+
 # ── stop mode ────────────────────────────────────────────────────────────────
 if [[ "${1:-}" == "stop" ]]; then
   echo "Stopping backend (:8001) and frontend (:8080)…"
   lsof -ti:8001,8080 2>/dev/null | xargs kill -9 2>/dev/null || true
   echo "Stopped."
+  exit 0
+fi
+
+# ── logs mode: display recent logs AND copy them to the clipboard ────────────
+if [[ "${1:-}" == "logs" ]]; then
+  copy_show "$(collect_logs)"
   exit 0
 fi
 
@@ -70,6 +127,7 @@ echo "  Toolchain OK."
 lsof -ti:8001,8080 2>/dev/null | xargs kill -9 2>/dev/null || true
 
 # ── 2. create the "Intl" venv (reuse if present) ─────────────────────────────
+STEP="creating venv 'Intl'"
 if [[ ! -x "$VENV/bin/python" ]]; then
   echo "  Creating venv 'Intl' with Python $PY_VER…"
   "$PY" -m venv "$VENV"
@@ -81,6 +139,7 @@ PYBIN="$VENV/bin/python"
 PIPBIN="$VENV/bin/pip"
 
 # ── 3. install backend deps ──────────────────────────────────────────────────
+STEP="installing backend requirements"
 echo "  Installing backend requirements…"
 "$PYBIN" -m pip install --quiet --upgrade pip
 if ! "$PIPBIN" install --quiet -r "$BACKEND/requirements.txt"; then
@@ -103,18 +162,22 @@ fi
 echo "  .env found — backend will auto-connect the database on startup."
 
 # ── 5. start the backend (auto-loads .env, auto-inits the DB schema) ─────────
+STEP="starting backend"
 echo "  Starting backend on :8001…"
 ( cd "$BACKEND" && nohup "$VENV/bin/uvicorn" main:app --host 0.0.0.0 --port 8001 >"$BLOG" 2>&1 & )
 
 # ── 6. start the frontend (npm install on first run) ─────────────────────────
+STEP="installing frontend deps"
 if [[ ! -d "$FRONTEND/node_modules" ]]; then
   echo "  Installing frontend deps (first run)…"
   ( cd "$FRONTEND" && npm install --silent )
 fi
+STEP="starting frontend"
 echo "  Starting frontend on :8080…"
 ( cd "$FRONTEND" && nohup npm run dev >"$FLOG" 2>&1 & )
 
 # ── 7. health-check both + confirm DB reachable ──────────────────────────────
+STEP="waiting for services"
 echo -n "  Waiting for services"
 db_ok=""; front_ok=""
 for _ in $(seq 1 40); do
@@ -129,10 +192,21 @@ done
 echo
 
 echo "──────────────────────────────────────────────"
-if [[ -n "$db_ok" ]]; then echo "✓ Backend + database  : http://localhost:8001  (DB connected)"
-else echo "✗ Backend/DB not ready — check $BLOG"; fi
-if [[ -n "$front_ok" ]]; then echo "✓ Frontend            : http://localhost:8080"
-else echo "✗ Frontend not ready — check $FLOG"; fi
+[[ -n "$db_ok" ]]    && echo "✓ Backend + database  : http://localhost:8001  (DB connected)" \
+                     || echo "✗ Backend/DB not ready — check $BLOG"
+[[ -n "$front_ok" ]] && echo "✓ Frontend            : http://localhost:8080" \
+                     || echo "✗ Frontend not ready — check $FLOG"
 echo "──────────────────────────────────────────────"
-echo "Logs : $BLOG | $FLOG"
+echo "Logs : $BLOG | $FLOG   (view+copy: ./start.sh logs)"
 echo "Stop : ./start.sh stop"
+
+# If either service failed to come up, display + copy the logs and exit non-zero.
+if [[ -z "$db_ok" || -z "$front_ok" ]]; then
+  echo
+  echo "One or more services didn't start — recent logs (copied to clipboard):"
+  copy_show "$(collect_logs)"
+  exit 1
+fi
+
+# Success: copy the app URL so it's ready to paste into the browser.
+if printf 'http://localhost:8080' | clip 2>/dev/null; then echo "App URL copied to clipboard."; fi
