@@ -12,6 +12,12 @@ it runs under any Python already on the box:
 
 Or just double-click start_kpmg.bat, which calls this.
 
+If you're copying this project to the server as a zip: exclude Intl/,
+frontend/node_modules/, and backend/__pycache__/ first — venvs and
+node_modules hardcode absolute paths from the machine that built them and
+will not work copied elsewhere (this script detects and rebuilds a broken
+venv automatically, but skipping the copy is faster).
+
 What it does:
   1. Creates a venv named "Intl" (reused if already there)
   2. Installs backend/requirements.txt (+ python-dotenv)
@@ -142,7 +148,30 @@ def check_toolchain() -> None:
     log("  Toolchain OK.")
 
 
+def _venv_is_usable() -> bool:
+    """A venv's Scripts/python.exe existing on disk doesn't mean it works —
+    pyvenv.cfg hardcodes the absolute path to the base interpreter that
+    created it, so a venv copied/zipped from another machine (or another
+    path on this one) fails at runtime once that path doesn't resolve here."""
+    if not VENV_PY.exists():
+        return False
+    try:
+        result = subprocess.run(
+            [str(VENV_PY), "-c", "print('ok')"],
+            capture_output=True, text=True, timeout=15,
+        )
+        return result.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
 def ensure_venv() -> None:
+    if VENV_PY.exists() and not _venv_is_usable():
+        log("  Existing venv 'Intl' is broken (likely copied from another machine — venvs "
+            "aren't portable) — recreating...")
+        import shutil
+        shutil.rmtree(VENV, ignore_errors=True)
+
     if VENV_PY.exists():
         log("  Reusing existing venv 'Intl'.")
         return
