@@ -22,8 +22,10 @@ export default defineConfig({
   },
   server: {
     host: "0.0.0.0", // listen on all interfaces — reachable from the LAN, not just localhost
-    port: 8080,
-    strictPort: false,
+    port: 5173, // Vite's own default — 8080 was getting silently blocked on the KPMG
+                // server's network path (TCP connect timeout) while 8001 got through fine;
+                // moving off a "custom-looking" port is the workaround being tested.
+    strictPort: true, // fail loudly instead of silently drifting to 5174+ while diagnosing this
     proxy: {
       "/api": {
         target: "http://localhost:8001",

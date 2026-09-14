@@ -27,7 +27,7 @@ What it does:
      startup, same as before
   5. Starts the FastAPI backend on :8001
   6. Installs frontend deps (npm install, first run only) and starts the Vite
-     frontend on :8080
+     frontend on :5173
   7. Health-checks both and reports status
 
 AI features (Ask IntelliSource) run with whatever OPENROUTER_API_KEY is in
@@ -66,6 +66,7 @@ IS_WINDOWS = platform.system() == "Windows"
 VENV_PY = VENV / ("Scripts/python.exe" if IS_WINDOWS else "bin/python")
 VENV_UVICORN = VENV / ("Scripts/uvicorn.exe" if IS_WINDOWS else "bin/uvicorn")
 NPM = "npm.cmd" if IS_WINDOWS else "npm"
+FRONTEND_PORT = 5173  # keep in sync with frontend/vite.config.ts server.port
 
 BLOG = LOG_DIR / "backend.log"
 FLOG = LOG_DIR / "frontend.log"
@@ -248,7 +249,7 @@ def start_frontend() -> subprocess.Popen:
     if not (FRONTEND / "node_modules").exists():
         log("  Installing frontend deps (first run)...")
         subprocess.run([NPM, "install", "--silent"], cwd=str(FRONTEND), check=True)
-    log("  Starting frontend on :8080...")
+    log(f"  Starting frontend on :{FRONTEND_PORT}...")
     with open(FLOG, "w") as f:
         kwargs = {}
         if IS_WINDOWS:
@@ -287,7 +288,7 @@ def wait_for_services() -> tuple[bool, bool]:
         if not db_ok:
             db_ok = _http_ok("http://localhost:8001/api/chat/sessions")
         if not front_ok:
-            front_ok = _http_ok("http://localhost:8080/")
+            front_ok = _http_ok(f"http://localhost:{FRONTEND_PORT}/")
         if db_ok and front_ok:
             break
         print(".", end="", flush=True)
@@ -317,11 +318,11 @@ def cmd_start() -> None:
     else:
         log(f"✗ Backend/DB not ready — check {BLOG}")
     if front_ok:
-        log(f"✓ Frontend            : http://localhost:8080  |  LAN: http://{ip}:8080")
+        log(f"✓ Frontend            : http://localhost:{FRONTEND_PORT}  |  LAN: http://{ip}:{FRONTEND_PORT}")
     else:
         log(f"✗ Frontend not ready — check {FLOG}")
     log("-" * 48)
-    log(f"Other machines on the network can reach the app at http://{ip}:8080")
+    log(f"Other machines on the network can reach the app at http://{ip}:{FRONTEND_PORT}")
     log("(Windows may prompt to allow Python/Node through the firewall the first time — allow it.)")
     log(f"Logs : {BLOG} | {FLOG}   (view: python init_kpmg.py logs)")
     log("Stop : python init_kpmg.py stop")
