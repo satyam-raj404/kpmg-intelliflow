@@ -473,6 +473,17 @@ INSERT INTO users (user_id, email, full_name, role, password, is_active, created
 VALUES ('00000000-0000-0000-0000-000000000001', 'admin', 'System Admin', 'Admin', '12345678', 1, 'system')
 ON CONFLICT (user_id) DO UPDATE SET email = EXCLUDED.email, password = EXCLUDED.password, role = EXCLUDED.role;
 
+-- Demo personas shown on the login page (frontend/src/context/AppContext.tsx
+-- DEMO_PERSONAS) — the UI only fills in the email/password fields, it never
+-- creates the account, so these must exist here or every demo login 401s.
+INSERT INTO users (user_id, email, full_name, role, password, is_active, created_by) VALUES
+    ('00000000-0000-0000-0000-000000000002', 'priya.sharma@kpmg.com', 'Priya Sharma', 'Procurement Manager', 'demo1234', 1, 'system'),
+    ('00000000-0000-0000-0000-000000000003', 'arjun.mehta@kpmg.com',  'Arjun Mehta',  'Delivery Manager',    'demo1234', 1, 'system'),
+    ('00000000-0000-0000-0000-000000000004', 'neha.gupta@kpmg.com',   'Neha Gupta',   'Finance User',        'demo1234', 1, 'system'),
+    ('00000000-0000-0000-0000-000000000005', 'rahul.sinha@kpmg.com',  'Rahul Sinha',  'Compliance Officer',  'demo1234', 1, 'system'),
+    ('00000000-0000-0000-0000-000000000006', 'ananya.bose@kpmg.com',  'Ananya Bose',  'CXO',                 'demo1234', 1, 'system')
+ON CONFLICT (user_id) DO UPDATE SET email = EXCLUDED.email, password = EXCLUDED.password, role = EXCLUDED.role;
+
 CREATE TABLE IF NOT EXISTS actions (
     action_id           SERIAL PRIMARY KEY,
     action_type         TEXT NOT NULL,
