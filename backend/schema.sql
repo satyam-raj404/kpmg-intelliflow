@@ -477,11 +477,18 @@ ON CONFLICT (user_id) DO UPDATE SET email = EXCLUDED.email, password = EXCLUDED.
 -- DEMO_PERSONAS) -- the UI only fills in the email/password fields, it never
 -- creates the account, so these must exist here or every demo login 401s.
 INSERT INTO users (user_id, email, full_name, role, password, is_active, created_by) VALUES
-    ('00000000-0000-0000-0000-000000000002', 'priya.sharma@kpmg.com', 'Priya Sharma', 'Procurement Manager', 'demo1234', 1, 'system'),
-    ('00000000-0000-0000-0000-000000000003', 'arjun.mehta@kpmg.com',  'Arjun Mehta',  'Delivery Manager',    'demo1234', 1, 'system'),
-    ('00000000-0000-0000-0000-000000000004', 'neha.gupta@kpmg.com',   'Neha Gupta',   'Finance User',        'demo1234', 1, 'system'),
-    ('00000000-0000-0000-0000-000000000005', 'rahul.sinha@kpmg.com',  'Rahul Sinha',  'Compliance Officer',  'demo1234', 1, 'system'),
-    ('00000000-0000-0000-0000-000000000006', 'ananya.bose@kpmg.com',  'Ananya Bose',  'CXO',                 'demo1234', 1, 'system')
+    ('00000000-0000-0000-0000-000000000002', 'priya.sharma@kpmg.com',   'Priya Sharma',   'Procurement Manager', 'demo1234', 1, 'system'),
+    ('00000000-0000-0000-0000-000000000003', 'arjun.mehta@kpmg.com',    'Arjun Mehta',    'Delivery Manager',    'demo1234', 1, 'system'),
+    ('00000000-0000-0000-0000-000000000004', 'neha.gupta@kpmg.com',     'Neha Gupta',     'Finance User',        'demo1234', 1, 'system'),
+    ('00000000-0000-0000-0000-000000000005', 'rahul.sinha@kpmg.com',    'Rahul Sinha',    'Compliance Officer',  'demo1234', 1, 'system'),
+    ('00000000-0000-0000-0000-000000000006', 'ananya.bose@kpmg.com',    'Ananya Bose',    'CXO',                 'demo1234', 1, 'system'),
+    ('00000000-0000-0000-0000-000000000007', 'vikram.nair@kpmg.com',    'Vikram Nair',    'Admin',               'demo1234', 1, 'system'),
+    ('00000000-0000-0000-0000-000000000008', 'sunita.rao@kpmg.com',     'Sunita Rao',     'Leadership',          'demo1234', 1, 'system'),
+    ('00000000-0000-0000-0000-000000000009', 'deepak.kapoor@kpmg.com',  'Deepak Kapoor',  'Partner',             'demo1234', 1, 'system'),
+    ('00000000-0000-0000-0000-00000000000a', 'meena.iyer@kpmg.com',     'Meena Iyer',     'Consultant',          'demo1234', 1, 'system'),
+    ('00000000-0000-0000-0000-00000000000b', 'rohan.das@kpmg.com',      'Rohan Das',      'Manager',             'demo1234', 1, 'system'),
+    ('00000000-0000-0000-0000-00000000000c', 'kavitha.pillai@kpmg.com', 'Kavitha Pillai', 'Director',            'demo1234', 1, 'system'),
+    ('00000000-0000-0000-0000-00000000000d', 'sanjay.bhat@kpmg.com',    'Sanjay Bhat',    'Associate Director',  'demo1234', 1, 'system')
 ON CONFLICT (user_id) DO UPDATE SET email = EXCLUDED.email, password = EXCLUDED.password, role = EXCLUDED.role;
 
 CREATE TABLE IF NOT EXISTS actions (
