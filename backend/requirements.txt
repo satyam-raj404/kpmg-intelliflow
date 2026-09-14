@@ -1,9 +1,13 @@
+# pandas/pydantic bumped from 2.2.3/2.8.2 — those pin pydantic-core to a
+# version with no Python 3.14 wheel, forcing a source build that needs Rust
+# (rustup) and fails on a plain Windows box. 2.3.3/2.12.0 have cp314 wheels
+# and are drop-in compatible with this codebase.
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 python-multipart==0.0.9
-pandas==2.2.3
+pandas==2.3.3
 openpyxl==3.1.5
-pydantic==2.8.2
+pydantic==2.12.0
 python-dateutil==2.9.0
 psycopg[binary]>=3.2
 

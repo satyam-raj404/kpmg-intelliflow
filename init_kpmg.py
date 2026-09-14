@@ -32,12 +32,21 @@ backend/services/agent/config.py:ai_enabled().
 import json
 import os
 import platform
+import socket
 import subprocess
 import sys
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+
+# Windows consoles default to a legacy codepage (cp1252/cp437) that can't
+# encode the ✓/✗/▶ etc. used below — a bare print() of them crashes with
+# UnicodeEncodeError before anything useful runs. Force UTF-8 on stdout/err;
+# reconfigure() exists on Python 3.7+'s TextIOWrapper.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
 
 ROOT = Path(__file__).resolve().parent
 BACKEND = ROOT / "backend"
@@ -49,7 +58,6 @@ PID_FILE = ROOT / ".kpmg_pids.json"
 
 IS_WINDOWS = platform.system() == "Windows"
 VENV_PY = VENV / ("Scripts/python.exe" if IS_WINDOWS else "bin/python")
-VENV_PIP = VENV / ("Scripts/pip.exe" if IS_WINDOWS else "bin/pip")
 VENV_UVICORN = VENV / ("Scripts/uvicorn.exe" if IS_WINDOWS else "bin/uvicorn")
 NPM = "npm.cmd" if IS_WINDOWS else "npm"
 
@@ -144,13 +152,17 @@ def ensure_venv() -> None:
 
 def install_backend_deps() -> None:
     log("  Installing backend requirements...")
+    # Always go through "python -m pip", never the Scripts/pip.exe shim directly —
+    # that shim goes missing if pip's own install gets corrupted (seen on the KPMG
+    # box as a "WARNING: Ignoring invalid distribution ~ip" — an AV-mangled pip
+    # dist-info), even though the pip package itself, and -m pip, still work.
     subprocess.run([str(VENV_PY), "-m", "pip", "install", "--quiet", "--upgrade", "pip"], check=True)
     result = subprocess.run(
-        [str(VENV_PIP), "install", "--quiet", "-r", str(BACKEND / "requirements.txt")]
+        [str(VENV_PY), "-m", "pip", "install", "--quiet", "-r", str(BACKEND / "requirements.txt")]
     )
     if result.returncode != 0:
         die("Backend dependency install failed — check the pinned versions support your Python.")
-    subprocess.run([str(VENV_PIP), "install", "--quiet", "python-dotenv"], check=True)
+    subprocess.run([str(VENV_PY), "-m", "pip", "install", "--quiet", "python-dotenv"], check=True)
 
 
 def ensure_env_file() -> dict:
@@ -187,6 +199,11 @@ def start_backend(env_vars: dict) -> subprocess.Popen:
     LOG_DIR.mkdir(exist_ok=True)
     proc_env = os.environ.copy()
     proc_env.update(env_vars)
+    # Without this, uvicorn's own Python process inherits Windows' legacy
+    # console codepage and mangles any non-ASCII print() in backend code
+    # (seed.py's em-dashes show up as "�" in logs/backend.log otherwise).
+    proc_env["PYTHONUTF8"] = "1"
+    proc_env["PYTHONIOENCODING"] = "utf-8"
     with open(BLOG, "w") as f:
         kwargs = {}
         if IS_WINDOWS:
@@ -211,6 +228,19 @@ def start_frontend() -> subprocess.Popen:
             [NPM, "run", "dev"], cwd=str(FRONTEND), stdout=f, stderr=subprocess.STDOUT, **kwargs,
         )
     return proc
+
+
+def lan_ip() -> str:
+    """Best-effort LAN IP — used only to print a URL others on the network
+    can use; doesn't actually send anything (UDP socket, no connect)."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except OSError:
+        return "localhost"
+    finally:
+        s.close()
 
 
 def _http_ok(url: str) -> bool:
@@ -251,16 +281,19 @@ def cmd_start() -> None:
 
     db_ok, front_ok = wait_for_services()
 
+    ip = lan_ip()
     log("-" * 48)
     if db_ok:
-        log("✓ Backend + database  : http://localhost:8001  (DB connected)")
+        log(f"✓ Backend + database  : http://localhost:8001  (DB connected)  |  LAN: http://{ip}:8001")
     else:
         log(f"✗ Backend/DB not ready — check {BLOG}")
     if front_ok:
-        log("✓ Frontend            : http://localhost:8080")
+        log(f"✓ Frontend            : http://localhost:8080  |  LAN: http://{ip}:8080")
     else:
         log(f"✗ Frontend not ready — check {FLOG}")
     log("-" * 48)
+    log(f"Other machines on the network can reach the app at http://{ip}:8080")
+    log("(Windows may prompt to allow Python/Node through the firewall the first time — allow it.)")
     log(f"Logs : {BLOG} | {FLOG}   (view: python init_kpmg.py logs)")
     log("Stop : python init_kpmg.py stop")
 

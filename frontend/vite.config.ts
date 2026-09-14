@@ -21,7 +21,7 @@ export default defineConfig({
     },
   },
   server: {
-    host: "::",
+    host: "0.0.0.0", // listen on all interfaces — reachable from the LAN, not just localhost
     port: 8080,
     strictPort: false,
     proxy: {
