@@ -18,9 +18,16 @@ from pydantic import BaseModel
 from typing import Optional
 
 from database import get_connection
+from services.agent.config import ai_enabled
 from services.agent.orchestrator import run_turn, clear_session_manifest
 from services.artifacts import get_artifact
 from services.audit import write_audit
+
+_NO_KEY_MESSAGE = (
+    "AI features aren't available on this deployment yet — no LLM API key is "
+    "configured (OPENROUTER_API_KEY). Ask your admin to set one in .env, then "
+    "restart the backend."
+)
 
 router = APIRouter()
 
@@ -77,9 +84,26 @@ def _persist_turn(session_id: str, user_message: str, reply: str, tools_used: li
     conn.commit()
 
 
+@router.get("/chat/status")
+def chat_status():
+    """Lets the frontend gray out the Ask IntelliSource UI up front instead of
+    letting the user send a message and get an error back."""
+    return {"ai_enabled": ai_enabled()}
+
+
 @router.post("/chat")
 def chat(body: ChatRequest):
     sid = body.session_id or "default"
+
+    if not ai_enabled():
+        return {
+            "reply": _NO_KEY_MESSAGE,
+            "tools_used": [],
+            "artifacts": [],
+            "session_id": sid,
+            "ai_enabled": False,
+        }
+
     with _sessions_lock:
         history = _sessions.get(sid)
     if history is None:

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Bot, User, Loader2, Trash2, Zap, Search, TrendingUp, AlertTriangle, Package, Clock, CreditCard, Building2, ShieldAlert, FileCheck, BadgeAlert, Users, BarChart2, Download, FileSpreadsheet, FileImage, FileText, Presentation, Library, History as HistoryIcon, Bookmark, PanelRightClose, MessageSquare, X } from "lucide-react";
+import { Send, Bot, User, Loader2, Trash2, Zap, Search, TrendingUp, AlertTriangle, Package, Clock, CreditCard, Building2, ShieldAlert, FileCheck, BadgeAlert, Users, BarChart2, Download, FileSpreadsheet, FileImage, FileText, Presentation, Library, History as HistoryIcon, Bookmark, PanelRightClose, MessageSquare, X, KeyRound } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
 import { apiFetch } from "@/api/client";
@@ -520,9 +520,16 @@ function AskIntelliSource() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [panelTab, setPanelTab] = useState<"library" | "history" | null>(null);
+  const [aiEnabled, setAiEnabled] = useState(true); // optimistic until status loads
   const sessionId = useRef(getOrCreateSessionId());
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    apiFetch<{ ai_enabled: boolean }>("/chat/status")
+      .then((s) => setAiEnabled(s.ai_enabled))
+      .catch(() => setAiEnabled(true)); // fail open — don't block chat on a status hiccup
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -668,6 +675,13 @@ function AskIntelliSource() {
           }
         />
 
+        {!aiEnabled && (
+          <div className="flex items-center gap-2 px-6 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-900 text-amber-800 dark:text-amber-300 text-[12px]">
+            <KeyRound className="h-3.5 w-3.5 shrink-0" />
+            AI features are disabled on this deployment — no LLM API key is configured yet. Ask your admin to set one in <code className="font-mono text-[11px]">.env</code>.
+          </div>
+        )}
+
         <div className="flex-1 min-h-0 flex">
         <div className="flex-1 min-w-0 flex flex-col">
         {/* Message list */}
@@ -722,14 +736,14 @@ function AskIntelliSource() {
                 e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
               }}
               onKeyDown={handleKeyDown}
-              placeholder='Ask anything — e.g. "Tell me about PO 2000001004 and its KPIs"'
-              disabled={loading}
+              placeholder={aiEnabled ? 'Ask anything — e.g. "Tell me about PO 2000001004 and its KPIs"' : "AI features disabled — no API key configured"}
+              disabled={loading || !aiEnabled}
               className="flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 outline-none min-h-[28px] max-h-[120px] overflow-y-auto leading-relaxed py-0.5 disabled:opacity-50"
               style={{ height: "28px" }}
             />
             <button
               onClick={() => send(input)}
-              disabled={!input.trim() || loading}
+              disabled={!input.trim() || loading || !aiEnabled}
               className="h-7 w-7 rounded-lg bg-primary text-white flex items-center justify-center shrink-0 hover:bg-primary-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}

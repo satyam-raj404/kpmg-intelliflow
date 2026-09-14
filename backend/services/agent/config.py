@@ -49,6 +49,20 @@ _ROLE_DEFAULTS: dict[str, tuple[str, str]] = {
 }
 
 
+def ai_enabled() -> bool:
+    """True if at least one provider in the default cascade can actually run —
+    Ollama needs no key (local), OpenRouter needs OPENROUTER_API_KEY. Used to
+    gate the chat endpoint/UI when no key is configured (e.g. on-prem KPMG
+    server with no LLM key issued yet)."""
+    if os.environ.get("OPENROUTER_API_KEY"):
+        return True
+    # Ollama has no key requirement — if it's explicitly pointed at, allow it.
+    return bool(os.environ.get("OLLAMA_BASE_URL")) and any(
+        os.environ.get(env_var, fallback).startswith("ollama:")
+        for env_var, fallback in _ROLE_DEFAULTS.values()
+    )
+
+
 def resolve(role: str) -> list[ModelRef]:
     """Ordered cascade for a role: [cheap_default, escalation_fallback].
     If the cheap default IS the escalation model (no Ollama configured), returns just one.

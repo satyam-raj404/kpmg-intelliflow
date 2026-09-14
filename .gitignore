@@ -12,3 +12,5 @@ General_P2P_data/
 backend/_artifacts/
 Intl/
 .DS_Store
+logs/
+.kpmg_pids.json
