@@ -24,7 +24,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND="$ROOT/backend"
-FRONTEND="$ROOT/kpmg-intelliflow"           # nested Vite app
+FRONTEND="$ROOT/frontend"           # nested Vite app
 VENV="$ROOT/Intl"
 ENV_FILE="$ROOT/.env"
 BLOG="/tmp/intl_backend.log"

@@ -55,7 +55,7 @@ Schema initializes automatically on first run (idempotent).
 
 ### 3. Start Frontend
 ```bash
-cd kpmg-intelliflow
+cd frontend
 npm install
 npm run dev
 # → http://localhost:8080
@@ -111,7 +111,7 @@ After upload, the system automatically:
 ## Project Structure
 
 ```
-kpmg-intelliflow/
+frontend/
 ├── backend/                    # FastAPI backend
 │   ├── main.py                 # App entry point
 │   ├── database.py             # PostgreSQL connection (psycopg3)
@@ -131,7 +131,7 @@ kpmg-intelliflow/
 │       ├── kpi_engine.py       # KPI computation (80+ formulas)
 │       ├── fact_builder.py     # P2P fact table builder
 │       └── event_generator.py  # Anomaly detection engine
-├── kpmg-intelliflow/           # React frontend
+├── frontend/           # React frontend
 │   └── src/
 │       ├── routes/             # Page components
 │       ├── components/         # Shared UI components

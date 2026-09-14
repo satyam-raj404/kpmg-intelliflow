@@ -7,7 +7,7 @@ import sys
 import os
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent / "backend"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
 import openpyxl
 from openpyxl.styles import (
@@ -1269,7 +1269,7 @@ ws_keys.row_dimensions[row].height = 30
 
 # ── Save ──────────────────────────────────────────────────────────────────────
 
-OUT_PATH = Path(__file__).parent / "IntelliSource_KPI_Documentation.xlsx"
+OUT_PATH = Path(__file__).parent.parent / "presentations" / "IntelliSource_KPI_Documentation.xlsx"
 wb.save(str(OUT_PATH))
 print(f"\nSaved: {OUT_PATH}")
 print(f"  Sheets: {', '.join([ws.title for ws in wb.worksheets])}")

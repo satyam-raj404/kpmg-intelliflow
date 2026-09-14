@@ -11,3 +11,4 @@ __pycache__
 General_P2P_data/
 backend/_artifacts/
 Intl/
+.DS_Store

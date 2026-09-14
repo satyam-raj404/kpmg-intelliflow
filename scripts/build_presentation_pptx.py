@@ -27,7 +27,7 @@ PNL_W  = W - IMG_W              # 25% ≈ 3.33"
 BODY_H = H - HDR                # content height below header
 PAD    = Inches(0.24)           # panel inner padding
 
-SS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app_screenshots")
+SS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "app_screenshots")
 _NB    = chr(0x202F)            # macOS narrow no-break space before AM/PM
 
 def ss(t):
@@ -369,7 +369,7 @@ txt(s, "KPMG India  |  Procurement Advisory",
 
 
 # ── save ───────────────────────────────────────────────────────────────────────
-out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "IntelliSource_Presentation.pptx")
+out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "presentations", "IntelliSource_Presentation.pptx")
 prs.save(out)
 print(f"Saved  {out}")
 print(f"Slides {len(prs.slides)}")

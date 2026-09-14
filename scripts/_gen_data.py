@@ -23,7 +23,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 random.seed(42)
-DATA_DIR = Path(__file__).parent / "data"
+DATA_DIR = Path(__file__).parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
 # ── MASTER REFERENCE DATA ─────────────────────────────────────────────────────

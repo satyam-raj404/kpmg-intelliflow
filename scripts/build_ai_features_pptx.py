@@ -415,7 +415,7 @@ add_text(s, "KPMG India  |  Procurement Advisory", Inches(0.3), Inches(7.1), Inc
 
 
 # ── save ───────────────────────────────────────────────────────────────────────
-out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "IntelliSource_AI_Roadmap.pptx")
+out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "presentations", "IntelliSource_AI_Roadmap.pptx")
 prs.save(out)
 print(f"Saved  {out}")
 print(f"Slides {len(prs.slides)}")

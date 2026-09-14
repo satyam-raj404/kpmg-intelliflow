@@ -146,7 +146,7 @@ for i in range(1, 31):
         'tracking_number': f'TRK-{random.randint(1000,9999)}' if random.random()>0.3 else '',
     })
 
-with open('data/01_PR_Dump.csv','w',newline='') as f:
+with open('../data/01_PR_Dump.csv','w',newline='') as f:
     w = csv.DictWriter(f, fieldnames=datasets['01_PR_Dump'])
     w.writeheader(); w.writerows(rows)
 print(f'01_PR_Dump: {len(rows)} rows')
@@ -185,7 +185,7 @@ for i in range(1, 31):
         'delivery_completed': pick(['X','']),
     })
 
-with open('data/02_PO_Dump.csv','w',newline='') as f:
+with open('../data/02_PO_Dump.csv','w',newline='') as f:
     w = csv.DictWriter(f, fieldnames=datasets['02_PO_Dump'])
     w.writeheader(); w.writerows(rows)
 print(f'02_PO_Dump: {len(rows)} rows')
@@ -211,7 +211,7 @@ for i in range(1, 31):
         'actual_delivery_date': rdate('2022-05-15','2023-01-15'),
     })
 
-with open('data/03_PO_Delivery_Dump.csv','w',newline='') as f:
+with open('../data/03_PO_Delivery_Dump.csv','w',newline='') as f:
     w = csv.DictWriter(f, fieldnames=datasets['03_PO_Delivery_Dump'])
     w.writeheader(); w.writerows(rows)
 print(f'03_PO_Delivery_Dump: {len(rows)} rows')
@@ -238,7 +238,7 @@ for i in range(1, 31):
         'reference_doc': f'DN-2022-{random.randint(100,999)}' if random.random()>0.3 else '',
     })
 
-with open('data/04_GRN_Dump.csv','w',newline='') as f:
+with open('../data/04_GRN_Dump.csv','w',newline='') as f:
     w = csv.DictWriter(f, fieldnames=datasets['04_GRN_Dump'])
     w.writeheader(); w.writerows(rows)
 print(f'04_GRN_Dump: {len(rows)} rows')
@@ -264,7 +264,7 @@ for i in range(1, 31):
         'reference_doc': f'INV-2022-{random.randint(1000,9999)}',
     })
 
-with open('data/05_PO_Invoice_Dump.csv','w',newline='') as f:
+with open('../data/05_PO_Invoice_Dump.csv','w',newline='') as f:
     w = csv.DictWriter(f, fieldnames=datasets['05_PO_Invoice_Dump'])
     w.writeheader(); w.writerows(rows)
 print(f'05_PO_Invoice_Dump: {len(rows)} rows')
@@ -294,7 +294,7 @@ for i in range(1, 31):
         'clearing_doc': f'29000{random.randint(10000,99999)}' if random.random()>0.5 else '',
     })
 
-with open('data/06_Invoice_Dump.csv','w',newline='') as f:
+with open('../data/06_Invoice_Dump.csv','w',newline='') as f:
     w = csv.DictWriter(f, fieldnames=datasets['06_Invoice_Dump'])
     w.writeheader(); w.writerows(rows)
 print(f'06_Invoice_Dump: {len(rows)} rows')
@@ -320,7 +320,7 @@ for i in range(1, 31):
         'house_bank': pick(['HDFC1','SBII1','ICIC1','AXIS1']),
     })
 
-with open('data/07_Payment_Dump.csv','w',newline='') as f:
+with open('../data/07_Payment_Dump.csv','w',newline='') as f:
     w = csv.DictWriter(f, fieldnames=datasets['07_Payment_Dump'])
     w.writeheader(); w.writerows(rows)
 print(f'07_Payment_Dump: {len(rows)} rows')
@@ -345,7 +345,7 @@ for idx, (v_code, v_name) in enumerate(VENDORS):
         'posting_block_cc': pick(['','X']) if random.random()>0.9 else '',
     })
 
-with open('data/08_Vendor_Master.csv','w',newline='') as f:
+with open('../data/08_Vendor_Master.csv','w',newline='') as f:
     w = csv.DictWriter(f, fieldnames=datasets['08_Vendor_Master'])
     w.writeheader(); w.writerows(rows)
 print(f'08_Vendor_Master: {len(rows)} rows')
@@ -382,7 +382,7 @@ for _ in range(20):
         'new_value': str(round(random.uniform(100,100000),2)),
     })
 
-with open('data/09_Change_Log.csv','w',newline='') as f:
+with open('../data/09_Change_Log.csv','w',newline='') as f:
     w = csv.DictWriter(f, fieldnames=datasets['09_Change_Log'])
     w.writeheader(); w.writerows(rows)
 print(f'09_Change_Log: {len(rows)} rows')
@@ -400,7 +400,7 @@ rows = [
     {'rfq_id':'RFQ003','supplier_id':'700500','bid_id':'BID006','bid_version':'1','submitted_datetime':'2022-05-11 08:30:00','submission_status':'SUBMITTED','currency':'INR','total_bid_value':'2650000.00'},
     {'rfq_id':'RFQ001','supplier_id':'700600','bid_id':'BID007','bid_version':'1','submitted_datetime':'2022-03-14 12:00:00','submission_status':'SUBMITTED','currency':'INR','total_bid_value':'4350000.00'},
 ]
-with open('data/BID_Data.csv','w',newline='') as f:
+with open('../data/BID_Data.csv','w',newline='') as f:
     w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
     w.writeheader(); w.writerows(rows)
 print(f'BID_Data: {len(rows)} rows')
@@ -414,7 +414,7 @@ rows = [
     {'rfq_id':'RFQ004','rfq_title':'Office Supplies Annual Contract','sourcing_team':'ADMIN','status':'DRAFT','published_date':'2022-06-01','closing_date':'2022-06-30','currency':'INR'},
     {'rfq_id':'RFQ005','rfq_title':'Chemical Raw Materials Q3 2022','sourcing_team':'DIRECT','status':'ACTIVE','published_date':'2022-05-15','closing_date':'2022-06-15','currency':'INR'},
 ]
-with open('data/RFQ.csv','w',newline='') as f:
+with open('../data/RFQ.csv','w',newline='') as f:
     w = csv.DictWriter(f, fieldnames=rfq_fields)
     w.writeheader(); w.writerows(rows)
 print(f'RFQ: {len(rows)} rows')
@@ -430,7 +430,7 @@ rows = [
     {'budget_id':'BUD004','fiscal_year':'2022','status':'APPROVED','owner_id':'PDESAI','currency':'INR','dimension_key_id':'DIM004','business_unit_id':'BU03','cost_center_id':'CC1004','project_id':'P004','category_id':'OPEX','version_number':'V1','budget_amount':'15000000.00','check_stage':'INVOICE','control_type':'SOFT','tolerance_percent':'10'},
     {'budget_id':'BUD005','fiscal_year':'2023','status':'PENDING','owner_id':'RKUMAR','currency':'INR','dimension_key_id':'DIM005','business_unit_id':'BU01','cost_center_id':'CC1001','project_id':'P005','category_id':'CAPEX','version_number':'V1','budget_amount':'60000000.00','check_stage':'PO_CREATION','control_type':'HARD','tolerance_percent':'5'},
 ]
-with open('data/Budget_Master.csv','w',newline='') as f:
+with open('../data/Budget_Master.csv','w',newline='') as f:
     w = csv.DictWriter(f, fieldnames=budget_fields)
     w.writeheader(); w.writerows(rows)
 print(f'Budget_Master: {len(rows)} rows')
