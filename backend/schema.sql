@@ -1,4 +1,4 @@
--- IntelliSource P2P — PostgreSQL Schema v2
+-- IntelliSource P2P -- PostgreSQL Schema v2
 
 -- ============================================================
 -- STAGING TABLES
@@ -474,7 +474,7 @@ VALUES ('00000000-0000-0000-0000-000000000001', 'admin', 'System Admin', 'Admin'
 ON CONFLICT (user_id) DO UPDATE SET email = EXCLUDED.email, password = EXCLUDED.password, role = EXCLUDED.role;
 
 -- Demo personas shown on the login page (frontend/src/context/AppContext.tsx
--- DEMO_PERSONAS) — the UI only fills in the email/password fields, it never
+-- DEMO_PERSONAS) -- the UI only fills in the email/password fields, it never
 -- creates the account, so these must exist here or every demo login 401s.
 INSERT INTO users (user_id, email, full_name, role, password, is_active, created_by) VALUES
     ('00000000-0000-0000-0000-000000000002', 'priya.sharma@kpmg.com', 'Priya Sharma', 'Procurement Manager', 'demo1234', 1, 'system'),
@@ -546,7 +546,7 @@ CREATE TABLE IF NOT EXISTS license_usage (
 -- UTILIZATION EXTENDED TABLES
 -- ============================================================
 
--- Per-PO category tagging — auto (SYSTEM) or manual (user override)
+-- Per-PO category tagging -- auto (SYSTEM) or manual (user override)
 CREATE TABLE IF NOT EXISTS po_categorization (
     id                  SERIAL PRIMARY KEY,
     purchasing_document TEXT NOT NULL,
@@ -587,7 +587,7 @@ CREATE TABLE IF NOT EXISTS material_license_cost (
 CREATE INDEX IF NOT EXISTS idx_mlc_po      ON material_license_cost(purchasing_document, item);
 CREATE INDEX IF NOT EXISTS idx_mlc_type    ON material_license_cost(license_type);
 
--- Profit center master — maps BUs to company codes
+-- Profit center master -- maps BUs to company codes
 CREATE TABLE IF NOT EXISTS profit_center_master (
     id                 SERIAL PRIMARY KEY,
     profit_center      TEXT NOT NULL UNIQUE,
@@ -616,7 +616,7 @@ CREATE TABLE IF NOT EXISTS pc_budget (
 );
 CREATE INDEX IF NOT EXISTS idx_pcb_pc      ON pc_budget(profit_center, fiscal_year);
 
--- ── Profit Center Master: extra columns ───────────────────────────────────────
+-- -- Profit Center Master: extra columns ---------------------------------------
 ALTER TABLE profit_center_master ADD COLUMN IF NOT EXISTS default_capex_opex TEXT DEFAULT 'OPEX';
 ALTER TABLE profit_center_master ADD COLUMN IF NOT EXISTS dept_code          TEXT DEFAULT '';
 ALTER TABLE profit_center_master ADD COLUMN IF NOT EXISTS plant              TEXT DEFAULT '';
@@ -624,51 +624,51 @@ ALTER TABLE profit_center_master ADD COLUMN IF NOT EXISTS capex_budget       REA
 ALTER TABLE profit_center_master ADD COLUMN IF NOT EXISTS opex_budget        REAL DEFAULT 0;
 ALTER TABLE profit_center_master ADD COLUMN IF NOT EXISTS material_group     TEXT DEFAULT '';
 
--- ── Seed 40 standard profit centers ──────────────────────────────────────────
+-- -- Seed 40 standard profit centers ------------------------------------------
 INSERT INTO profit_center_master (profit_center, pc_name, company_code, dept_code, plant, material_group, default_capex_opex, bu_type, is_active) VALUES
-('1001-FAC-MUM','Facilities — Mumbai',      '1001','FAC','MNAL','9901','OPEX',  'FACILITIES',   1),
-('1001-FAC-DEL','Facilities — Delhi North', '1001','FAC','DELP','9901','OPEX',  'FACILITIES',   1),
-('1001-FAC-SDL','Facilities — South Delhi', '1001','FAC','SDPL','9901','OPEX',  'FACILITIES',   1),
-('1001-FAC-BLR','Facilities — Bengaluru',   '1001','FAC','BLRP','9901','OPEX',  'FACILITIES',   1),
-('1001-FAC-HYD','Facilities — Hyderabad',   '1001','FAC','HYDP','9901','OPEX',  'FACILITIES',   1),
-('1001-ENG-MUM','Engineering — Mumbai',     '1001','ENG','MNAL','9902','CAPEX', 'ENGINEERING',  1),
-('1001-ENG-DEL','Engineering — Delhi North','1001','ENG','DELP','9902','CAPEX', 'ENGINEERING',  1),
-('1001-ENG-SDL','Engineering — South Delhi','1001','ENG','SDPL','9902','CAPEX', 'ENGINEERING',  1),
-('1001-ENG-BLR','Engineering — Bengaluru',  '1001','ENG','BLRP','9902','CAPEX', 'ENGINEERING',  1),
-('1001-ENG-HYD','Engineering — Hyderabad',  '1001','ENG','HYDP','9902','CAPEX', 'ENGINEERING',  1),
-('1001-ADM-MUM','Admin & Office — Mumbai',  '1001','ADM','MNAL','9903','OPEX',  'ADMIN',        1),
-('1001-ADM-DEL','Admin & Office — Delhi',   '1001','ADM','DELP','9903','OPEX',  'ADMIN',        1),
-('1001-ADM-SDL','Admin & Office — S.Delhi', '1001','ADM','SDPL','9903','OPEX',  'ADMIN',        1),
-('1001-ADM-BLR','Admin & Office — BLR',     '1001','ADM','BLRP','9903','OPEX',  'ADMIN',        1),
-('1001-ADM-HYD','Admin & Office — HYD',     '1001','ADM','HYDP','9903','OPEX',  'ADMIN',        1),
-('1001-ITH-MUM','IT Hardware — Mumbai',     '1001','ITH','MNAL','9904','CAPEX', 'IT',           1),
-('1001-ITH-DEL','IT Hardware — Delhi',      '1001','ITH','DELP','9904','CAPEX', 'IT',           1),
-('1001-ITH-SDL','IT Hardware — S.Delhi',    '1001','ITH','SDPL','9904','CAPEX', 'IT',           1),
-('1001-ITH-BLR','IT Hardware — Bengaluru',  '1001','ITH','BLRP','9904','CAPEX', 'IT',           1),
-('1001-ITH-HYD','IT Hardware — Hyderabad',  '1001','ITH','HYDP','9904','CAPEX', 'IT',           1),
-('1001-ITS-MUM','IT Software — Mumbai',     '1001','ITS','MNAL','9905','OPEX',  'IT',           1),
-('1001-ITS-DEL','IT Software — Delhi',      '1001','ITS','DELP','9905','OPEX',  'IT',           1),
-('1001-ITS-SDL','IT Software — S.Delhi',    '1001','ITS','SDPL','9905','OPEX',  'IT',           1),
-('1001-ITS-BLR','IT Software — Bengaluru',  '1001','ITS','BLRP','9905','OPEX',  'IT',           1),
-('1001-ITS-HYD','IT Software — Hyderabad',  '1001','ITS','HYDP','9905','OPEX',  'IT',           1),
-('1001-STR-MUM','Strategy & Consulting — Mumbai', '1001','STR','MNAL','9906','OPEX','STRATEGY', 1),
-('1001-STR-DEL','Strategy & Consulting — Delhi',  '1001','STR','DELP','9906','OPEX','STRATEGY', 1),
-('1001-STR-SDL','Strategy & Consulting — SDL',    '1001','STR','SDPL','9906','OPEX','STRATEGY', 1),
-('1001-STR-BLR','Strategy & Consulting — BLR',    '1001','STR','BLRP','9906','OPEX','STRATEGY', 1),
-('1001-STR-HYD','Strategy & Consulting — HYD',    '1001','STR','HYDP','9906','OPEX','STRATEGY', 1),
-('1001-SCM-MUM','Supply Chain — Mumbai',    '1001','SCM','MNAL','9907','OPEX',  'SUPPLY_CHAIN', 1),
-('1001-SCM-DEL','Supply Chain — Delhi',     '1001','SCM','DELP','9907','OPEX',  'SUPPLY_CHAIN', 1),
-('1001-SCM-SDL','Supply Chain — S.Delhi',   '1001','SCM','SDPL','9907','OPEX',  'SUPPLY_CHAIN', 1),
-('1001-SCM-BLR','Supply Chain — Bengaluru', '1001','SCM','BLRP','9907','OPEX',  'SUPPLY_CHAIN', 1),
-('1001-SCM-HYD','Supply Chain — Hyderabad', '1001','SCM','HYDP','9907','OPEX',  'SUPPLY_CHAIN', 1),
-('1001-OPS-MUM','Operations — Mumbai',      '1001','OPS','MNAL','9908','OPEX',  'OPERATIONS',   1),
-('1001-OPS-DEL','Operations — Delhi',       '1001','OPS','DELP','9908','OPEX',  'OPERATIONS',   1),
-('1001-OPS-SDL','Operations — S.Delhi',     '1001','OPS','SDPL','9908','OPEX',  'OPERATIONS',   1),
-('1001-OPS-BLR','Operations — Bengaluru',   '1001','OPS','BLRP','9908','OPEX',  'OPERATIONS',   1),
-('1001-OPS-HYD','Operations — Hyderabad',   '1001','OPS','HYDP','9908','OPEX',  'OPERATIONS',   1)
+('1001-FAC-MUM','Facilities -- Mumbai',      '1001','FAC','MNAL','9901','OPEX',  'FACILITIES',   1),
+('1001-FAC-DEL','Facilities -- Delhi North', '1001','FAC','DELP','9901','OPEX',  'FACILITIES',   1),
+('1001-FAC-SDL','Facilities -- South Delhi', '1001','FAC','SDPL','9901','OPEX',  'FACILITIES',   1),
+('1001-FAC-BLR','Facilities -- Bengaluru',   '1001','FAC','BLRP','9901','OPEX',  'FACILITIES',   1),
+('1001-FAC-HYD','Facilities -- Hyderabad',   '1001','FAC','HYDP','9901','OPEX',  'FACILITIES',   1),
+('1001-ENG-MUM','Engineering -- Mumbai',     '1001','ENG','MNAL','9902','CAPEX', 'ENGINEERING',  1),
+('1001-ENG-DEL','Engineering -- Delhi North','1001','ENG','DELP','9902','CAPEX', 'ENGINEERING',  1),
+('1001-ENG-SDL','Engineering -- South Delhi','1001','ENG','SDPL','9902','CAPEX', 'ENGINEERING',  1),
+('1001-ENG-BLR','Engineering -- Bengaluru',  '1001','ENG','BLRP','9902','CAPEX', 'ENGINEERING',  1),
+('1001-ENG-HYD','Engineering -- Hyderabad',  '1001','ENG','HYDP','9902','CAPEX', 'ENGINEERING',  1),
+('1001-ADM-MUM','Admin & Office -- Mumbai',  '1001','ADM','MNAL','9903','OPEX',  'ADMIN',        1),
+('1001-ADM-DEL','Admin & Office -- Delhi',   '1001','ADM','DELP','9903','OPEX',  'ADMIN',        1),
+('1001-ADM-SDL','Admin & Office -- S.Delhi', '1001','ADM','SDPL','9903','OPEX',  'ADMIN',        1),
+('1001-ADM-BLR','Admin & Office -- BLR',     '1001','ADM','BLRP','9903','OPEX',  'ADMIN',        1),
+('1001-ADM-HYD','Admin & Office -- HYD',     '1001','ADM','HYDP','9903','OPEX',  'ADMIN',        1),
+('1001-ITH-MUM','IT Hardware -- Mumbai',     '1001','ITH','MNAL','9904','CAPEX', 'IT',           1),
+('1001-ITH-DEL','IT Hardware -- Delhi',      '1001','ITH','DELP','9904','CAPEX', 'IT',           1),
+('1001-ITH-SDL','IT Hardware -- S.Delhi',    '1001','ITH','SDPL','9904','CAPEX', 'IT',           1),
+('1001-ITH-BLR','IT Hardware -- Bengaluru',  '1001','ITH','BLRP','9904','CAPEX', 'IT',           1),
+('1001-ITH-HYD','IT Hardware -- Hyderabad',  '1001','ITH','HYDP','9904','CAPEX', 'IT',           1),
+('1001-ITS-MUM','IT Software -- Mumbai',     '1001','ITS','MNAL','9905','OPEX',  'IT',           1),
+('1001-ITS-DEL','IT Software -- Delhi',      '1001','ITS','DELP','9905','OPEX',  'IT',           1),
+('1001-ITS-SDL','IT Software -- S.Delhi',    '1001','ITS','SDPL','9905','OPEX',  'IT',           1),
+('1001-ITS-BLR','IT Software -- Bengaluru',  '1001','ITS','BLRP','9905','OPEX',  'IT',           1),
+('1001-ITS-HYD','IT Software -- Hyderabad',  '1001','ITS','HYDP','9905','OPEX',  'IT',           1),
+('1001-STR-MUM','Strategy & Consulting -- Mumbai', '1001','STR','MNAL','9906','OPEX','STRATEGY', 1),
+('1001-STR-DEL','Strategy & Consulting -- Delhi',  '1001','STR','DELP','9906','OPEX','STRATEGY', 1),
+('1001-STR-SDL','Strategy & Consulting -- SDL',    '1001','STR','SDPL','9906','OPEX','STRATEGY', 1),
+('1001-STR-BLR','Strategy & Consulting -- BLR',    '1001','STR','BLRP','9906','OPEX','STRATEGY', 1),
+('1001-STR-HYD','Strategy & Consulting -- HYD',    '1001','STR','HYDP','9906','OPEX','STRATEGY', 1),
+('1001-SCM-MUM','Supply Chain -- Mumbai',    '1001','SCM','MNAL','9907','OPEX',  'SUPPLY_CHAIN', 1),
+('1001-SCM-DEL','Supply Chain -- Delhi',     '1001','SCM','DELP','9907','OPEX',  'SUPPLY_CHAIN', 1),
+('1001-SCM-SDL','Supply Chain -- S.Delhi',   '1001','SCM','SDPL','9907','OPEX',  'SUPPLY_CHAIN', 1),
+('1001-SCM-BLR','Supply Chain -- Bengaluru', '1001','SCM','BLRP','9907','OPEX',  'SUPPLY_CHAIN', 1),
+('1001-SCM-HYD','Supply Chain -- Hyderabad', '1001','SCM','HYDP','9907','OPEX',  'SUPPLY_CHAIN', 1),
+('1001-OPS-MUM','Operations -- Mumbai',      '1001','OPS','MNAL','9908','OPEX',  'OPERATIONS',   1),
+('1001-OPS-DEL','Operations -- Delhi',       '1001','OPS','DELP','9908','OPEX',  'OPERATIONS',   1),
+('1001-OPS-SDL','Operations -- S.Delhi',     '1001','OPS','SDPL','9908','OPEX',  'OPERATIONS',   1),
+('1001-OPS-BLR','Operations -- Bengaluru',   '1001','OPS','BLRP','9908','OPEX',  'OPERATIONS',   1),
+('1001-OPS-HYD','Operations -- Hyderabad',   '1001','OPS','HYDP','9908','OPEX',  'OPERATIONS',   1)
 ON CONFLICT (profit_center) DO NOTHING;
 
--- ── Contract Center ────────────────────────────────────────────────────────────
+-- -- Contract Center ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS contract_master (
     id                SERIAL PRIMARY KEY,
     contract_number   TEXT NOT NULL UNIQUE,
@@ -695,8 +695,8 @@ ALTER TABLE po_dump ADD COLUMN IF NOT EXISTS contract_check TEXT DEFAULT '';
 CREATE INDEX IF NOT EXISTS idx_po_contract_num   ON po_dump(contract_number);
 CREATE INDEX IF NOT EXISTS idx_po_contract_check ON po_dump(contract_check);
 
--- ── Ask IntelliSource: Prompt Library ──────────────────────────────────────────
--- App metadata (not harness data) — lives in the main app DB, not the
+-- -- Ask IntelliSource: Prompt Library ------------------------------------------
+-- App metadata (not harness data) -- lives in the main app DB, not the
 -- read-only harness plane.
 CREATE TABLE IF NOT EXISTS prompt_library (
     id             SERIAL PRIMARY KEY,
@@ -712,7 +712,7 @@ CREATE TABLE IF NOT EXISTS prompt_library (
 CREATE INDEX IF NOT EXISTS idx_promptlib_category ON prompt_library(category);
 CREATE INDEX IF NOT EXISTS idx_promptlib_shared    ON prompt_library(is_shared);
 
--- ── Ask IntelliSource: conversation persistence ────────────────────────────────
+-- -- Ask IntelliSource: conversation persistence --------------------------------
 CREATE TABLE IF NOT EXISTS chat_sessions (
     session_id     TEXT PRIMARY KEY,
     title          TEXT DEFAULT 'New conversation',
@@ -733,16 +733,16 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 CREATE INDEX IF NOT EXISTS idx_chatmsg_session ON chat_messages(session_id, id);
 ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS artifacts TEXT DEFAULT '[]';
 
--- Seed the original 10 quick-prompt library entries (idempotent — matched on name).
+-- Seed the original 10 quick-prompt library entries (idempotent -- matched on name).
 INSERT INTO prompt_library (name, category, prompt_text, is_shared) VALUES
 ('Spend Summary', 'Spend', 'What is the total procurement spend this month broken down by company code and CAPEX vs OPEX? Show top spending categories.', 1),
-('Anomaly Risk Report', 'Risk', 'Give me a full anomaly risk report — split POs, retro POs, price variances, no-GRN cases, and deleted-after-GRN. Include PO numbers.', 1),
+('Anomaly Risk Report', 'Risk', 'Give me a full anomaly risk report -- split POs, retro POs, price variances, no-GRN cases, and deleted-after-GRN. Include PO numbers.', 1),
 ('Top Vendors by Spend', 'Vendor', 'Who are the top 10 vendors by spend this year? Show their PO count, total value, and payment status.', 1),
 ('P2P Cycle Times', 'P2P', 'What is the average cycle time at each P2P stage: PR to PO, PO to GRN, GRN to Invoice, Invoice to Payment? Which stage has the most delays?', 1),
 ('PR to PO Backlog', 'P2P', 'Show all open purchase requisitions that have not yet been converted to a PO. How many days have they been pending? Which departments have the highest backlog?', 1),
 ('Overdue Payments', 'Spend', 'Which vendors have invoices pending payment beyond 30 days? Show the invoice amounts, due dates, and total overdue value by vendor.', 1),
 ('Budget vs Actual', 'Spend', 'Compare actual CAPEX and OPEX spend against the defined budget for each profit center. Flag any profit centers that are over budget.', 1),
-('Maverick Buying', 'Risk', 'Show all maverick buying incidents — POs raised without a valid purchase requisition. Which departments and vendors are involved and what is the total value?', 1),
+('Maverick Buying', 'Risk', 'Show all maverick buying incidents -- POs raised without a valid purchase requisition. Which departments and vendors are involved and what is the total value?', 1),
 ('GRN Pending POs', 'P2P', 'Show all active POs where goods receipt (GRN) has not yet been posted. How long have these POs been open and what is the total open value?', 1),
 ('MSME Compliance', 'Compliance', 'Which MSME-registered vendors have payment delays beyond 45 days? Are we compliant with MSMED Act payment timelines? Show total overdue amount.', 1)
 ON CONFLICT (name) DO NOTHING;

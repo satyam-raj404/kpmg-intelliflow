@@ -78,7 +78,13 @@ class _PGConnection:
 
 
 def _new_connection() -> _PGConnection:
-    raw = psycopg.connect(DATABASE_URL)
+    # On Windows, libpq defaults client_encoding to the OS ANSI codepage
+    # (cp1252 via GetACP()) when nothing overrides it — any non-ASCII
+    # character psycopg then needs to send (even from a Python source
+    # comment folded into a schema.sql statement) raises UnicodeEncodeError
+    # client-side before the query ever reaches Postgres. Force UTF-8
+    # explicitly so this doesn't depend on the host OS's codepage.
+    raw = psycopg.connect(DATABASE_URL, options="-c client_encoding=UTF8")
     raw.autocommit = False
     return _PGConnection(raw)
 
