@@ -78,6 +78,25 @@ def _seed_licenses(conn) -> None:
 
 
 def main() -> None:
+    from database import init_db, get_connection, close_connection
+    from services.parser import parse_file
+    from services.validator import validate
+    from services.loader import load
+    from services.fact_builder import build_facts, build_entity_hierarchy
+    from services.event_generator import generate_events
+    from services.kpi_engine import compute_all
+
+    # This runs on a one-shot executor thread. get_connection() is thread-local
+    # and only rolls back when called again on the SAME thread, so any early
+    # return here leaves the transaction open forever, holding locks on po_dump
+    # and its virtualxid that wedge CREATE INDEX and everything queued behind it.
+    try:
+        _seed()
+    finally:
+        close_connection()
+
+
+def _seed() -> None:
     from database import init_db, get_connection
     from services.parser import parse_file
     from services.validator import validate

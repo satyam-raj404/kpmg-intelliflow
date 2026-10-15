@@ -86,6 +86,15 @@ def _new_connection() -> _PGConnection:
     # explicitly so this doesn't depend on the host OS's codepage.
     raw = psycopg.connect(DATABASE_URL, options="-c client_encoding=UTF8")
     raw.autocommit = False
+    # Never let a blocked query hang forever. Without these, one abandoned
+    # transaction wedges CREATE INDEX, which then blocks the contract_check
+    # UPDATE, and every subsequent request (including /auth/login) queues
+    # behind it indefinitely - the app just spins. Fail fast with a clear
+    # Postgres error instead, so the request surfaces as a 500 the UI can show.
+    raw.execute("SET lock_timeout = '10s'")
+    raw.execute("SET statement_timeout = '60s'")
+    raw.execute("SET idle_in_transaction_session_timeout = '30s'")
+    raw.commit()
     return _PGConnection(raw)
 
 
@@ -103,6 +112,29 @@ def get_connection() -> _PGConnection:
                 pass
             _local.conn = _new_connection()
     return _local.conn
+
+
+def close_connection() -> None:
+    """Roll back and close THIS thread's connection, if it has one.
+
+    Required on short-lived worker threads. get_connection() only rolls back
+    when it is called again on the same thread; a thread that is created, used
+    once and dropped (e.g. the startup seed thread) therefore leaves its
+    transaction open for the life of the process, holding table and virtualxid
+    locks that block DDL and everything queued behind it.
+    """
+    conn = getattr(_local, "conn", None)
+    if conn is None:
+        return
+    try:
+        conn._raw.rollback()
+    except Exception:
+        pass
+    try:
+        conn._raw.close()
+    except Exception:
+        pass
+    _local.conn = None
 
 
 def init_db():

@@ -207,17 +207,38 @@
   --muted: oklch(0.20 0.008 252);
 }
 
-/* ── Font size (attribute on <html>) ───────────────────────────────────── */
-html[data-font-size="sm"] { zoom: 1.00; }
-html[data-font-size="md"] { zoom: 1.15; }
-html[data-font-size="lg"] { zoom: 1.30; }
+/* ── Font size (attribute on <html>) ───────────────────────────────────────────
+   The scale is applied to #root, NOT to <html>.
+
+   Zooming the root element puts the whole document — including Radix's
+   portalled overlays — inside a zoom context. floating-ui measures the anchor
+   with getBoundingClientRect (already zoom-scaled) but writes its position as
+   a CSS translate, which the root zoom then multiplies a second time. Measured:
+   a translate of 1674px rendered at 1925px on a 1920 viewport, pushing the
+   profile menu 263px off-screen. Same break affected every Select, Tooltip and
+   HoverCard (including the KPI ⓘ tooltips).
+
+   #root is a child of <body>; Radix portals into <body> as its sibling, so the
+   overlays sit outside the zoom context and position correctly. They render at
+   1x, so we nudge their type up to match the scaled page. */
+html[data-font-size="sm"] ~ body > #root { zoom: 1.0; }
+html[data-font-size="md"] ~ body > #root { zoom: 1.15; }
+html[data-font-size="lg"] ~ body > #root { zoom: 1.3; }
+
+/* Overlay content matches the scaled page; the wrapper itself must stay
+   unzoomed or its translate is re-scaled and the clipping comes back. */
+[data-radix-popper-content-wrapper] > * {
+  zoom: 1.15;
+}
+html[data-font-size="sm"] ~ body [data-radix-popper-content-wrapper] > * { zoom: 1.0; }
+html[data-font-size="lg"] ~ body [data-radix-popper-content-wrapper] > * { zoom: 1.3; }
 
 @layer base {
   * {
     border-color: var(--color-border);
   }
 
-  html {
+  body > #root {
     zoom: 1.15; /* default md — overridden by data-font-size attribute */
   }
 

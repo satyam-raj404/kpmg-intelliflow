@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
-from database import get_connection
+from database import close_connection, get_connection
 from services.etl import run_etl
 from services.audit import write_audit
 from routers.events import broadcast
@@ -51,6 +51,11 @@ def _etl_worker(file_bytes: bytes, filename: str, batch_id: str) -> None:
             details=f"file={filename} error={str(exc)[:200]}",
         )
         broadcast({"type": "UPLOAD_ERROR", "batch_id": batch_id, "error": str(exc)})
+    finally:
+        # Same reasoning as the startup seed thread: this worker is pooled, but
+        # never close the connection here and a failed ETL leaves an open
+        # transaction holding locks on po_dump / kpi_results.
+        close_connection()
 
 
 @router.post("/upload")
