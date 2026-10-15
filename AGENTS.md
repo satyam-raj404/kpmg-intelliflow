@@ -32,6 +32,14 @@ Two of these are the real gate:
 API key. Many `backend/services/agent/*.py` modules are also their own tests — run
 `python services/agent/guardrails.py` directly.
 
+Tier 1 also needs the read-only role: `psql "$DATABASE_URL" -f backend/scripts/setup_harness_ro_role.sql`
+(once). Without it 3 of the 12 tests error at connect. The launcher does not provision it.
+
+Tier 2 (`--live`) reads the repo-root `.env` itself, so it works without exporting anything. A run
+where every case finishes in ~0.3s means the key did not load — that is an auth failure, not a model
+regression. The model matters: `openrouter/free` routes to whatever has capacity, so tool-selection
+results vary run to run; pin a specific model in `.env` for repeatable evals.
+
 ### Run it
 
 `start_kpmg.bat` (Windows) is the launcher: it builds `Intl/`, installs deps, writes `.env`, starts

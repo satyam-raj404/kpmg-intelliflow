@@ -14,11 +14,25 @@ Reports: grounding rate, tool-selection outcome, read-only enforcement, and a
 pass/fail summary per the categories in ASK_INTELLISOURCE_HARNESS_PLAN.md §5d.
 """
 import json
+import os
 import sys
 import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Load the repo-root .env the same way main.py does, BEFORE importing anything
+# that reads the environment. providers/openrouter.py reads OPENROUTER_API_KEY at
+# import time, so without this `--live` silently runs every case against an empty
+# key: each LLM call 401s in ~0.3s and the run reports bogus tool-selection
+# failures that look like model regressions but are just a missing key.
+_ENV_FILE = Path(__file__).resolve().parent.parent.parent / ".env"
+if _ENV_FILE.exists():
+    for _line in _ENV_FILE.read_text(encoding="utf-8", errors="replace").splitlines():
+        _line = _line.strip()
+        if _line and not _line.startswith("#") and "=" in _line:
+            _k, _v = _line.split("=", 1)
+            os.environ.setdefault(_k.strip(), _v.strip())
 
 from services.agent import cache, guardrails, grounding, metrics, router
 from services.agent.context import DataManifest, TurnContext
