@@ -31,14 +31,17 @@ export const brand = {
     mono: '"JetBrains Mono", "Consolas", monospace',
   },
 
-  // Logo — official KPMG mark, supplied as PNGs in /public.
-  //   kpmg-logo.png        navy mark, for light backgrounds
-  //   kpmg-logo-white.png  white mark, for the navy sidebar / auth panels
-  // Both must share the same aspect ratio (~2.5:1); Logo.tsx sizes by height.
+// Logo — official KPMG mark, supplied as WebP in /public.
+  //   kpmg-logo.webp        navy mark, for light backgrounds
+  //   kpmg-logo-white.webp  white mark (transparent bg), for the navy
+  //                        sidebar and the login/signup panels
+  // `aspect` is only a max-width guard so a mis-proportioned file cannot blow
+  // out the sidebar layout; the mark is sized by height, so the two files do
+  // not need identical dimensions.
   logo: {
-    path: "/kpmg-logo.png",
-    pathWhite: "/kpmg-logo-white.png",
-    aspect: 2.5,
+    path: "/kpmg-logo.webp",
+    pathWhite: "/kpmg-logo-white.webp",
+    aspect: 2.8,
   },
 } as const;
 

@@ -8,12 +8,14 @@ interface LogoProps {
 
 /**
  * KPMG logo. Renders the official mark supplied in /public:
- *   variant="blue"  -> /kpmg-logo.png        (navy, for light backgrounds)
- *   variant="white" -> /kpmg-logo-white.png  (white, for the navy sidebar/auth panels)
+ *   variant="blue"  -> /kpmg-logo.webp        (navy, for light backgrounds)
+ *   variant="white" -> /kpmg-logo-white.webp  (white on transparent, for the
+ *                                               navy sidebar / auth panels)
  *
- * Sized by height; width follows brand.logo.aspect so the mark keeps its
- * proportions. If the asset is missing we render a neutral placeholder block
- * rather than a text wordmark — a fake "KPMG" in Arial reads as a broken logo.
+ * Sized by height, width follows naturally; brand.logo.aspect is only a
+ * max-width guard. If the asset is missing we render a neutral placeholder
+ * block rather than a text wordmark — a fake "KPMG" in Arial reads as a
+ * broken logo.
  */
 export function Logo({ variant = "blue", size = 32 }: LogoProps) {
   const [failed, setFailed] = useState(false);
