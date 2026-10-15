@@ -35,7 +35,13 @@ def main() -> None:
         if exists:
             print(f"[ensure_db] Database {dbname!r} already exists.")
         else:
-            conn.execute(f'CREATE DATABASE "{dbname}"')
+            # template1's default encoding follows the OS locale — on the KPMG
+            # Windows box that's WIN1252, which can't hold characters like the
+            # "→" arrow in change_log data and crashes fact-building mid-seed.
+            # template0 is always UTF8/C, so build off that instead.
+            conn.execute(
+                f'CREATE DATABASE "{dbname}" ENCODING \'UTF8\' TEMPLATE template0'
+            )
             print(f"[ensure_db] Created database {dbname!r}.")
     finally:
         conn.close()
