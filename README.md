@@ -20,7 +20,7 @@ IntelliSource ingests SAP P2P data (POs, PRs, GRNs, Invoices, Payments, Vendors)
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React 18 + TypeScript + Vite + TanStack Router |
+| Frontend | React 19 + TypeScript + Vite + TanStack Router |
 | State | TanStack Query + React Context |
 | UI | Tailwind CSS + shadcn/ui + Recharts |
 | Backend | FastAPI + Python 3.12 + uvicorn |
@@ -43,12 +43,16 @@ psql -U postgres -c "CREATE DATABASE intellisource;"
 ```
 
 ### 2. Start Backend
+
+Easiest on Windows: double-click **`start_kpmg.bat`**, which builds the `Intl/` virtualenv,
+installs dependencies, writes `.env`, and starts both services. Manual equivalent:
+
 ```bash
-cd backend
-python -m venv venv
-source venv/bin/activate          # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+# from the repo root — the venv is named Intl/, not venv/
+python -m venv Intl
+Intl\Scripts\activate                # Windows  (source Intl/bin/activate on macOS/Linux)
+pip install -r backend/requirements.txt
+cd backend && uvicorn main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
 Schema initializes automatically on first run (idempotent).
@@ -58,7 +62,7 @@ Schema initializes automatically on first run (idempotent).
 cd frontend
 npm install
 npm run dev
-# → http://localhost:8080
+# → http://localhost:5173
 ```
 
 ### 4. Login
@@ -74,7 +78,7 @@ npm run dev
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DATABASE_URL` | `postgresql://postgres:1234@localhost:5432/intellisource` | PostgreSQL connection string |
-| `OPENROUTER_API_KEY` | (bundled) | OpenRouter API key for chatbot |
+| `OPENROUTER_API_KEY` | (blank) | OpenRouter API key for Ask IntelliSource. Blank disables AI features by design |
 | `CORS_ORIGINS` | — | Comma-separated extra allowed origins |
 
 Create a `.env` file in the repo root to override defaults.
@@ -111,35 +115,40 @@ After upload, the system automatically:
 ## Project Structure
 
 ```
-frontend/
+kpmg-intelliflow/
 ├── backend/                    # FastAPI backend
-│   ├── main.py                 # App entry point
-│   ├── database.py             # PostgreSQL connection (psycopg3)
-│   ├── schema.sql              # DDL + seed data
-│   ├── routers/                # API endpoint handlers
-│   │   ├── auth.py             # Authentication + user management
-│   │   ├── kpi.py              # KPI fetch + recompute
-│   │   ├── chat.py             # AI chat session management
-│   │   ├── profit_center.py    # Profit Center CRUD
-│   │   ├── p2p.py              # P2P lifecycle queries
-│   │   ├── events.py           # Process mining anomalies
+│   ├── main.py                 # App entry point; mounts routers, runs init_db()
+│   ├── database.py             # PostgreSQL connection (psycopg3, thread-local)
+│   ├── schema.sql              # The ONLY DDL source — replayed every boot
+│   ├── routers/                # API endpoint handlers (plain def, inline SQL)
+│   │   ├── auth.py             # Users + roles + audit trail
+│   │   ├── kpi.py              # KPI fetch, chart data, threshold config
+│   │   ├── chat.py             # AI chat sessions + artifact download
+│   │   ├── p2p.py              # P2P lifecycle + anomaly queries
+│   │   ├── events.py           # SSE stream (upload progress, KPI refresh)
 │   │   ├── upload.py           # CSV upload + ETL trigger
-│   │   └── actions.py          # Action log
+│   │   └── ...
 │   └── services/
-│       ├── chat_engine.py      # OpenRouter agentic loop
-│       ├── chat_tools.py       # LLM tool executors
-│       ├── kpi_engine.py       # KPI computation (80+ formulas)
-│       ├── fact_builder.py     # P2P fact table builder
-│       └── event_generator.py  # Anomaly detection engine
-├── frontend/           # React frontend
+│       ├── agent/              # Ask IntelliSource harness (15 tools, guardrails)
+│       ├── kpi_engine.py       # KPI computation (~100 formulas as SQL)
+│       ├── etl.py              # Upload pipeline
+│       ├── fact_builder.py     # P2P fact table (PR→PO→GRN→Invoice→Payment)
+│       ├── event_generator.py  # Anomaly + process-variant detection
+│       └── reports/            # PDF / PPTX / Excel / chart rendering
+├── frontend/                   # React 19 + Vite + TanStack Router
 │   └── src/
-│       ├── routes/             # Page components
-│       ├── components/         # Shared UI components
-│       ├── context/            # AppContext (global state)
-│       └── api/                # API client + TanStack Query hooks
-├── data/                       # Sample CSV data files
-├── TECHNICAL_DOCUMENTATION.md  # Full technical reference
-├── SAP_FUNCTIONAL_DOCUMENTATION.md  # SAP field mapping + KPI queries
+│       ├── routes/             # One file per page
+│       ├── components/         # Shared UI (shadcn/ui)
+│       ├── hooks/              # TanStack Query layer
+│       └── api/client.ts       # apiFetch() — the whole HTTP layer
+├── data/                       # Synthetic SAP CSV exports, auto-seeded on first boot
+├── tools/                      # One-off pptx/doc/data generators (nothing imports them)
+├── docs/                       # All documentation — see docs/README.md for the index
+│   ├── FEATURES.md             # What the app does, end to end
+│   ├── reference/              # Technical, functional and KPI reference
+│   ├── architecture/           # ARB submission + diagrams
+│   ├── deliverables/           # Presentations and pitch scripts
+│   └── assets/                 # Screenshots
 └── README.md
 ```
 
@@ -181,10 +190,16 @@ The chatbot uses an **agentic loop** — GPT-4o decides which tools to call, que
 
 ## Documentation
 
+Every document is indexed in [docs/README.md](docs/README.md). The most-used ones:
+
 | Document | Description |
 |----------|-------------|
-| [TECHNICAL_DOCUMENTATION.md](TECHNICAL_DOCUMENTATION.md) | Architecture, API reference, DB schema, design decisions |
-| [SAP_FUNCTIONAL_DOCUMENTATION.md](SAP_FUNCTIONAL_DOCUMENTATION.md) | SAP field mapping, KPI SQL queries, CAPEX/OPEX logic, integration roadmap |
+| [docs/README.md](docs/README.md) | Index of all documentation |
+| [docs/FEATURES.md](docs/FEATURES.md) | What the application does, end to end — every page, KPI and AI capability |
+| [docs/reference/TECHNICAL_DOCUMENTATION.md](docs/reference/TECHNICAL_DOCUMENTATION.md) | Architecture, API reference, DB schema, design decisions |
+| [docs/reference/SAP_FUNCTIONAL_DOCUMENTATION.md](docs/reference/SAP_FUNCTIONAL_DOCUMENTATION.md) | SAP field mapping, KPI SQL queries, CAPEX/OPEX logic, integration roadmap |
+| [docs/reference/ASK_INTELLISOURCE_HARNESS_PLAN.md](docs/reference/ASK_INTELLISOURCE_HARNESS_PLAN.md) | Design of the AI agent harness, guardrails and read-only DB role |
+| [AGENTS.md](AGENTS.md) | Conventions, verification commands and silent-failure traps for coding agents |
 
 ---
 

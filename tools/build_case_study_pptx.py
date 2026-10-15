@@ -8,7 +8,7 @@ requirements.txt, package.json) — not fabricated. Measurable outcomes are
 scope facts (KPI count, anomaly categories) rather than invented metrics,
 since this hasn't been deployed to production yet and has no usage telemetry.
 
-Output: presentations/IntelliSource_Case_Study.pptx
+Output: docs/deliverables/presentations/IntelliSource_Case_Study.pptx
 """
 import os
 from pptx import Presentation
@@ -185,6 +185,6 @@ txt(Inches(0.4), H - Inches(0.42), Inches(9), Inches(0.3),
     "Engagement owner: [TBD]",
     size=8, italic=True, color=TEXT_MUTED)
 
-out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "presentations", "IntelliSource_Case_Study.pptx")
+out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "deliverables", "presentations", "IntelliSource_Case_Study.pptx")
 prs.save(out)
 print(f"Saved: {os.path.abspath(out)}")

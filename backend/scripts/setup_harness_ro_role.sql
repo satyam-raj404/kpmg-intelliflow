@@ -23,4 +23,4 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO intellisource_harness_ro;
 -- Cover tables created after this script runs (e.g. future schema.sql additions).
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO intellisource_harness_ro;
 
--- Explicitly no write/DDL grants of any kind — verified by scripts/verify_harness_ro_role.sql.
+-- Explicitly no write/DDL grants of any kind — verified by backend/scripts/verify_harness_ro_role.sh.

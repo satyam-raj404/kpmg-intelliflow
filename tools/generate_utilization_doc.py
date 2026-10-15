@@ -1,5 +1,6 @@
 """Generate Utilization_Schema_and_KPIs.xlsx in the repo root."""
 import openpyxl
+from pathlib import Path
 from openpyxl.styles import (
     PatternFill, Font, Alignment, Border, Side, numbers
 )
@@ -496,6 +497,6 @@ border_range(ws8, 2, 2+len(steps), 1, 3)
 set_col_widths(ws8, [8, 22, 90])
 
 # save
-out = "Utilization_Schema_and_KPIs.xlsx"
-wb.save(out)
+out = Path(__file__).resolve().parent.parent / "Utilization_Schema_and_KPIs.xlsx"
+wb.save(str(out))
 print(f"Saved: {out}")

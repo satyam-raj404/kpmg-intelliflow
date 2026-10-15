@@ -1269,7 +1269,13 @@ ws_keys.row_dimensions[row].height = 30
 
 # ── Save ──────────────────────────────────────────────────────────────────────
 
-OUT_PATH = Path(__file__).parent.parent / "presentations" / "IntelliSource_KPI_Documentation.xlsx"
+OUT_PATH = (
+    Path(__file__).parent.parent
+    / "docs"
+    / "deliverables"
+    / "presentations"
+    / "IntelliSource_KPI_Documentation.xlsx"
+)
 wb.save(str(OUT_PATH))
 print(f"\nSaved: {OUT_PATH}")
 print(f"  Sheets: {', '.join([ws.title for ws in wb.worksheets])}")

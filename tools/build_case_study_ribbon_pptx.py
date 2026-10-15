@@ -3,7 +3,7 @@ Engagement Details / Technology Stack Used / Expected Outcome & Deliverables),
 matching the second reference template. Same grounded content as
 build_case_study_pptx.py, different visual format.
 
-Output: presentations/IntelliSource_Case_Study_Ribbon.pptx
+Output: docs/deliverables/presentations/IntelliSource_Case_Study_Ribbon.pptx
 """
 import os
 from pptx import Presentation
@@ -200,7 +200,7 @@ for cx in (Inches(0.45), W - Inches(0.45)):
     circle(cx - Inches(0.08), bar_y - Inches(0.08), Inches(0.16), NAVY)
     circle(cx - Inches(0.08), bar_y + bar_h - Inches(0.08), Inches(0.16), NAVY)
 
-out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "presentations",
+out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "deliverables", "presentations",
                     "IntelliSource_Case_Study_Ribbon.pptx")
 prs.save(out)
 print(f"Saved: {os.path.abspath(out)}")

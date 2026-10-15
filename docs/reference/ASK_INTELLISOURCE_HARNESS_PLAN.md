@@ -3,10 +3,10 @@
 ## Context
 
 Today "Ask IntelliSource" is a single blocking loop: `POST /api/chat` → `run_chat`
-([backend/services/chat_engine.py:225](backend/services/chat_engine.py)) calls OpenRouter
+([backend/services/chat_engine.py:225](../../backend/services/chat_engine.py)) calls OpenRouter
 `gpt-4o` in an agentic tool-loop over 6 **read-only** tools
-([backend/services/chat_tools.py](backend/services/chat_tools.py)), returns `{reply, tools_used}`.
-The frontend ([kpmg-intelliflow/src/routes/ask.tsx](kpmg-intelliflow/src/routes/ask.tsx))
+([backend/services/chat_tools.py](../../backend/services/chat_tools.py)), returns `{reply, tools_used}`.
+The frontend ([frontend/src/routes/ask.tsx](../../frontend/src/routes/ask.tsx))
 renders markdown with a hand-rolled parser. There is **no** artifact/file output, **no**
 data-analysis engine, **no** chart/PPT/Excel/PDF generation, and the model is hardwired to one
 provider.
@@ -60,7 +60,7 @@ The harness cannot write to the database under any circumstance. Enforced at **f
    (`GRANT SELECT` / no INSERT/UPDATE/DELETE/DDL). The database physically rejects any write.
 2. **Read-only session:** connection opened with `default_transaction_read_only = on` /
    `SET TRANSACTION READ ONLY` — the server aborts write statements.
-3. **Write-guard regex:** reuse ([chat_tools.py:5-8](backend/services/chat_tools.py)) to reject
+3. **Write-guard regex:** reuse ([chat_tools.py:5-8](../../backend/services/chat_tools.py)) to reject
    INSERT/UPDATE/DELETE/DROP/TRUNCATE/ALTER/CREATE/GRANT/REVOKE/EXECUTE/CALL before execution.
 4. **Tool surface:** the registry exposes **only** read/analysis/report tools. No write/DDL/DML
    tool exists to be called. Analysis tools operate on in-memory result frames, never write back.
@@ -68,7 +68,7 @@ The harness cannot write to the database under any circumstance. Enforced at **f
 
 **Reconciling non-data writes:** artifacts (files) are written to the filesystem, not the DB.
 Chat **audit logging** and **session history** are the only persistence needs — audit uses the
-app's existing separate write path/connection ([write_audit](backend/services/audit.py)), *not*
+app's existing separate write path/connection ([write_audit](../../backend/services/audit.py)), *not*
 the harness's read-only data connection; session history stays in-memory (as today). So the
 harness's **data connection is strictly read-only**, while the app's own audit trail (a system
 concern, outside the harness data plane) continues through its normal channel. If even that
@@ -79,7 +79,7 @@ must be avoided, audit can be emitted as a log/event instead of a DB row — cal
 ## 1. Model cascade & provider abstraction — `services/agent/providers/`
 
 `base.py` — `LLMProvider` interface: `chat(messages, tools=None, json_mode=False, model=...) -> {content, tool_calls}`.
-- `openrouter.py` — refactor the existing `_openrouter_call` ([chat_engine.py:157](backend/services/chat_engine.py)); model id becomes a param (any OpenRouter model).
+- `openrouter.py` — refactor the existing `_openrouter_call` ([chat_engine.py:157](../../backend/services/chat_engine.py)); model id becomes a param (any OpenRouter model).
 - `ollama.py` — local `http://localhost:11434/api/chat` via `urllib`/`httpx`; supports `format:"json"` for constrained tool-call output (small models are far more reliable constrained).
 
 `config.py` — **role → model** map, env-driven, with cascade fallback:
@@ -99,7 +99,7 @@ must be avoided, audit can be emitted as a log/event instead of a DB row — cal
 - **Pre-computed KPI shortcut** — `get_kpis` already returns finished numbers; the model just narrates.
 - **Deterministic report templates** — model supplies only titles/bullets/narrative; layout+numbers are code, so a tiny model produces a polished deck.
 - **Metric registry** (`schema_card.py` + a `metrics.py` map) — canonical KPI SQL the model reuses instead of inventing, preventing metric drift.
-- **Aggressive result compression** — keep `_compress_result` ([chat_engine.py:198](backend/services/chat_engine.py)); cap rows/chars so context stays tiny.
+- **Aggressive result compression** — keep `_compress_result` ([chat_engine.py:198](../../backend/services/chat_engine.py)); cap rows/chars so context stays tiny.
 
 ---
 
@@ -117,7 +117,7 @@ Keep thin backward-compat shims in `chat_engine.py`/`chat_tools.py` so nothing e
 
 ## 3. Tools — `services/agent/tools/`
 
-**Existing (moved in):** `data_tools.py` = `query_database`, `get_kpis`, `find_document`, `get_anomalies`, `get_vendor_info`, `get_p2p_stage_summary` (verbatim from [chat_tools.py](backend/services/chat_tools.py)).
+**Existing (moved in):** `data_tools.py` = `query_database`, `get_kpis`, `find_document`, `get_anomalies`, `get_vendor_info`, `get_p2p_stage_summary` (verbatim from [chat_tools.py](../../backend/services/chat_tools.py)).
 
 **New — analysis (parameterized, safe):** `analysis_tools.py`
 - `analyze_data(source, op, group_by?, metric?, agg?, top_n?, filters?)` — op ∈ {groupby, trend, top_n, describe, correlation, pivot}. Operates on a manifest dataset or a scoped SELECT. Pure pandas. Returns a result table + stores it in the manifest.
@@ -136,10 +136,10 @@ Each takes a **ReportSpec** (sections/titles/narrative + **manifest data-keys**)
 ## 4. Report generators — `services/reports/`
 
 - `theme.py` — KPMG palette/fonts shared by all (reuse the constants already in
-  [build_presentation_pptx.py](kpmg-intelliflow/build_presentation_pptx.py): NAVY `#00338D`, etc.).
+  [build_presentation_pptx.py](../../tools/build_presentation_pptx.py): NAVY `#00338D`, etc.).
 - `charts.py` — matplotlib helpers (KPMG-styled), shared by `chart_tool` and PDF/PPTX embeds.
 - `excel.py` — openpyxl/xlsxwriter styled workbook (KPI tables, conditional formatting, freeze
-  header). Pattern already proven in [backend/run_kpi_queries_to_excel.py](backend/run_kpi_queries_to_excel.py) — refactor its helpers into an importable builder.
+  header). Pattern already proven in [backend/run_kpi_queries_to_excel.py](../../backend/run_kpi_queries_to_excel.py) — refactor its helpers into an importable builder.
 - `pptx.py` — refactor the standalone `build_*_pptx.py` helpers (`add_rect`, `add_text`,
   `kpmg_header`, `slide_a/b`) into a reusable branded deck generator driven by ReportSpec.
 - `pdf.py` — **ReportLab** in-depth report: cover, exec summary, KPI tables, embedded charts,
@@ -172,13 +172,13 @@ and **output** (before returning). All are deterministic Python — not model se
 ### 5c. Access & safety guardrails
 - **RBAC-aware data:** chat must not surface data a user's role can't see on dashboards (respect the 12 roles); scope queries by the caller's role/company where applicable.
 - **Artifact isolation:** artifacts written under per-session dirs; download endpoint validates `artifact_id` ownership (no path traversal, no cross-session access).
-- **Audit:** every chat turn + artifact generation logged via `write_audit` (already used at [routers/chat.py](backend/routers/chat.py)) — `CHAT_QUERY`, `ARTIFACT_GENERATED`.
+- **Audit:** every chat turn + artifact generation logged via `write_audit` (already used at [routers/chat.py](../../backend/routers/chat.py)) — `CHAT_QUERY`, `ARTIFACT_GENERATED`.
 - **Rate limiting:** per-session request throttle to bound cost/abuse.
 
 ## 5d. Evaluation harness — `backend/tests/eval_chat.py` (+ `eval/` cases)
 
 A runnable eval suite (no framework — plain asserts, per repo norm) that gates changes and
-model swaps. Ties to the AISIA testing scenarios already documented in `ARB/AI_ARB.md`.
+model swaps. Ties to the AISIA testing scenarios already documented in `docs/architecture/ar-submission/AI_ARB.md`.
 
 **Golden case set** (`backend/tests/eval/*.jsonl`) — each case = `{question, expects}`:
 
@@ -210,15 +210,15 @@ regressions. Feedback thumbs (frontend) append new failing cases to the golden s
 
 ---
 
-## 7. Frontend — `kpmg-intelliflow/src/routes/ask.tsx`
+## 7. Frontend — `frontend/src/routes/ask.tsx`
 
 - Render **artifact cards** (icon by type, filename, Download button → artifact `url`).
 - **Inline chart preview** (`<img>` from chart artifact preview URL).
 - Tool-progress list from `tools_used` (already present) — richer labels.
-- Swap the hand-rolled markdown parser for a small lib (`react-markdown` + `remark-gfm`) — optional cleanup, reduces bespoke code in [ask.tsx:147-266](kpmg-intelliflow/src/routes/ask.tsx).
-- Use `apiFetch` ([api/client.ts](kpmg-intelliflow/src/api/client.ts)) for cold-start retry (chat currently bypasses it).
+- Swap the hand-rolled markdown parser for a small lib (`react-markdown` + `remark-gfm`) — optional cleanup, reduces bespoke code in [ask.tsx:147-266](../../frontend/src/routes/ask.tsx).
+- Use `apiFetch` ([api/client.ts](../../frontend/src/api/client.ts)) for cold-start retry (chat currently bypasses it).
 - **Deferred (phase 2):** SSE token streaming + live tool timeline via the existing bus
-  ([backend/routers/events.py](backend/routers/events.py)) with a new per-session event `type`.
+  ([backend/routers/events.py](../../backend/routers/events.py)) with a new per-session event `type`.
 
 ---
 
@@ -246,7 +246,7 @@ backend/
   tests/eval_chat.py      # runnable eval suite (guardrails + grounding + tools)
   tests/eval/*.jsonl      # golden case set (grows via feedback thumbs)
   chat_engine.py / chat_tools.py   # thin shims → services/agent (compat)
-kpmg-intelliflow/src/routes/ask.tsx   # artifact cards + chart previews
+frontend/src/routes/ask.tsx   # artifact cards + chart previews
 ```
 
 ---

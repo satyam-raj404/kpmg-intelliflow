@@ -273,5 +273,5 @@ Unchanged: D02 (As-Is), D03 (Conceptual Data Model), D04 (CRUD), D09 (Authentica
 
 ---
 
-*Deliverable file:* `ARB/ARB Solution Review - AI Based solution.docx.docx`
-*Rebuild:* `python ARB/build_ai_arb.py` (requires the 5 AI diagrams under `ARB/Diagrams/`).
+*Deliverable file:* `docs/architecture/ar-submission/ARB Solution Review - AI Based solution.docx.docx`
+*Rebuild:* `python docs/architecture/ar-submission/build_ai_arb.py` (requires the 5 AI diagrams under `docs/architecture/ar-submission/Diagrams/`).

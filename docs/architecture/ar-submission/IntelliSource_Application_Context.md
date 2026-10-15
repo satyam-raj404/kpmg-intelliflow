@@ -391,16 +391,16 @@ The AI executes up to 3 database tool calls per response, querying live PostgreS
 
 ---
 
-## 16. File Inventory (ARB Folder)
+## 16. File Inventory (`docs/architecture/ar-submission/`)
 
 | File | Purpose |
 |---|---|
 | ARB_Solution_Review_Specification.docx | Blank KPMG ARB template |
 | IntelliSource_Filled.docx | Filled ARB submission — Draft 1.0, 30 Jun 2026 |
 | P2P_KPIs.xlsx | 45 KPIs with exact SQL queries and formulas |
-| IntelliSource_BPD.png | Executive P2P flow diagram |
-| IntelliSource_BPD_Teams.png | Swim-lane team BPD (9 actor lanes) |
+| Diagrams/IntelliSource_BPD.png | Executive P2P flow diagram |
+| Diagrams/IntelliSource_BPD_Teams.png | Swim-lane team BPD (9 actor lanes) |
 | IntelliSource_BPD_Teams.md | Mermaid source for swim-lane BPD |
 | IntelliSource_ARB_Diagrams.md | All 11 ARB architecture diagrams (Mermaid source) |
-| D01–D11 .mmd + .png | 11 individual architecture diagrams — source + rendered PNG |
+| D01–D11 .mmd + `Diagrams/` .png | 11 individual architecture diagrams — source + rendered PNG |
 | IntelliSource_Application_Context.md | This file — complete application context reference |

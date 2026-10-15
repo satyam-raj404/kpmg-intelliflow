@@ -277,5 +277,5 @@ every transaction. every user. every action.
 | Act 2 — Anomaly grid | 12 anomaly cards (icons + labels — provided in ARB doc) |
 | Act 2 — AI chat | Animated chat bubble mockup (not real screenshot) |
 | Act 3 — Impact stats | Full-bleed bold stat cards (3 × animated counters) |
-| Act 3 — Azure architecture | Simplified Azure zone diagram (from D08 PNG in ARB/) |
+| Act 3 — Azure architecture | Simplified Azure zone diagram (from D08 PNG in docs/architecture/ar-submission/Diagrams/) |
 | Act 4 — Logo | Official KPMG IntelliSource logo (navy + white) |

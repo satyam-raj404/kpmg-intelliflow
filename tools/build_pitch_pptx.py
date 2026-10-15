@@ -632,6 +632,6 @@ add_text(s, "KPMG India — Procurement Advisory  |  getdev24@gmail.com  |  Inte
 
 
 # ── Save ──────────────────────────────────────────────────────────────────────
-out = os.path.join(os.path.dirname(__file__), "..", "presentations", "IntelliSource_Pitch.pptx")
+out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "deliverables", "presentations", "IntelliSource_Pitch.pptx")
 prs.save(out)
 print(f"Saved: {out}")

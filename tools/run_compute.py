@@ -1,9 +1,11 @@
 """Directly trigger compute_all on the live PostgreSQL database."""
 import sys, os
-sys.path.insert(0, "backend")
-
 from pathlib import Path
-env = Path(".env")
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "backend"))
+
+env = REPO_ROOT / ".env"
 if env.exists():
     for l in env.read_text().splitlines():
         if "=" in l and not l.startswith("#"):

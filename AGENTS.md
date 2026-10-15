@@ -54,6 +54,8 @@ backend/services/kpi_engine.py   ~80 KPI formulas as hardcoded SQL; results pers
 backend/services/agent/          the Ask IntelliSource harness: orchestrator, guardrails, 15 tools
 backend/schema.sql               the ONLY DDL source, replayed on every boot, all IF NOT EXISTS
 data/*.csv                       synthetic SAP exports, auto-seeded on first boot
+tools/                           one-off pptx/doc/data generators; nothing imports them
+docs/                            all documentation; see docs/README.md for the index
 ```
 
 Request path: route file → `apiFetch`/`useKpi` → `/api/*` → router handler → `get_connection()` →
@@ -145,7 +147,7 @@ Regenerate by running the tool that owns it; hand edits are silently overwritten
   and `vite build`. Add routes as files in `src/routes/` (`admin.users.tsx` → `/admin/users`).
 - `backend/schema.sql` seed blocks — replayed on every boot; only `ON CONFLICT DO NOTHING` /
   `IF NOT EXISTS` forms are safe there.
-- `scripts/` — one-off pptx/doc/data generators, nothing imports them. Run standalone; leave them
+- `tools/` — one-off pptx/doc/data generators, nothing imports them. Run standalone; leave them
   alone.
 - `backend/services/chat_engine.py` and `chat_tools.py` — deliberate compat shims, kept so old
   import paths resolve. New agent code goes in `services/agent/`.
@@ -177,17 +179,19 @@ showing mock data, not a working query.
 
 ## Reference
 
-Read the doc when the task touches that area; do not preload them.
+Read the doc when the task touches that area; do not preload them. `docs/README.md` indexes all of
+them.
 
 | Task | Doc |
 |---|---|
-| Architecture, API surface, schema, design rationale | `docs/TECHNICAL_DOCUMENTATION.md` |
-| SAP field → column mapping, KPI SQL, CAPEX/OPEX logic | `docs/SAP_FUNCTIONAL_DOCUMENTATION.md` |
-| P2P lifecycle, full DDL, ETL contract | `docs/SKILL_IntelliSource.md` |
-| Harness design; cited by `orchestrator.py`, `harness_db.py`, `guardrails.py` | `docs/ASK_INTELLISOURCE_HARNESS_PLAN.md` + `..._OPTIMIZATION_PLAN.md` |
-| Per-dashboard KPI SQL | `docs/PROCUREMENT_KPI_QUERIES.md`, `finance.md`, `UTILIZATION_KPI_REFERENCE.md`, `VendorD.md` |
-| Business requirements, security posture | `docs/BRD_Summary_IntelliSource.md`, `docs/BRD_Security_Requirements_Addendum.md` |
+| What the app does, end to end | `docs/FEATURES.md` |
+| Architecture, API surface, schema, design rationale | `docs/reference/TECHNICAL_DOCUMENTATION.md` |
+| SAP field → column mapping, KPI SQL, CAPEX/OPEX logic | `docs/reference/SAP_FUNCTIONAL_DOCUMENTATION.md` |
+| P2P lifecycle, full DDL, ETL contract | `docs/reference/SKILL_IntelliSource.md` |
+| Harness design; cited by `orchestrator.py`, `harness_db.py`, `guardrails.py` | `docs/reference/ASK_INTELLISOURCE_HARNESS_PLAN.md` + `ASK_INTELLISOURCE_OPTIMIZATION_PLAN.md` |
+| Per-dashboard KPI SQL | `docs/reference/PROCUREMENT_KPI_QUERIES.md`, `finance.md`, `UTILIZATION_KPI_REFERENCE.md`, `VendorD.md` |
+| Business requirements, security posture | `docs/reference/BRD_Summary_IntelliSource.md`, `BRD_Security_Requirements_Addendum.md` |
+| KPMG submission artefacts (ARB, decks, screenshots) | `docs/architecture/`, `docs/deliverables/`, `docs/assets/` |
 
-`ARB/` and `presentations/` are frozen submission artefacts, not living docs. `README.md` is the
-user-facing pitch and is **partly out of date** (React 18, port 8080, "bundled" API key, docs at repo
-root) — trust the code.
+`docs/architecture/` and `docs/deliverables/` are frozen submission artefacts, not living docs.
+`README.md` is the user-facing pitch and is **partly out of date** — trust the code.

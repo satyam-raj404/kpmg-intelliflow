@@ -246,7 +246,7 @@ login page). 12 roles. Signup lets you pick any role with a description of what 
 | Excel button | **Stub.** `toast.success("Export ready")` on every page. No Excel export exists in the frontend. |
 | Agent artifacts | Real — PDF/PPTX/XLSX/PNG from Ask IntelliSource, served from `/api/chat/artifacts/{id}`. |
 | `backend/run_kpi_queries_to_excel.py` | Standalone script, run by hand. Dumps every KPI query to an Excel workbook. Not an endpoint. |
-| `scripts/run_compute.py` | Standalone CLI: re-run `compute_all()` and print the utilization KPIs. |
+| `tools/run_compute.py` | Standalone CLI: re-run `compute_all()` and print the utilization KPIs. |
 
 ---
 

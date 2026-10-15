@@ -3,7 +3,7 @@
 The harness (Ask IntelliSource agent) NEVER uses the app's main get_connection()
 (database.py), which connects with a write-capable role to the app's primary DB
 (Neon). Instead it uses HARNESS_DATABASE_URL — a dedicated SELECT-only Postgres
-role on local Postgres (see scripts/setup_harness_ro_role.sql), with the session
+role on local Postgres (see backend/scripts/setup_harness_ro_role.sql), with the session
 itself set read-only. Even if every application-level guard failed, Postgres
 would still physically reject any write on this connection.
 
