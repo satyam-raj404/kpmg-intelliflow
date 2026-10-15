@@ -31,10 +31,14 @@ export const brand = {
     mono: '"JetBrains Mono", "Consolas", monospace',
   },
 
-  // Logo — Placeholder. KPMG team will upload official logo SVG/PNG to /public/kpmg-logo.svg
+  // Logo — official KPMG mark, supplied as PNGs in /public.
+  //   kpmg-logo.png        navy mark, for light backgrounds
+  //   kpmg-logo-white.png  white mark, for the navy sidebar / auth panels
+  // Both must share the same aspect ratio (~2.5:1); Logo.tsx sizes by height.
   logo: {
-    path: "/kpmg-logo.svg",
-    text: "KPMG",
+    path: "/kpmg-logo.png",
+    pathWhite: "/kpmg-logo-white.png",
+    aspect: 2.5,
   },
 } as const;
 

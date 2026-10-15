@@ -7,37 +7,50 @@ interface LogoProps {
 }
 
 /**
- * KPMG Logo. Tries /kpmg-logo.svg first; falls back to a styled wordmark.
+ * KPMG logo. Renders the official mark supplied in /public:
+ *   variant="blue"  -> /kpmg-logo.png        (navy, for light backgrounds)
+ *   variant="white" -> /kpmg-logo-white.png  (white, for the navy sidebar/auth panels)
+ *
+ * Sized by height; width follows brand.logo.aspect so the mark keeps its
+ * proportions. If the asset is missing we render a neutral placeholder block
+ * rather than a text wordmark — a fake "KPMG" in Arial reads as a broken logo.
  */
 export function Logo({ variant = "blue", size = 32 }: LogoProps) {
   const [failed, setFailed] = useState(false);
-  const color = variant === "white" ? "#FFFFFF" : brand.colors.primary;
+  const src = variant === "white" ? brand.logo.pathWhite : brand.logo.path;
 
   if (failed) {
     return (
       <span
-        aria-label="KPMG"
+        aria-label="KPMG logo asset missing"
+        role="img"
         style={{
-          fontFamily: brand.fonts.heading,
-          color,
-          fontWeight: 700,
-          fontStyle: "italic",
-          letterSpacing: "0.04em",
-          fontSize: size * 0.7,
-          lineHeight: 1,
+          display: "inline-block",
+          width: size * brand.logo.aspect * 0.55,
+          height: size,
+          borderRadius: 2,
+          background: variant === "white" ? "#FFFFFF" : brand.colors.primary,
+          opacity: 0.25,
         }}
-      >
-        {brand.logo.text}
-      </span>
+      />
     );
   }
 
   return (
     <img
-      src={brand.logo.path}
+      src={src}
       alt="KPMG"
-      onError={() => setFailed(true)}
-      style={{ height: size, width: "auto" }}
+      onError={() => {
+        console.warn(`[Logo] missing asset ${src} — add it to frontend/public/`);
+        setFailed(true);
+      }}
+      style={{
+        height: size,
+        width: "auto",
+        maxWidth: size * brand.logo.aspect,
+        objectFit: "contain",
+        display: "block",
+      }}
     />
   );
 }

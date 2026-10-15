@@ -61,7 +61,7 @@ export function TopBar() {
           <span className="font-medium">{period}</span>
           <ChevronDown className="h-3 w-3 text-muted-foreground" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent align="end" collisionPadding={16}>
           {PERIODS.map((p) => (
             <DropdownMenuItem key={p} onClick={() => setPeriod(p)}>{p}</DropdownMenuItem>
           ))}
@@ -148,7 +148,16 @@ export function TopBar() {
           </div>
           <ChevronDown className="h-3 w-3 text-muted-foreground" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
+        {/* align="end" + collisionPadding keeps the menu inside the viewport.
+            Without collisionPadding, floating-ui has no room to shift and the
+            panel overflows the right edge on narrower screens, clipping the
+            role list and the Profile / Sign out items. */}
+        <DropdownMenuContent
+          align="end"
+          alignOffset={-6}
+          collisionPadding={16}
+          className="w-56 max-w-[calc(100vw-2rem)]"
+        >
           <DropdownMenuLabel className="text-[12px]">View as role</DropdownMenuLabel>
           {ROLES.map((r) => (
             <DropdownMenuItem key={r} onClick={() => setRole(r)} className={cn(role === r && "bg-secondary font-medium")}>
