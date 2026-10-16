@@ -529,7 +529,161 @@ for i in range(8):
     })
 
 
-# ── 03  PO DELIVERY DUMP ──────────────────────────────────────────────────────
+# ── 02b  COMPANY SPLIT + DEMO-WINDOW ANOMALIES ────────────────────────────────
+# Two jobs, both of which used to leave whole KPI tiles reading 0 in the demo.
+#
+# (a) company_code. Every PO/PR/GRN/invoice/payment was hardcoded to "1001",
+#     so the Company Filter had nothing to filter on. The split is applied here,
+#     after the PO dump exists, because it is keyed on the sorted purchasing
+#     documents. add_company_codes.py did this once as a post-process but was
+#     clobbered every time this generator ran - it also grew vendor_master by
+#     26 rows on every invocation.
+#
+# (b) Anomalies that only count inside the reporting month. ref_date is
+#     MAX(po_dump.document_date) and MTD is the first of that month, so an
+#     anomaly dated 2022 never shows up in an MTD KPI no matter how many exist.
+
+REF_DATE = date(2023, 3, 27)          # keep every date <= this; see note below
+MTD_ANCHOR = date(2023, 3, 1)
+
+# (a) ── company split: 65% / 25% / 10% over sorted purchasing documents ──────
+_po_docs = sorted({r["purchasing_document"] for r in po_rows})
+_cut1 = int(len(_po_docs) * 0.65)
+_cut2 = int(len(_po_docs) * 0.90)
+_po_cc = {}
+for _i, _doc in enumerate(_po_docs):
+    _po_cc[_doc] = "1001" if _i < _cut1 else ("1002" if _i < _cut2 else "1003")
+
+for r in po_rows:
+    r["company_code"] = _po_cc[r["purchasing_document"]]
+
+# PRs inherit the company of the PO that consumed them; PRs with no PO (and the
+# orphan PRs added below) default to 1001. Without this column pr_dump.company_code
+# is NULL and every company-scoped PR KPI returns nothing.
+_pr_cc = {}
+for r in po_rows:
+    if r["purchase_requisition"]:
+        _pr_cc.setdefault((r["purchase_requisition"], r["item_of_requisition"]),
+                          r["company_code"])
+for r in pr_rows:
+    r["company_code"] = _pr_cc.get(
+        (r["purchase_requisition"], r["item_of_requisition"]), "1001")
+
+# Vendor master must hold one row per vendor per company, otherwise a
+# vendor-scoped join finds nothing. (UNIQUE(vendor, company_code) in schema.sql.)
+vendor_rows_out = []
+for v in VENDORS:
+    for cc in ("1001", "1002", "1003"):
+        _v = dict(v)
+        _v["company_code"] = cc
+        vendor_rows_out.append(_v)
+VENDORS_OUT = vendor_rows_out
+
+# (b) ── anomalies inside the March 2023 reporting month ──────────────────────
+
+# PO deletions dated inside MTD -> PO_DELETION_MTD
+_del_targets = [r for r in po_rows if r["deletion_indicator"] != "L"][:6]
+for _k, _r in enumerate(_del_targets):
+    _dt = add(MTD_ANCHOR, 4 + _k * 3)          # 03-05 .. 03-20, all <= REF_DATE
+    _r["deletion_indicator"] = "L"
+    _r["created_on"] = fd(_dt)
+    _r["document_date"] = fd(_dt)
+    _r["delivery_completed"] = ""
+
+# Orphan approved PRs: released, but no PO ever raised. These feed
+# OPEN_PR_AGING and the four "Aging of Open PR Lines" chart buckets.
+_pr_used = {(r["purchase_requisition"], r["item_of_requisition"]) for r in pr_rows}
+_pr_used |= {(r["purchase_requisition"], r["item_of_requisition"])
+             for r in po_rows if r["purchase_requisition"]}
+# bucket boundaries relative to REF_DATE (2023-03-27)
+_bucket_release_dates = [
+    date(2023, 3, 24),   # 0-7d
+    date(2023, 3, 10),   # 8-30d
+    date(2023, 2, 10),   # 31-60d
+    date(2022, 12, 15),  # 60+d
+    date(2023, 3, 22),   # 0-7d
+    date(2023, 2, 28),   # 8-30d
+]
+_next_pr = 10900000
+for _bd in _bucket_release_dates:
+    _next_pr += random.randint(1, 9)
+    _vid = random.choice(VENDORS)["vendor"]
+    _mg = random.choice(list(MATERIAL_GROUPS.keys()))
+    _descs = MATERIAL_GROUPS[_mg][0]
+    pr_rows.append({
+        "purchase_requisition": str(_next_pr),
+        "item_of_requisition":  "00010",
+        "purchasing_doc_type":  "NB",
+        "vendor":               _vid,
+        "material_group":       _mg,
+        "material_description": random.choice(_descs),
+        "plant":                random.choice(PLANTS),
+        "purchasing_group":     "MAT",
+        "order_quantity":       round(random.uniform(5, 90), 3),
+        "unit_of_measure":      "EA",
+        "valuation_price":      round(random.uniform(50000, 900000), 2),
+        "delivery_date":        fd(add(_bd, random.randint(10, 40))),
+        "release_status":       "X",
+        "release_date":         fd(_bd),
+        "requisitioner":        random.choice(BUYERS),
+        "tracking_number":      f"TR{_next_pr}001",
+        "company_code":         _pr_cc.get((str(_next_pr), "00010"), "1001"),
+    })
+
+# Duplicate PO groups: two documents sharing company + material group + vendor +
+# value + qty + date -> DUPLICATE_PO_COUNT.
+_dup_src = [r for r in po_rows if r["deletion_indicator"] != "L"]
+for _k in range(3):
+    _src = _dup_src[_k * 17]
+    _clone = dict(_src)
+    _clone["purchasing_document"] = f"2990000{_k:03d}"
+    _clone["created_by"] = random.choice(BUYERS)
+    po_rows.append(_clone)
+
+# Software POs in every company code -> SW_CAPEX_SPEND / SW_OPEX_SPEND.
+_sw_lines = [
+    ("SAP S/4HANA perpetual license - enterprise", "CAPEX"),
+    ("Oracle DB perpetual license upgrade", "CAPEX"),
+    ("SAP S/4HANA annual support subscription", "OPEX"),
+    ("Tableau perpetual license renewal", "CAPEX"),
+    ("Microsoft 365 E3 annual subscription", "OPEX"),
+    ("Automation Anywhere perpetual license", "CAPEX"),
+]
+for _cc in ("1001", "1002", "1003"):
+    for _desc, _co in _sw_lines:
+        _doc = "2980" + _cc + _co[0] + f"{len(po_rows):04d}"
+        _qty = round(random.uniform(2, 40), 3)
+        po_rows.append({
+            "purchasing_document": _doc,
+            "item":                "00010",
+            "purchasing_doc_type": "ZAN",
+            "purchasing_org":      "3000",
+            "purchasing_group":    "IT",
+            "vendor":              "800100" if _cc == "1001" else "700400",
+            "vendor_name":         "SAP Deutschland GmbH" if _cc == "1001" else "Infosys Ltd",
+            "document_date":       fd(add(REF_DATE, -random.randint(20, 120))),
+            "created_on":          fd(add(REF_DATE, -random.randint(20, 120))),
+            "created_by":          random.choice(BUYERS),
+            "plant":               "BLRP",
+            "company_code":        _cc,
+            "material_group":      "9905",
+            "material_description": _desc,
+            "order_quantity":      _qty,
+            "unit_of_measure":     "EA",
+            "net_order_price":     round(random.uniform(120000, 480000), 2),
+            "net_order_value":     round(random.uniform(900000, 9200000), 2),
+            "tax_code":            "I0",
+            "purchase_requisition":  "",
+            "item_of_requisition":   "",
+            "release_indicator":   "X",
+            "release_strategy":    "STD_L2",
+            "delivery_completed":  "",
+            "deletion_indicator":  "",
+            "payment_terms":       "N030",
+            "capex_opex_flag":     _co,
+        })
+
+
 del_rows = []
 grn_exp_map = {}   # po+item → expected_delivery_date
 
@@ -603,8 +757,12 @@ for po in po_rows:
         "po_history_category": "E",
         "movement_type":       "101",
         "debit_credit_ind":    "S",
+        "company_code":        po["company_code"],
         "posting_date":        fd(posting_date),
-        "entry_date":          fd(posting_date),
+        # Goods receipt lands a few days after the expected delivery date, so
+        # the vendor lead-time average lands slightly late instead of averaging
+        # early and late deliveries into each other and rounding to 0.0.
+        "entry_date":          fd(add(posting_date, 3)),
         "quantity":            grn_qty,
         "amount_local_ccy":    grn_amt,
         "reference_doc":       f"DN-{posting_date.year}-{random.randint(1000,9999)}",
@@ -623,12 +781,13 @@ for i in range(3):
     mat_doc_counter += 1
     ret_date = add(date.fromisoformat(orig["posting_date"]), random.randint(2, 7))
     grn_rows.append({
-        "purchasing_document": orig["purchasing_document"],
-        "item":                orig["item"],
-        "material_document":   str(mat_doc_counter),
-        "material_doc_item":   "0001",
-        "po_history_category": "E",
-        "movement_type":       "122",
+          "purchasing_document": orig["purchasing_document"],
+          "item":                orig["item"],
+          "material_document":   str(mat_doc_counter),
+          "material_doc_item":   "0001",
+          "po_history_category": "E",
+          "movement_type":       "122",
+          "company_code":        orig["company_code"],
         "debit_credit_ind":    "H",
         "posting_date":        fd(ret_date),
         "entry_date":          fd(ret_date),
@@ -674,6 +833,7 @@ for gi, grn in enumerate(grn_rows):
         "invoice_doc_item":    "0001",
         "po_history_category": "Q",
         "debit_credit_ind":    "S",
+        "company_code":        grn["company_code"],
         "posting_date":        fd(inv_date),
         "entry_date":          fd(inv_date),
         "quantity":            grn["quantity"],
@@ -696,11 +856,17 @@ inv_general_rows = []
 gen_inv_counter  = 1900000000
 clr_doc_counter  = 2900000000
 pay_inv_map      = {}   # clearing_doc → invoice_doc for payment generation
+_inv_cc_by_doc   = {}   # invoice_doc → company_code, so payments inherit it
 
 for po_inv in po_inv_rows:
-    gen_inv_counter += random.randint(3, 20)
-    inv_id   = str(gen_inv_counter)
+    # The invoice takes its document number from the PO invoice line. These two
+    # tables used to run independent counters (5105... vs 1900...), so the
+    # po_invoice -> invoice join matched zero rows: invoice_due_date was NULL
+    # for every fact row, invoice_to_payment_days was never computed, and
+    # E2E_CYCLE_TIME could only ever fall back to the PO->GRN branch.
+    inv_id   = po_inv["invoice_doc"]
     inv_date = date.fromisoformat(po_inv["posting_date"])
+    _inv_cc_by_doc[inv_id] = po_inv["company_code"]
     vendor   = next(
         (p["vendor"] for p in po_rows if p["purchasing_document"] == po_inv["purchasing_document"]),
         "700100")
@@ -723,6 +889,7 @@ for po_inv in po_inv_rows:
         "invoice_doc":        inv_id,
         "invoice_year":       po_inv["invoice_year"],
         "vendor":             vendor,
+        "company_code":       po_inv["company_code"],
         "document_type":      "RE",
         "vendor_invoice_ref": po_inv["reference_doc"],
         "vendor_invoice_date": fd(inv_date),
@@ -765,6 +932,10 @@ for i in range(30):
         "invoice_doc":        str(gen_inv_counter),
         "invoice_year":       str(inv_date.year),
         "vendor":             vendor,
+        # Non-PO invoices have no PO to inherit from, so spread them across
+        # companies; a blank here becomes NULL and drops the row out of every
+        # company-scoped invoice KPI.
+        "company_code":       random.choice(("1001", "1002", "1003")),
         "document_type":      "KR",
         "vendor_invoice_ref": f"INV-{inv_date.year}-{random.randint(1000,9999)}",
         "vendor_invoice_date": fd(inv_date),
@@ -795,6 +966,7 @@ for i in range(3):
         "invoice_doc":        str(gen_inv_counter),
         "invoice_year":       str(inv_date.year),
         "vendor":             vendor,
+        "company_code":       random.choice(("1001", "1002", "1003")),
         "document_type":      "RN",   # cancellation doc type
         "vendor_invoice_ref": f"CANCEL-{random.randint(1000,9999)}",
         "vendor_invoice_date": fd(inv_date),
@@ -816,8 +988,6 @@ pay_rows = []
 pay_counter = 2900100000
 
 for clr_doc, (inv_id, inv_year, amt, vendor, due_date) in pay_inv_map.items():
-    pay_counter += random.randint(1, 50)
-
     # 75% on time, 25% late
     if random.random() < 0.75:
         pay_date = add(due_date, random.randint(-5, 0))
@@ -834,9 +1004,13 @@ for clr_doc, (inv_id, inv_year, amt, vendor, due_date) in pay_inv_map.items():
     discount = round(amt * 0.005, 2) if random.random() < 0.08 else 0.0
 
     pay_rows.append({
-        "payment_doc":     str(pay_counter),
+        # payment_doc is the invoice's clearing document. These were separate
+        # series (29001... vs 2900...), so clearing_doc = payment_doc matched
+        # nothing and no invoice could ever be tied to its payment.
+        "payment_doc":     clr_doc,
         "payment_year":    str(pay_date.year),
         "vendor":          vendor,
+        "company_code":    _inv_cc_by_doc.get(inv_id, "1001"),
         "document_type":   random.choice(["ZP", "ZP", "KZ"]),
         "posting_date":    fd(pay_date),
         "clearing_date":   fd(pay_date),
@@ -848,7 +1022,13 @@ for clr_doc, (inv_id, inv_year, amt, vendor, due_date) in pay_inv_map.items():
         "house_bank":      random.choice(["HDFC1", "ICIC1", "SBIN1"]),
     })
 
-# 2 Payment-before-GRN anomaly
+# 2 Payment-before-GRN anomaly.
+# The payment has to reference a REAL invoice doc: the detector reaches payment
+# through payment_dump.cleared_invoice -> invoice_dump.invoice_doc ->
+# invoice_dump.po_reference, so a synthetic "PREPAY_..." cleared_invoice joined
+# to nothing and PAYMENT_BEFORE_GRN could never fire.
+_po_to_inv = {r["po_reference"]: r["invoice_doc"] for r in inv_general_rows
+              if r.get("po_reference")}
 pbg_targets = [p for p in po_rows
                if f"{p['purchasing_document']}|{p['item']}" in grn_po_map][:2]
 for pb in pbg_targets:
@@ -861,13 +1041,15 @@ for pb in pbg_targets:
         "payment_doc":     str(pay_counter),
         "payment_year":    str(early_pay.year),
         "vendor":          pb["vendor"],
+        "company_code":    pb["company_code"],
         "document_type":   "ZP",
         "posting_date":    fd(early_pay),
         "clearing_date":   fd(early_pay),
         "payment_method":  "T",
         "amount_local_ccy": float(pb["net_order_value"]),
         "discount_taken":  0,
-        "cleared_invoice": f"PREPAY_{pb['purchasing_document']}_{pb['item']}",
+        "cleared_invoice": _po_to_inv.get(pb["purchasing_document"],
+                                         f"PREPAY_{pb['purchasing_document']}_{pb['item']}"),
         "bank_reference":  f"HDFC{early_pay.strftime('%Y%m%d')}{random.randint(10000,99999)}",
         "house_bank":      "HDFC1",
     })
@@ -947,9 +1129,11 @@ for pr in released_prs[:25]:
             str(round(float(pr["valuation_price"]) * 0.92, 2)),
             str(pr["valuation_price"]))
 
-# Vendor master changes (KRED)
-for v in VENDORS[:6]:
-    chg_date = d(FY_START, FY_END)
+# Vendor master changes (KRED).
+# Dated inside March 2023: VENDOR_MASTER_CHANGES is an MTD KPI, so changes
+# scattered across the fiscal year never showed up in it.
+for _i, v in enumerate(VENDORS[:6]):
+    chg_date = add(MTD_ANCHOR, 3 + _i * 2)
     add_chg("KRED", v["vendor"], random.choice(BUYERS),
             chg_date, "XK01", "LFA1", "ZTERM", "U",
             "N030", v["payment_terms"])
@@ -994,7 +1178,7 @@ write_csv("04_GRN_Dump.csv",           grn_rows)
 write_csv("05_PO_Invoice_Dump.csv",    po_inv_rows)
 write_csv("06_Invoice_Dump.csv",       inv_general_rows)
 write_csv("07_Payment_Dump.csv",       pay_rows)
-write_csv("08_Vendor_Master.csv",      VENDORS)
+write_csv("08_Vendor_Master.csv",      VENDORS_OUT)
 write_csv("09_Change_Log.csv",         chg_rows)
 write_csv("company_plant_master.csv",  PLANT_MASTER)
 
