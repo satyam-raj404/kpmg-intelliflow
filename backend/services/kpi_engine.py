@@ -1637,9 +1637,9 @@ def _utilization_materials(conn, FY: str, company_code: str = "ALL") -> None:
     try:
         open_val = _run(conn, f"""
             SELECT SUM(f.po_net_value - COALESCE(f.grn_amount,0))
-            FROM pr_po_grn_invoice f
-            WHERE f.po_deletion_indicator NOT IN ('L','X')
-              AND COALESCE(f.grn_amount,0) < f.po_net_value * 0.95
+              FROM pr_po_grn_invoice f
+              WHERE (f.po_deletion_indicator IS NULL OR f.po_deletion_indicator NOT IN ('L','X'))
+                AND COALESCE(f.grn_amount,0) < f.po_net_value * 0.95
               AND f.po_net_value > 0
               {("AND f.company_code = '" + company_code + "'") if company_code != "ALL" else ""}
         """)
@@ -1696,8 +1696,8 @@ def _utilization_materials(conn, FY: str, company_code: str = "ALL") -> None:
                            THEN 1 END) * 100.0 / NULLIF(COUNT(CASE WHEN f.grn_amount > 0 THEN 1 END),0)
             FROM pr_po_grn_invoice f
             LEFT JOIN po_categorization c ON f.purchasing_document=c.purchasing_document AND f.item=c.item
-            WHERE f.po_deletion_indicator NOT IN ('L','X')
-              AND (c.po_category IS NULL OR c.po_category='MATERIAL')
+              WHERE (f.po_deletion_indicator IS NULL OR f.po_deletion_indicator NOT IN ('L','X'))
+                AND (c.po_category IS NULL OR c.po_category='MATERIAL')
               {("AND f.company_code = '" + company_code + "'") if company_code != "ALL" else ""}
         """).fetchone()
         _upsert(conn, "utilization", "MAT_3WAY_MATCH", "3-Way Match Rate (Materials %)",

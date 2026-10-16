@@ -322,6 +322,28 @@ for pr in released_prs:
 if tmp:
     groups.append(tmp)
 
+# Give each SOD victim its own PO document. Two victims can land in the same
+# group, and a group produces a single PO, so three violations collapsed into two
+# documents and the third company showed zero. Split multi-victim groups, then
+# hoist them to the front: only groups[:130] become POs, so a victim in the tail
+# is dropped entirely. Stable sort keeps every other group in its original order.
+def _is_victim(p):
+    return f"{p['purchase_requisition']}|{p['item_of_requisition']}" in sod_req_pr_keys
+
+
+_split_groups = []
+for _g in groups:
+    _vics = [p for p in _g if _is_victim(p)]
+    if len(_vics) > 1:
+        _rest = [p for p in _g if not _is_victim(p)]
+        _split_groups.extend([[v] for v in _vics])
+        if _rest:
+            _split_groups.append(_rest)
+    else:
+        _split_groups.append(_g)
+groups = _split_groups
+groups.sort(key=lambda g: 0 if any(_is_victim(p) for p in g) else 1)
+
 deleted_po_set = set()
 
 for grp in groups[:130]:
@@ -548,6 +570,12 @@ MTD_ANCHOR = date(2023, 3, 1)
 
 # (a) ── company split: 65% / 25% / 10% over sorted purchasing documents ──────
 _po_docs = sorted({r["purchasing_document"] for r in po_rows})
+# Shuffle before banding. Document numbers are issued in chronological order, so
+# banding the sorted list put company 1001 on every early document and 1003 on
+# every late one -- 1001 ended up with no POs in March at all and its MTD KPIs
+# read zero. Shuffling decouples company from date so each company spans the
+# whole fiscal year.
+random.shuffle(_po_docs)
 _cut1 = int(len(_po_docs) * 0.65)
 _cut2 = int(len(_po_docs) * 0.90)
 _po_cc = {}
@@ -557,17 +585,47 @@ for _i, _doc in enumerate(_po_docs):
 for r in po_rows:
     r["company_code"] = _po_cc[r["purchasing_document"]]
 
-# PRs inherit the company of the PO that consumed them; PRs with no PO (and the
-# orphan PRs added below) default to 1001. Without this column pr_dump.company_code
-# is NULL and every company-scoped PR KPI returns nothing.
+# Pin one SOD-violating PO per company. The three violations otherwise landed in
+# whichever company their requisitions happened to be banded into, so
+# SOD_PO_CREATE_RELEASE read zero for the other two. Pinning here (before the PR
+# inheritance loop below) keeps PO and PR company codes consistent.
+_sod_pr_keys = set(sod_req_pr_keys.keys())
+_sod_pos = [r for r in po_rows
+            if f"{r['purchase_requisition']}|{r['item_of_requisition']}" in _sod_pr_keys
+            and r["deletion_indicator"] != "L"]
+for _cc, _po in zip(("1001", "1002", "1003"), _sod_pos[:3]):
+    _po["company_code"] = _cc
+
+# Guarantee one negotiated saving per company. The 8% discount is rolled per
+# PR-linked line, and the smallest company only has ~20 such lines, so whether
+# NEGOTIATION_SAVINGS was non-zero there was a coin flip. Force one line down.
+for _cc in ("1001", "1002", "1003"):
+    _cand = [r for r in po_rows
+             if r.get("company_code") == _cc
+             and r.get("purchase_requisition")
+             and r["deletion_indicator"] != "L"]
+    if _cand:
+        _t = _cand[0]
+        _np = round(float(_t["net_order_price"]) * 0.88, 2)
+        _t["net_order_price"] = _np
+        _t["net_order_value"] = round(_np * float(_t["order_quantity"]), 2)
+
+# PRs inherit the company of the PO that consumed them. A PR with no PO used to
+# default to 1001, which left company 1003 with zero requisitions and every
+# PR-scoped KPI blank for it. Unconsumed PRs are now dealt round-robin over the
+# three companies so each one has a requisition population.
 _pr_cc = {}
 for r in po_rows:
     if r["purchase_requisition"]:
         _pr_cc.setdefault((r["purchase_requisition"], r["item_of_requisition"]),
                           r["company_code"])
+_default_cc = ("1001", "1001", "1002", "1003")
+_free = 0
 for r in pr_rows:
     r["company_code"] = _pr_cc.get(
-        (r["purchase_requisition"], r["item_of_requisition"]), "1001")
+        (r["purchase_requisition"], r["item_of_requisition"]),
+        _default_cc[_free % len(_default_cc)])
+    _free += 1
 
 # Vendor master must hold one row per vendor per company, otherwise a
 # vendor-scoped join finds nothing. (UNIQUE(vendor, company_code) in schema.sql.)
@@ -581,8 +639,60 @@ VENDORS_OUT = vendor_rows_out
 
 # (b) ── anomalies inside the March 2023 reporting month ──────────────────────
 
-# PO deletions dated inside MTD -> PO_DELETION_MTD
-_del_targets = [r for r in po_rows if r["deletion_indicator"] != "L"][:6]
+# PO deletions dated inside MTD -> PO_DELETION_MTD.
+# Skip POs built from an SOD-violation PR: those get created_by = the PR's
+# requisitioner so that change_log EKKO/FRGZU matches po.created_by, and a
+# deletion is filtered out by the same NOT IN predicate most KPIs use. Deleting
+# one silently switches SOD_PO_CREATE_RELEASE back to zero.
+_sod_pr_keys = set(sod_req_pr_keys.keys())
+
+
+def _del_eligible(r):
+    return (r["deletion_indicator"] != "L"
+            and f"{r['purchase_requisition']}|{r['item_of_requisition']}" not in _sod_pr_keys)
+
+
+# Two deletions per company. Taking the first six in file order concentrated all
+# of them on one company -- and on 1003 they landed on its only March POs, which
+# zeroed PO_COUNT_MTD and TOTAL_PO_VALUE_MTD for that company.
+#
+# Guarantee March volume first. POs are drawn uniformly across twelve months, so
+# the smallest company can end up with one or two March documents; the two
+# deletions then take both of them. These clones are pinned to a company (they
+# bypass the shuffled banding above) and to March, so there is always something
+# left for the deletions to land on. Values and vendors are varied so they do not
+# read as duplicates to DUPLICATE_PO_COUNT.
+_march_pool = [r for r in po_rows if _del_eligible(r)]
+if _march_pool:
+    _seed_po = _march_pool[0]
+    for _cc in ("1001", "1002", "1003"):
+        for _n in range(3):
+            _v = random.choice(VENDORS)["vendor"]
+            _vname = VENDOR_MAP[_v]["vendor_name"]
+            _dt = date(2023, 3, 2) + timedelta(days=random.randint(0, 22))
+            _qty = round(random.uniform(2.0, 60.0), 3)
+            _price = round(random.uniform(40_000, 900_000), 2)
+            _cl = dict(_seed_po)
+            _cl["purchasing_document"] = f"29700{_cc[-1]}{_n:02d}"
+            _cl["company_code"] = _cc
+            _cl["document_date"] = fd(_dt)
+            _cl["created_on"] = fd(_dt)
+            _cl["vendor"] = _v
+            _cl["vendor_name"] = _vname
+            _cl["net_order_price"] = _price
+            _cl["net_order_value"] = round(_price * _qty, 2)
+            _cl["order_quantity"] = _qty
+            _cl["created_by"] = random.choice(BUYERS)
+            _cl["purchase_requisition"] = ""
+            _cl["item_of_requisition"] = ""
+            _cl["deletion_indicator"] = ""
+            _cl["delivery_completed"] = ""
+            po_rows.append(_cl)
+
+_del_targets = []
+for _cc in ("1001", "1002", "1003"):
+    _del_targets += [r for r in po_rows
+                     if r.get("company_code") == _cc and _del_eligible(r)][:2]
 for _k, _r in enumerate(_del_targets):
     _dt = add(MTD_ANCHOR, 4 + _k * 3)          # 03-05 .. 03-20, all <= REF_DATE
     _r["deletion_indicator"] = "L"
@@ -605,7 +715,10 @@ _bucket_release_dates = [
     date(2023, 2, 28),   # 8-30d
 ]
 _next_pr = 10900000
-for _bd in _bucket_release_dates:
+# Two orphan PRs per company, so OPEN_PR_AGING is populated whichever company
+# the demo viewer has selected rather than only for the default 1001.
+_orphan_ccs = ["1001", "1002", "1003", "1001", "1002", "1003"]
+for _bd, _occ in zip(_bucket_release_dates, _orphan_ccs):
     _next_pr += random.randint(1, 9)
     _vid = random.choice(VENDORS)["vendor"]
     _mg = random.choice(list(MATERIAL_GROUPS.keys()))
@@ -627,14 +740,20 @@ for _bd in _bucket_release_dates:
         "release_date":         fd(_bd),
         "requisitioner":        random.choice(BUYERS),
         "tracking_number":      f"TR{_next_pr}001",
-        "company_code":         _pr_cc.get((str(_next_pr), "00010"), "1001"),
+        "company_code":         _occ,
     })
 
 # Duplicate PO groups: two documents sharing company + material group + vendor +
 # value + qty + date -> DUPLICATE_PO_COUNT.
+# One group per company. Taking fixed offsets into the PO list put all three in
+# whichever company those offsets happened to fall in, leaving the other two
+# companies with a zero on that card.
 _dup_src = [r for r in po_rows if r["deletion_indicator"] != "L"]
-for _k in range(3):
-    _src = _dup_src[_k * 17]
+_by_cc = {}
+for _r in _dup_src:
+    _by_cc.setdefault(_r.get("company_code"), []).append(_r)
+for _k, _cc in enumerate(("1001", "1002", "1003")):
+    _src = _by_cc[_cc][0]
     _clone = dict(_src)
     _clone["purchasing_document"] = f"2990000{_k:03d}"
     _clone["created_by"] = random.choice(BUYERS)
@@ -758,6 +877,10 @@ for po in po_rows:
         "movement_type":       "101",
         "debit_credit_ind":    "S",
         "company_code":        po["company_code"],
+        # SOD_PO_GRN compares po.created_by with grn.created_by. Without this the
+        # column falls back to the schema default 'SYSTEM' for every posting and
+        # the KPI can never match.
+        "created_by":          po["created_by"],
         "posting_date":        fd(posting_date),
         # Goods receipt lands a few days after the expected delivery date, so
         # the vendor lead-time average lands slightly late instead of averaging
@@ -802,8 +925,11 @@ po_inv_rows = []
 inv_doc_counter = 5105000000
 po_inv_map = {}   # po+item → list of invoice_doc
 
-# 2 duplicate invoice targets
-dup_grn_indices = [5, 30]
+# One duplicate invoice per company. Emitting from the Nth invoiced GRN of each
+# company (rather than from fixed list offsets) guarantees the target actually
+# produced an invoice row -- offsets could land on a GRN that the 10%
+# not-yet-invoiced skip dropped, leaving that company at zero duplicates.
+_inv_seen_by_cc = {}
 
 for gi, grn in enumerate(grn_rows):
     if grn["debit_credit_ind"] == "H":
@@ -824,6 +950,10 @@ for gi, grn in enumerate(grn_rows):
 
     pk = f"{grn['purchasing_document']}|{grn['item']}"
     inv_year = str(inv_date.year)
+    # First invoice actually emitted for each company becomes its duplicate pair.
+    _cc_seen = _inv_seen_by_cc.get(grn.get("company_code"), 0)
+    _inv_seen_by_cc[grn.get("company_code")] = _cc_seen + 1
+    _is_dup = _cc_seen == 0
 
     row = {
         "purchasing_document": grn["purchasing_document"],
@@ -839,12 +969,16 @@ for gi, grn in enumerate(grn_rows):
         "quantity":            grn["quantity"],
         "amount_local_ccy":    inv_amt,
         "reference_doc":       f"INV-{inv_date.year}-{random.randint(1000,9999)}",
+        # SOD_GRN_INVOICE compares grn.created_by with inv.created_by. Without
+        # this column both sides fell back to the schema default 'SYSTEM' and the
+        # check passed on every row by accident rather than by a real match.
+        "created_by":          grn["created_by"],
     }
     po_inv_rows.append(row)
     po_inv_map.setdefault(pk, []).append(inv_doc)
 
     # Embed duplicate: same row, different inv_doc
-    if gi in dup_grn_indices:
+    if _is_dup:
         inv_doc_counter += 1
         dup_row = dict(row)
         dup_row["invoice_doc"] = str(inv_doc_counter)
@@ -952,6 +1086,8 @@ for i in range(30):
     })
 
 # 3 Cancelled invoices (RN doc type, negative or zero amounts)
+# One per company: random.choice left a company with no cancellation at all, so
+# INVOICE_CANCELLATION_RATE read zero there.
 for i in range(3):
     gen_inv_counter += random.randint(2, 10)
     vendor   = random.choice(["700100", "700200", "700400"])
@@ -966,7 +1102,7 @@ for i in range(3):
         "invoice_doc":        str(gen_inv_counter),
         "invoice_year":       str(inv_date.year),
         "vendor":             vendor,
-        "company_code":       random.choice(("1001", "1002", "1003")),
+        "company_code":       ("1001", "1002", "1003")[i % 3],
         "document_type":      "RN",   # cancellation doc type
         "vendor_invoice_ref": f"CANCEL-{random.randint(1000,9999)}",
         "vendor_invoice_date": fd(inv_date),
