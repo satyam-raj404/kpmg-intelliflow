@@ -591,6 +591,9 @@ CREATE TABLE IF NOT EXISTS material_license_cost (
     created_at          TEXT DEFAULT NOW()::TEXT,
     notes               TEXT DEFAULT ''
 );
+-- Without this key seed_utilization_data.py's ON CONFLICT is inert and every
+-- run appends another set of duplicate royalty rows.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mlc_uniq ON material_license_cost(purchasing_document, item, license_type);
 CREATE INDEX IF NOT EXISTS idx_mlc_po      ON material_license_cost(purchasing_document, item);
 CREATE INDEX IF NOT EXISTS idx_mlc_type    ON material_license_cost(license_type);
 

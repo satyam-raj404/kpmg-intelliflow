@@ -835,6 +835,7 @@ def _leadership(conn, FY, MTD, high_value_threshold, cc_cfg: str = "", company_c
                        * CASE WHEN i.debit_credit_ind = 'S' THEN 1.0 ELSE -1.0 END) AS total_amount
             FROM invoice_dump i
             LEFT JOIN vendor_master v ON i.vendor = v.vendor
+                AND v.company_code = i.company_code
             WHERE i.document_type IN ('RE','KR')
               AND (i.reverse_invoice IS NULL OR i.reverse_invoice = '')
               AND i.invoice_doc NOT IN (
@@ -887,6 +888,7 @@ def _leadership(conn, FY, MTD, high_value_threshold, cc_cfg: str = "", company_c
                    SUM(CAST(po.net_order_value AS REAL)) AS spend
             FROM po_dump po
             LEFT JOIN vendor_master vm ON po.vendor = vm.vendor
+                AND vm.company_code = po.company_code
             WHERE (po.deletion_indicator IS NULL OR po.deletion_indicator <> 'L')
               AND {_cc_po}
             GROUP BY po.vendor
@@ -939,6 +941,7 @@ def _leadership(conn, FY, MTD, high_value_threshold, cc_cfg: str = "", company_c
                    ROUND(ss.total_value::NUMERIC, 2)
             FROM ss
             LEFT JOIN vendor_master vm ON ss.vendor_code = vm.vendor
+                AND vm.company_code = ss.company_code
             ORDER BY ss.total_value DESC
             LIMIT 20
         """).fetchall()
@@ -1297,6 +1300,7 @@ def _vendor(conn, FY, MTD, cc_cfg: str = "", company_code: str = "ALL"):
             JOIN po_dump po ON po.purchasing_document = pd.purchasing_document
                            AND po.item               = pd.item
             LEFT JOIN vendor_master vm ON po.vendor = vm.vendor
+                AND vm.company_code = po.company_code
             WHERE pd.expected_delivery_date IS NOT NULL AND pd.expected_delivery_date != ''
               AND (po.deletion_indicator IS NULL OR po.deletion_indicator NOT IN ('L','X'))
               AND {_cc_sql}
@@ -1357,6 +1361,7 @@ def _vendor(conn, FY, MTD, cc_cfg: str = "", company_code: str = "ALL"):
                    SUM(CAST(po.net_order_value AS REAL)) AS spend
             FROM po_dump po
             LEFT JOIN vendor_master vm ON po.vendor = vm.vendor
+                AND vm.company_code = po.company_code
             WHERE (po.deletion_indicator IS NULL OR po.deletion_indicator NOT IN ('L','X'))
               AND {_cc_sql}
             GROUP BY po.vendor
@@ -2013,6 +2018,7 @@ def compute_chart_data(conn: Any, dashboard: str) -> list[dict]:
                        COUNT(*) AS invoice_count
                 FROM invoice_dump i
                 LEFT JOIN vendor_master v ON i.vendor = v.vendor
+                    AND v.company_code = i.company_code
                 WHERE i.document_type IN ('RE','KR')
                   AND CAST(i.amount_local_ccy AS REAL) > 0
                   AND i.posting_date >= {cutoff}
@@ -2029,6 +2035,7 @@ def compute_chart_data(conn: Any, dashboard: str) -> list[dict]:
                        COUNT(*) AS invoice_count
                 FROM invoice_dump i
                 LEFT JOIN vendor_master v ON i.vendor = v.vendor
+                    AND v.company_code = i.company_code
                 WHERE i.document_type IN ('RE','KR')
                   AND CAST(i.amount_local_ccy AS REAL) > 0
                   AND i.posting_date >= {cutoff}

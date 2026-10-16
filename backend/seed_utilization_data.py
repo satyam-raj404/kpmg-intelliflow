@@ -212,7 +212,12 @@ else:
                             (purchasing_document, item, license_type, license_fee_inr,
                              fee_basis, fee_pct, vendor, validity_start, validity_end, created_by)
                         VALUES (%s,%s,%s,%s,'PERCENTAGE',3.5,%s,'2024-04-01','2025-03-31','SYSTEM')
-                        ON CONFLICT DO NOTHING
+                        ON CONFLICT (purchasing_document, item, license_type) DO UPDATE SET
+                            license_fee_inr = EXCLUDED.license_fee_inr,
+                            vendor          = EXCLUDED.vendor,
+                            fee_pct         = EXCLUDED.fee_pct,
+                            validity_start  = EXCLUDED.validity_start,
+                            validity_end    = EXCLUDED.validity_end
                     """, (po_doc, item, lic_type, fee, vendor or 'UNKNOWN'))
                     lic_count += 1
                 except Exception:

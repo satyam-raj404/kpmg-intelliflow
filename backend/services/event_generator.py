@@ -116,11 +116,9 @@ def generate_events(conn: Any) -> None:
     late_payment_pos = set()
     try:
         rows = conn.execute("""
-            SELECT pi.purchasing_document FROM po_invoice_dump pi
-            JOIN invoice_dump inv ON pi.invoice_doc = inv.invoice_doc
-              AND pi.invoice_year = inv.invoice_year
-            JOIN payment_dump pay ON inv.invoice_doc = pay.cleared_invoice
-            WHERE pay.clearing_date > inv.due_date
+              SELECT DISTINCT inv.po_reference AS purchasing_document FROM invoice_dump inv
+              JOIN payment_dump pay ON inv.invoice_doc = pay.cleared_invoice
+              WHERE pay.clearing_date > inv.due_date
         """).fetchall()
         late_payment_pos = {r[0] for r in rows}
     except Exception:
@@ -130,11 +128,10 @@ def generate_events(conn: Any) -> None:
     payment_before_grn_pos = set()
     try:
         rows = conn.execute("""
-            SELECT pi.purchasing_document FROM po_invoice_dump pi
-            JOIN invoice_dump inv ON pi.invoice_doc = inv.invoice_doc
-            JOIN payment_dump pay ON inv.invoice_doc = pay.cleared_invoice
-            JOIN pr_po_grn_invoice f ON pi.purchasing_document = f.purchasing_document
-            WHERE pay.posting_date < f.grn_posting_date
+              SELECT DISTINCT inv.po_reference AS purchasing_document FROM invoice_dump inv
+              JOIN payment_dump pay ON inv.invoice_doc = pay.cleared_invoice
+              JOIN pr_po_grn_invoice f ON inv.po_reference = f.purchasing_document
+              WHERE pay.posting_date < f.grn_posting_date
         """).fetchall()
         payment_before_grn_pos = {r[0] for r in rows}
     except Exception:
@@ -174,10 +171,10 @@ def generate_events(conn: Any) -> None:
         pay_date = None
         try:
             r = conn.execute("""
-                SELECT MIN(pay.posting_date) FROM po_invoice_dump pi
-                JOIN invoice_dump inv ON pi.invoice_doc = inv.invoice_doc
-                JOIN payment_dump pay ON inv.invoice_doc = pay.cleared_invoice
-                WHERE pi.purchasing_document = ? AND pi.item = ?
+                  SELECT MIN(pay.posting_date) FROM po_invoice_dump pi
+                  JOIN invoice_dump inv ON inv.po_reference = pi.purchasing_document
+                  JOIN payment_dump pay ON inv.invoice_doc = pay.cleared_invoice
+                  WHERE pi.purchasing_document = ? AND pi.item = ?
             """, (po, item)).fetchone()
             if r and r[0]:
                 pay_date = r[0]

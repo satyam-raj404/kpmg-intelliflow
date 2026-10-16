@@ -146,15 +146,17 @@ def build_facts(conn: Any) -> None:
                      ELSE 0 END),
             MIN(CASE WHEN inv.debit_credit_ind = 'S' THEN inv.posting_date END),
 
-            -- Due date from invoice_dump (via po_invoice_dump → invoice_dump join)
+            -- Due date from invoice_dump, joined on po_reference.
+            -- The old path went po_invoice_dump -> invoice_dump on
+            -- (invoice_doc, invoice_year), but those two tables carry
+            -- UNRELATED document-number series in the SAP export, so that join
+            -- matched 0 rows and invoice_due_date was NULL for every fact row.
+            -- invoice_dump.po_reference is the real PO <-> invoice link.
             (SELECT MIN(id_ref.due_date)
-             FROM po_invoice_dump pi_ref
-             JOIN invoice_dump id_ref
-               ON pi_ref.invoice_doc  = id_ref.invoice_doc
-              AND pi_ref.invoice_year = id_ref.invoice_year
-             WHERE pi_ref.purchasing_document = po.purchasing_document
-               AND pi_ref.item               = po.item
-               AND pi_ref.debit_credit_ind   = 'S'),
+             FROM invoice_dump id_ref
+             WHERE id_ref.po_reference = po.purchasing_document
+               AND id_ref.document_type IN ('RE','KR')
+               AND id_ref.debit_credit_ind = 'S'),
 
             -- Maverick flag: 1 if no upstream PR
             MAX(CASE WHEN po.purchase_requisition IS NULL
@@ -254,12 +256,10 @@ def build_facts(conn: Any) -> None:
                 WHEN invoice_due_date IS NOT NULL
                 THEN (
                     SELECT (MIN(pay.posting_date)::DATE - invoice_due_date::DATE)
-                    FROM po_invoice_dump pi
-                    JOIN invoice_dump id ON pi.invoice_doc = id.invoice_doc
-                                       AND pi.invoice_year = id.invoice_year
-                    JOIN payment_dump pay ON id.clearing_doc = pay.payment_doc
-                    WHERE pi.purchasing_document = pr_po_grn_invoice.purchasing_document
-                      AND pi.item               = pr_po_grn_invoice.item
+                    FROM invoice_dump id
+                    JOIN payment_dump pay ON pay.cleared_invoice = id.invoice_doc
+                    WHERE id.po_reference = pr_po_grn_invoice.purchasing_document
+                      AND id.document_type IN ('RE','KR')
                     LIMIT 1
                 )
                 ELSE NULL END,
@@ -268,11 +268,10 @@ def build_facts(conn: Any) -> None:
                 WHEN pr_release_date IS NOT NULL
                 THEN (
                     SELECT (MIN(pay.posting_date)::DATE - pr_po_grn_invoice.pr_release_date::DATE)
-                    FROM po_invoice_dump pi
-                    JOIN invoice_dump id ON pi.invoice_doc = id.invoice_doc
-                                       AND pi.invoice_year = id.invoice_year
-                    JOIN payment_dump pay ON id.clearing_doc = pay.payment_doc
-                    WHERE pi.purchasing_document = pr_po_grn_invoice.purchasing_document
+                    FROM invoice_dump id
+                    JOIN payment_dump pay ON pay.cleared_invoice = id.invoice_doc
+                    WHERE id.po_reference = pr_po_grn_invoice.purchasing_document
+                      AND id.document_type IN ('RE','KR')
                     LIMIT 1
                 )
                 ELSE CASE

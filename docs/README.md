@@ -17,6 +17,7 @@ Everything in this folder. Grouped by lifecycle:
 | Document | What it covers |
 |---|---|
 | [FEATURES.md](FEATURES.md) | Every page, dashboard, KPI, the P2P lifecycle, process mining, the AI harness, reports, and a candid list of what is advertised but not implemented. |
+| [FEATURE_GUIDE.md](FEATURE_GUIDE.md) | What each feature does, how it works, and what every KPI on every dashboard means. |
 | [../AGENTS.md](../AGENTS.md) | Conventions, verification commands, and the silent-failure traps — read this before changing code. |
 | [../README.md](../README.md) | User-facing pitch and quick start. |
 
