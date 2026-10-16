@@ -936,7 +936,7 @@ def _leadership(conn, FY, MTD, high_value_threshold, cc_cfg: str = "", company_c
             )
             SELECT ss.company_code, ss.material_description, ss.vendor_code,
                    COALESCE(vm.vendor_name, ss.vendor_code) AS vendor_name,
-                   ROUND(ss.total_value, 2)
+                   ROUND(ss.total_value::NUMERIC, 2)
             FROM ss
             LEFT JOIN vendor_master vm ON ss.vendor_code = vm.vendor
             ORDER BY ss.total_value DESC
@@ -1462,7 +1462,14 @@ def _auto_categorize(conn) -> None:
                     break
             if matched_sub:
                 lic = matched_sub if matched_sub in ('SUBSCRIPTION','PERPETUAL','ROYALTY','IMPORT_LIC') else ''
-                conn.execute("""
+            else:
+                # No software keyword matched. Previously this branch inserted
+                # nothing, so po_categorization stayed empty for a dataset with
+                # no software POs — which left every PO uncategorised and made
+                # the MATERIAL KPIs (po_category IS NULL branch) measure the
+                # wrong thing. Record the MATERIAL classification too.
+                lic = ''
+            conn.execute("""
                     INSERT INTO po_categorization
                         (purchasing_document, item, po_category, sub_category,
                          capex_opex_flag, license_type, tagged_by, tagged_at)
@@ -1735,7 +1742,7 @@ def _utilization_materials(conn, FY: str, company_code: str = "ALL") -> None:
         """).fetchall()
         cat_list = [{"cat": r[0], "spend_cr": round((r[1] or 0)/1e7,2), "po_count": int(r[2] or 0)} for r in cat_rows]
         _upsert(conn, "utilization", "MAT_CAT_BREAKDOWN", "Material Spend by Category",
-                None, json.dumps(cat_list), "json")
+                    None, json.dumps(cat_list), "json", company_code=company_code)
     except Exception:
         try: conn.rollback()
         except Exception: pass
@@ -1861,12 +1868,15 @@ def _utilization(conn, FY, MTD, company_code: str = "ALL"):
     # U13 — CAPEX/OPEX by Plant (JSON)
     try:
         rows = conn.execute(f"""
-            SELECT plant,
-                   SUM(CASE WHEN {CAPEX_FLAG} THEN CAST(net_order_value AS REAL) ELSE 0 END) AS capex,
-                   SUM(CASE WHEN {OPEX_FLAG}  THEN CAST(net_order_value AS REAL) ELSE 0 END) AS opex
-            FROM po_dump
-            WHERE {NOT_DELETED}{CC}
-            GROUP BY plant ORDER BY (capex + opex) DESC
+            WITH by_plant AS (
+                SELECT plant,
+                       SUM(CASE WHEN {CAPEX_FLAG} THEN CAST(net_order_value AS REAL) ELSE 0 END) AS capex,
+                       SUM(CASE WHEN {OPEX_FLAG}  THEN CAST(net_order_value AS REAL) ELSE 0 END) AS opex
+                FROM po_dump
+                WHERE {NOT_DELETED}{CC}
+                GROUP BY plant
+            )
+            SELECT plant, capex, opex FROM by_plant ORDER BY (capex + opex) DESC
         """).fetchall()
         by_plant = [{"plant": r[0],
                      "capex": round(r[1], 2),
@@ -1877,9 +1887,10 @@ def _utilization(conn, FY, MTD, company_code: str = "ALL"):
     except Exception:
         pass
 
-    # Auto-categorize uncategorised POs (always global — no company filter needed)
-    if company_code == "ALL":
-        _auto_categorize(conn)
+    # NOTE: _auto_categorize() is invoked once by compute_all() *before* the
+    # per-company loop. It used to run here on the "ALL" pass, which meant the
+    # 1001/1002/1003 passes computed MATERIAL/SW KPIs against an unpopulated
+    # po_categorization table on a cold database.
 
     _utilization_software(conn, FY, company_code=company_code)
     _utilization_materials(conn, FY, company_code=company_code)
@@ -2145,8 +2156,10 @@ def compute_all(conn: Any) -> None:
     ).fetchall()
     for (cc,) in _cc_rows_procurement:
         _procurement(conn, FY, MTD, high_val, ref_date, cc_cfg=cc, company_code=cc)
+        conn.commit()
     _procurement(conn, FY, MTD, high_val, ref_date,
                  cc_cfg=overall_cc_cfg, company_code="ALL")
+    conn.commit()
 
     # Financial KPIs: run once per distinct company in invoice_dump, then once for ALL
     _cc_rows = conn.execute(
@@ -2155,7 +2168,9 @@ def compute_all(conn: Any) -> None:
     ).fetchall()
     for (cc,) in _cc_rows:
         _financial(conn, FY, MTD, cc_cfg=cc, company_code=cc)
+        conn.commit()
     _financial(conn, FY, MTD, cc_cfg=overall_cc_cfg, company_code="ALL")
+    conn.commit()
 
     # Leadership KPIs: run once per distinct company in po_dump, then once for ALL
     _cc_rows_leadership = conn.execute(
@@ -2164,9 +2179,12 @@ def compute_all(conn: Any) -> None:
     ).fetchall()
     for (cc,) in _cc_rows_leadership:
         _leadership(conn, FY, MTD, high_val, cc_cfg=cc, company_code=cc)
+        conn.commit()
     _leadership(conn, FY, MTD, high_val, cc_cfg=overall_cc_cfg, company_code="ALL")
+    conn.commit()
 
     _vendor(conn, FY, MTD)
+    conn.commit()
 
     # Vendor delivery days per company (V3 in _vendor uses cc_cfg/company_code params)
     _cc_rows_vendor = conn.execute(
@@ -2175,6 +2193,14 @@ def compute_all(conn: Any) -> None:
     ).fetchall()
     for (cc,) in _cc_rows_vendor:
         _vendor(conn, FY, MTD, cc_cfg=cc, company_code=cc)
+        conn.commit()
+
+    # Auto-categorize uncategorised POs once, globally, BEFORE any company-scoped
+    # utilization run — _utilization_materials/SW join po_categorization, so it
+    # has to exist first. Committed on its own so a failure here cannot discard
+    # the dashboards computed above.
+    _auto_categorize(conn)
+    conn.commit()
 
     _cc_rows_util = conn.execute(
         "SELECT DISTINCT company_code FROM po_dump "
@@ -2182,6 +2208,6 @@ def compute_all(conn: Any) -> None:
     ).fetchall()
     for (cc,) in _cc_rows_util:
         _utilization(conn, FY, MTD, company_code=cc)
+        conn.commit()
     _utilization(conn, FY, MTD, company_code="ALL")
-
     conn.commit()
