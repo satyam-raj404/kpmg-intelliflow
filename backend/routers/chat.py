@@ -63,8 +63,8 @@ def _persist_turn(session_id: str, user_message: str, reply: str, tools_used: li
             "UPDATE chat_sessions SET updated_at = NOW()::TEXT WHERE session_id = ?",
             (session_id,),
         )
-    # Drop the heavy base64 `preview` before persisting — the frontend re-fetches
-    # the image from `url`; storing base64 in every history row bloats the DB.
+    # Drop any heavy base64 `preview` before persisting (legacy chart_png). chart_spec
+    # artifacts keep their small `spec`, so history charts render without the file.
     slim_artifacts = [{k: v for k, v in a.items() if k != "preview"} for a in artifacts]
     conn.execute(
         "INSERT INTO chat_messages (session_id, role, content, tools_used, artifacts) VALUES (?, ?, ?, ?, ?)",

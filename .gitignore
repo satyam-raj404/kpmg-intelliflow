@@ -5,7 +5,8 @@ dist
 *.db-shm
 __pycache__
 *.pyc
-.env
+.env*
+!.env.example
 .~lock*
 .vite
 General_P2P_data/

@@ -22,6 +22,7 @@ Accuracy (Plan Part C):
     unverified figures are stripped, not trusted.
 """
 import json
+import re
 from concurrent.futures import ThreadPoolExecutor
 import threading
 
@@ -59,6 +60,10 @@ HARD RULES:
   create_report(format="pptx", source="spend_by_vendor", chart="bar", title="Top Vendors by Spend").
   Only use the start_report/add_*_section/finalize_report chain for a genuinely multi-section
   report that create_report can't express.
+- For a DETAILED / deep-dive deck or report about ONE purchase order or ONE vendor ("detailed ppt
+  on PO 2000001126 and its vendors", "full report on vendor 700300"), call create_deep_dive_report(
+  subject="po"|"vendor", id=...). It runs the full analysis itself — NEVER build such a deck from
+  find_document + create_report. After it returns, summarise its "summary" bullets; the deck is attached automatically.
 - Use at most 6 tool calls before synthesizing an answer from what you have.
 - Money-like fields (spend, value, amount, total, ...) above Rs.1 lakh come with a pre-computed
   "<field>_cr" sibling string already formatted in Cr — COPY that value verbatim, never divide by
@@ -142,6 +147,7 @@ def _build_system_prompt(user_message: str, manifest: DataManifest) -> str:
 
 
 _MONEY_KEY_HINTS = ("spend", "value", "amount", "total", "budget", "cost", "price")
+_ARTIFACT_LINK_RE = re.compile(r"!?\[[^\]]*\]\(\s*/api/chat/artifacts/[^)]*\)")
 
 
 def _add_cr_hints(row: dict) -> dict:
@@ -289,6 +295,19 @@ def _fast_path(session_id: str, user_message: str, history: list[dict], ctx: Tur
         return None
 
     budget = Budget(max_tool_calls=2)
+    if kind == "deep_dive":
+        subject, ident = value
+        info, compressed = _run_one_tool("create_deep_dive_report", {"subject": subject, "id": ident}, ctx, budget)
+        result = ctx.manifest.get(info["manifest_key"]) if info else None
+        if not isinstance(result, dict) or "error" in result:
+            err = (result or {}).get("error", "the analysis failed")
+            return _finish(ctx, history, user_message, f"I couldn't build that deck: {err}", skip_grounding=True)
+        label = f"purchase order {ident}" if subject == "po" else f"vendor {ident}"
+        analyses = "lifecycle, vendor and risk analyses" if subject == "po" else "vendor and risk analyses"
+        reply = (f"I ran the {analyses} for {label} and built a {result['slides']}-slide KPMG-style "
+                 "deck with charts, tables and recommendations (attached below).\n\n**Headline findings**\n"
+                 + "\n".join(f"- {b}" for b in result["summary"]))
+        return _finish(ctx, history, user_message, reply)
     if kind == "metric":
         cached = cache.get(value)
         if cached is not None:
@@ -371,7 +390,8 @@ def run_turn(session_id: str, user_message: str, history: list[dict]) -> dict:
                 "content": response.content or "",
                 "tool_calls": [
                     {"id": tc["id"], "type": "function",
-                     "function": {"name": tc["name"], "arguments": json.dumps(tc["arguments"])}}
+                     "function": {"name": tc["name"], "arguments": json.dumps(tc["arguments"])},
+                     **({"extra_content": tc["extra_content"]} if tc.get("extra_content") else {})}  # Gemini thought_signature
                     for tc in response.tool_calls
                 ],
             })
@@ -416,6 +436,10 @@ def _finish(ctx: TurnContext, history: list[dict], user_message: str, reply: str
             clean_reply = clean_reply.replace(token, "[unverifiable]")
         verification_summary = {"verified_numbers": verification.verified_count,
                                  "unverified_stripped": len(verification.unverified)}
+
+    # Artifacts render as cards under the reply; a model-written link/image to one
+    # is redundant (and for chart specs points at JSON, showing as broken markdown).
+    clean_reply = _ARTIFACT_LINK_RE.sub("", clean_reply).strip()
 
     # Failed report generation: the user asked for a downloadable file but no
     # report artifact was produced. Return a clear message instead of letting the

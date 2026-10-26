@@ -54,7 +54,12 @@ class DataManifest:
         items = list(self._descriptions.items())[-max_entries:]
         if not items:
             return "(none yet)"
-        return "\n".join(f"- {key}: {desc}" for key, desc in items)
+        return "\n".join(f"- {key}: {desc}{self._columns(key)}" for key, desc in items)
+
+    def _columns(self, key: str) -> str:
+        # Real column names, so a follow-up "chart that" doesn't guess them.
+        v = self._store.get(key)
+        return f" | columns: {', '.join(v[0])}" if isinstance(v, list) and v and isinstance(v[0], dict) else ""
 
     def prune(self, max_entries: int) -> None:
         """Drop oldest entries beyond max_entries — bounds memory for a

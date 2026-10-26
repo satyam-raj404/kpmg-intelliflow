@@ -25,7 +25,7 @@ class ArtifactRecord:
     session_id: str
     path: Path
     filename: str
-    kind: str  # chart_png | excel | pptx | pdf
+    kind: str  # chart_spec | chart_png | excel | pptx | pdf
     created_at: float = field(default_factory=time.time)
 
     @property

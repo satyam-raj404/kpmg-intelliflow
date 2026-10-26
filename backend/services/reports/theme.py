@@ -16,7 +16,15 @@ DARK   = "#051833"
 GREEN_OK = "#007A33"
 ORANGE_WARN = "#FF6B00"
 
-# Cycling palette for multi-series charts (bar groups, pie slices, ...)
-CHART_PALETTE = [NAVY, MED, LIGHT, TEAL, GOLD, RED, GREEN_OK, ORANGE_WARN, GRAY]
+# Neutral tokens for the KPMG-style deck (hairlines, flat panels, text greys)
+HAIRLINE = "#D8DFE9"
+PANEL    = "#F4F6FA"
+CHIP     = "#E6ECF6"
+BODY     = "#333940"
+CAPTION  = "#697280"
+TEAL_POS = "#00A3A1"   # favourable / fourth series
 
-FONT_FAMILY = "Calibri"
+# Cycling palette for multi-series charts (bar groups, pie slices, ...) — blue ladder first
+CHART_PALETTE = [NAVY, MED, LIGHT, TEAL_POS, GOLD, RED, GREEN_OK, ORANGE_WARN, GRAY]
+
+FONT_FAMILY = "Arial"

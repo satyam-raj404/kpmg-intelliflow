@@ -8,6 +8,7 @@ Three outcomes:
   - ("document", num)   -> call find_document directly (doc_type left to the
                             tool's own dispatch since prefix alone is ambiguous
                             across PO/PR/GRN/Invoice in this dataset)
+  - ("deep_dive", (subject, id)) -> create_deep_dive_report directly (deck about one PO / vendor)
   - (None, None)        -> no confident match, fall through to the full
                             agentic loop unchanged
 
@@ -28,13 +29,29 @@ _DOC_CONTEXT_RE = re.compile(
     re.IGNORECASE,
 )
 
+# "Detailed ppt on PO X / vendor Y" -> deterministic deep-dive deck (no planner loop).
+_DECK_RE = re.compile(r"\b(ppt|pptx|powerpoint|deck|slides?|presentation)\b", re.IGNORECASE)
+_NOT_DECK_RE = re.compile(r"\b(pdf|excel|xlsx|spreadsheet|csv)\b", re.IGNORECASE)
+_PO_NUMBER_RE = re.compile(r"\b(20\d{8})\b")
+_VENDOR_CODE_RE = re.compile(r"\b(\d{6})\b")
+_PO_WORD_RE = re.compile(r"\b(po|purchase order)\b", re.IGNORECASE)
+_VENDOR_WORD_RE = re.compile(r"\b(vendor|supplier)\b", re.IGNORECASE)
+
 # Report/analysis intent (chart/export/report) should NOT fast-path even if it
 # also matches a metric alias — those need the full loop to build the artifact.
 from .registry import REPORT_INTENT_KEYWORDS  # noqa: E402
 
 
-def route(question: str) -> tuple[str | None, str | None]:
+def route(question: str) -> tuple[str | None, str | tuple | None]:
     q = question.lower()
+
+    if _DECK_RE.search(question) and not _NOT_DECK_RE.search(question):
+        po = _PO_NUMBER_RE.search(question)
+        if po and _PO_WORD_RE.search(question):
+            return "deep_dive", ("po", po.group(1))
+        code = _VENDOR_CODE_RE.search(question)
+        if code and _VENDOR_WORD_RE.search(question) and not po:
+            return "deep_dive", ("vendor", code.group(1))
 
     if any(kw in q for kw in REPORT_INTENT_KEYWORDS):
         return None, None
@@ -57,6 +74,10 @@ if __name__ == "__main__":
     assert route("What happened with document 2000001004 and its GRNs?") == ("document", "2000001004")
     assert route("Chart the top vendors by spend") == (None, None)  # report intent wins
     assert route("Make a PDF report of total PO value") == (None, None)
+    assert route('Create a Detailed ppt on the PO number - "2000001126" and its Vendors') == ("deep_dive", ("po", "2000001126"))
+    assert route("make a deck on vendor 700300") == ("deep_dive", ("vendor", "700300"))
+    assert route("Make a PDF report of PO 2000001126") == (None, None)
+    assert route("create a ppt of top vendors by spend") == (None, None)
     assert route("What's the weather like today?") == (None, None)
     assert route("How many POs were touched by vendor 700200 last quarter with unusual terms?") == (None, None)
     print("router OK")

@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Send, Bot, User, Loader2, Trash2, Zap, Search, TrendingUp, AlertTriangle, Package, Clock, CreditCard, Building2, ShieldAlert, FileCheck, BadgeAlert, Users, BarChart2, Download, FileSpreadsheet, FileImage, FileText, Presentation, Library, History as HistoryIcon, Bookmark, PanelRightClose, MessageSquare, X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader } from "@/components/PageHeader";
+import { ChatChart, type ChartSpec } from "@/components/ChatChart";
 import { apiFetch } from "@/api/client";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -16,10 +17,11 @@ export const Route = createFileRoute("/ask")({
 
 interface Artifact {
   id: string;
-  type: "chart_png" | "excel" | "pptx" | "pdf" | string;
+  type: "chart_spec" | "chart_png" | "excel" | "pptx" | "pdf" | string;
   filename: string;
-  url: string;
+  url?: string;
   preview?: string;
+  spec?: ChartSpec;
 }
 
 interface Message {
@@ -110,6 +112,7 @@ function ToolBadge({ name }: { name: string }) {
     analyze_data: "Data Analysis",
     create_visual: "Chart",
     create_report: "Report",
+    create_deep_dive_report: "Deep-Dive Deck",
     start_report: "Report Draft",
     add_table_section: "Report Table",
     add_chart_section: "Report Chart",
@@ -125,6 +128,7 @@ function ToolBadge({ name }: { name: string }) {
 }
 
 const ARTIFACT_META: Record<string, { icon: typeof FileText; label: string; color: string }> = {
+  chart_spec: { icon: BarChart2, label: "Chart", color: "text-accent" },
   chart_png: { icon: FileImage, label: "Chart", color: "text-accent" },
   excel: { icon: FileSpreadsheet, label: "Excel Workbook", color: "text-success" },
   pptx: { icon: Presentation, label: "PowerPoint Deck", color: "text-warning" },
@@ -134,6 +138,14 @@ const ARTIFACT_META: Record<string, { icon: typeof FileText; label: string; colo
 function ArtifactCard({ artifact }: { artifact: Artifact }) {
   const meta = ARTIFACT_META[artifact.type] ?? { icon: FileText, label: "File", color: "text-muted-foreground" };
   const Icon = meta.icon;
+
+  if (artifact.type === "chart_spec" && artifact.spec) {
+    return (
+      <div className="rounded-lg border border-border bg-card overflow-hidden w-full max-w-xl">
+        <ChatChart spec={artifact.spec} />
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-lg border border-border bg-card overflow-hidden max-w-[320px]">
@@ -148,13 +160,15 @@ function ArtifactCard({ artifact }: { artifact: Artifact }) {
           <div className="text-[11px] font-medium text-foreground truncate">{artifact.filename}</div>
           <div className="text-[9px] text-muted-foreground">{meta.label}</div>
         </div>
-        <a
-          href={artifact.url}
-          download={artifact.filename}
-          className="h-6 w-6 rounded-md border border-border flex items-center justify-center text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors shrink-0"
-        >
-          <Download className="h-3 w-3" />
-        </a>
+        {artifact.url && (
+          <a
+            href={artifact.url}
+            download={artifact.filename}
+            className="h-6 w-6 rounded-md border border-border flex items-center justify-center text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors shrink-0"
+          >
+            <Download className="h-3 w-3" />
+          </a>
+        )}
       </div>
     </div>
   );

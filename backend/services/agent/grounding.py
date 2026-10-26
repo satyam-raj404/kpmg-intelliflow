@@ -7,6 +7,8 @@ from dataclasses import dataclass
 
 _NUMBER_RE = re.compile(r"-?\d[\d,]*(?:\.\d+)?")  # decimal only counts with digits after the dot —
                                                     # avoids swallowing a sentence-ending period
+_MONTHS = {m: i for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], 1)}
+_DATE_RE = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b|\b(\d{1,2})[- ]([A-Za-z]{3})[a-z]*[- ,]+(\d{4})\b")
 _URL_RE = re.compile(r"https?://\S+|/api/\S+")     # identifiers, not data claims — a UUID's hex
                                                     # digit-runs would otherwise look like numbers
 
@@ -30,6 +32,39 @@ def _normalize(token: str) -> float | None:
         return float(cleaned)
     except ValueError:
         return None
+
+
+def _iso_dates(text: str) -> list[tuple[tuple[int, int, int], tuple[int, int]]]:
+    """[(y, m, d), (start, end)] for every date in text, ISO or '24-Feb-2023' style."""
+    out = []
+    for m in _DATE_RE.finditer(text):
+        if m.group(1):
+            ymd = (int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        else:
+            mon = _MONTHS.get(m.group(5).lower())
+            if not mon:
+                continue
+            ymd = (int(m.group(6)), mon, int(m.group(4)))
+        out.append((ymd, m.span()))
+    return out
+
+
+def _manifest_dates(manifest_values: list) -> set[tuple[int, int, int]]:
+    found: set[tuple[int, int, int]] = set()
+
+    def walk(v):
+        if isinstance(v, str):
+            found.update(d for d, _ in _iso_dates(v))
+        elif isinstance(v, dict):
+            for x in v.values():
+                walk(x)
+        elif isinstance(v, (list, tuple)):
+            for x in v:
+                walk(x)
+
+    for v in manifest_values:
+        walk(v)
+    return found
 
 
 def _manifest_numbers(manifest_values: list) -> set[float]:
@@ -75,13 +110,23 @@ def verify_numbers(answer_text: str, manifest_values: list) -> VerificationResul
     "top 5") rather than data claims, and flagging them is pure noise.
     """
     known = _manifest_numbers(manifest_values)
+    known_dates = _manifest_dates(manifest_values)
     unverified: list[str] = []
     verified = 0
+
+    # A date is ONE claim, checked against dates present in the data — not three numbers.
+    date_spans = []
+    for ymd, span in _iso_dates(answer_text):
+        date_spans.append(span)
+        if ymd in known_dates:
+            verified += 1
+        else:
+            unverified.append(answer_text[span[0]:span[1]])
 
     url_spans = [m.span() for m in _URL_RE.finditer(answer_text)]
 
     def _inside_url(pos: int) -> bool:
-        return any(start <= pos < end for start, end in url_spans)
+        return any(start <= pos < end for start, end in url_spans + date_spans)
 
     for match in _NUMBER_RE.finditer(answer_text):
         if _inside_url(match.start()):

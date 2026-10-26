@@ -50,7 +50,7 @@ CORE_TOOL_NAMES = {
 # and, more importantly, cuts the choice space a small model has to pick from.
 REPORT_TOOL_NAMES = {
     "create_visual", "create_report", "start_report", "add_table_section",
-    "add_chart_section", "add_narrative_section", "finalize_report",
+    "add_chart_section", "add_narrative_section", "finalize_report", "create_deep_dive_report",
 }
 
 REPORT_INTENT_KEYWORDS = (
@@ -91,7 +91,7 @@ def tool_subset_for_question(question: str) -> set[str]:
 def _load_all_tool_modules() -> None:
     """Import every tools/*.py submodule so their register() calls fire.
     Idempotent — safe to call more than once (Python caches imports)."""
-    from .tools import analysis_tools, chart_tool, data_tools, report_tools  # noqa: F401
+    from .tools import analysis_tools, chart_tool, data_tools, deep_dive, report_tools  # noqa: F401
 
 
 _load_all_tool_modules()

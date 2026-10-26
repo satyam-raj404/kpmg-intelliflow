@@ -4,20 +4,35 @@ Each role has a cheap default and an escalation target. The orchestrator calls
 `resolve(role)` to get an ordered list of (provider, model) to try — first
 entry first; on ProviderUnavailable or a parse failure it tries the next.
 
-Model strings are "provider:model_id", e.g. "ollama:llama3.2" or
-"openrouter:openai/gpt-4o". This keeps the harness provider-agnostic — swap
-any tier to any OpenRouter model, or to Ollama, via env vars alone.
+Model strings are "provider:model_id", e.g. "ollama:llama3.2",
+"openrouter:openai/gpt-4o" or "gemini:google/gemini-2.5-flash". This keeps the harness
+provider-agnostic — swap any tier to any OpenRouter model, Gemini, or Ollama,
+via env vars alone.
 """
 import os
 from dataclasses import dataclass
 
 from .providers.base import LLMProvider
 from .providers.ollama import OllamaProvider
-from .providers.openrouter import OpenRouterProvider
+from .providers.openai_compat import OpenAICompatProvider
 
 _PROVIDERS: dict[str, LLMProvider] = {
     "ollama": OllamaProvider(),
-    "openrouter": OpenRouterProvider(),
+    "openrouter": OpenAICompatProvider(
+        "openrouter", "https://openrouter.ai/api/v1/chat/completions", "OPENROUTER_API_KEY",
+        extra_headers={"HTTP-Referer": "https://intellisource.kpmg.com", "X-Title": "IntelliSource P2P"},
+    ),
+    # Gemini on Vertex AI (express-mode "AQ." API key, GCP project below) via Vertex's
+    # OpenAI-compatible endpoint; the key goes in x-goog-api-key, not a Bearer token.
+    # Model ids carry the publisher prefix, e.g. "gemini:google/gemini-2.5-flash".
+    # Thinking tokens count against max_tokens, hence the larger cap and low effort.
+    "gemini": OpenAICompatProvider(
+        "gemini",
+        f"https://aiplatform.googleapis.com/v1/projects/{os.environ.get('GEMINI_PROJECT', '243936589471')}"
+        "/locations/global/endpoints/openapi/chat/completions",
+        "GEMINI_API_KEY", key_header="x-goog-api-key",
+        extra_body={"reasoning_effort": "low"}, max_tokens=8192,
+    ),
 }
 
 
