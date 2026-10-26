@@ -19,11 +19,13 @@ Every section's data is resolved from the DataManifest (or a canonical
 metric) at the moment it's added — never a model-authored number. Narrative
 text is numeric-verified before being added, same guarantee as before.
 """
+import json
+
 from ...artifacts import get_artifact, save_artifact
 from ...reports import charts
 from ...reports.excel import build_excel_report
 from ...reports.pdf import build_pdf_report
-from ...reports.pptx import build_pptx_report
+from ...reports.pptx import build_pptx_report, fmt_cell, pretty_header
 from ..context import TurnContext
 from ..grounding import verify_numbers
 from ..guardrails import GuardrailViolation
@@ -33,15 +35,6 @@ from .analysis_tools import _resolve_source
 _BUILDERS = {"excel": build_excel_report, "pptx": build_pptx_report, "pdf": build_pdf_report}
 _EXTENSIONS = {"excel": "xlsx", "pptx": "pptx", "pdf": "pdf"}
 _CHART_TYPES = {"bar", "hbar", "line", "pie", "donut", "scatter"}
-
-
-def _to_float(v) -> float:
-    if v is None:
-        return 0.0
-    try:
-        return float(str(v).replace(",", "").replace("₹", "").replace("%", ""))
-    except ValueError:
-        return 0.0
 
 
 def _auto_axes(rows: list[dict]) -> tuple[str | None, str | None]:
@@ -64,17 +57,9 @@ def _render_chart_png(rows: list[dict], chart_type: str, x_col: str | None, y_co
         x_col, y_col = x_col or ax, y_col or ay
     if not x_col or not y_col:
         raise GuardrailViolation("Could not determine chart columns from the data.")
-    labels = [str(r.get(x_col, "")) for r in rows]
-    values = [_to_float(r.get(y_col)) for r in rows]
-    if chart_type in ("bar", "hbar"):
-        return charts.bar_chart(labels, values, title, horizontal=(chart_type == "hbar"))
-    if chart_type == "line":
-        return charts.line_chart(labels, {y_col: values}, title)
-    if chart_type in ("pie", "donut"):
-        return charts.pie_chart(labels, values, title, donut=(chart_type == "donut"))
-    if chart_type == "scatter":
-        return charts.scatter_chart([_to_float(r.get(x_col)) for r in rows], values, title, x_label=x_col, y_label=y_col)
-    raise GuardrailViolation(f"Unsupported chart_type {chart_type!r}.")
+    if chart_type not in _CHART_TYPES:
+        raise GuardrailViolation(f"Unsupported chart_type {chart_type!r}.")
+    return charts.render_png(charts.build_spec(rows, chart_type, x_col, y_col, title))
 
 
 def _guard_narrative(text: str, ctx: TurnContext) -> str:
@@ -117,7 +102,9 @@ def add_chart_section(args: dict, ctx: TurnContext):
     record = get_artifact(args["artifact_id"])
     if record is None:
         raise GuardrailViolation(f"Unknown or expired artifact_id {args['artifact_id']!r}.")
-    draft["sections"].append({"heading": args["heading"], "kind": "chart", "chart_png": record.path.read_bytes()})
+    raw = record.path.read_bytes()
+    png = charts.render_png(json.loads(raw)) if record.kind == "chart_spec" else raw
+    draft["sections"].append({"heading": args["heading"], "kind": "chart", "chart_png": png})
     return {"ok": True, "sections_so_far": len(draft["sections"])}
 
 
@@ -231,25 +218,50 @@ register(Tool(
 # generation works regardless of model strength. The granular tools stay for
 # genuinely multi-section reports.
 
+def _dict_sections(raw: dict) -> tuple[list[dict], list[dict]]:
+    """dict-of-lists tool output -> report sections + the first table's rows (for an optional chart)."""
+    sections, first = [], []
+    facts = [(pretty_header(k), fmt_cell(k, v)[0]) for k, v in raw.items() if not isinstance(v, (list, dict)) and v not in (None, "")]
+    if facts:
+        sections.append({"heading": "Summary", "kind": "key_values", "pairs": facts})
+    for key, val in raw.items():
+        if isinstance(val, list) and val and isinstance(val[0], dict):
+            sections.append({"heading": pretty_header(key), "kind": "table", "data": val})
+            first = first or val
+    return sections, first
+
+
 def create_report(args: dict, ctx: TurnContext):
     fmt = args["format"]
     if fmt not in _BUILDERS:
         raise GuardrailViolation(f"format must be one of {list(_BUILDERS)}, got {fmt!r}")
 
     source = args["source"]
-    rows = _resolve_source(source, ctx)  # raises GuardrailViolation on a bad source
-    if not rows:
-        raise GuardrailViolation(f"Source {source!r} returned no data — nothing to put in the report.")
+    raw = ctx.manifest.get(source) if source in ctx.manifest.keys() else None
+    if isinstance(raw, dict):
+        # e.g. find_document -> {po_lines: [...], p2p_chain: [...], invoices: [...]}: one table per list,
+        # scalars as a facts panel — never a single row of Python reprs.
+        sections, rows = _dict_sections(raw)
+        if not sections:
+            raise GuardrailViolation(f"Source {source!r} returned no data — nothing to put in the report.")
+    else:
+        rows = _resolve_source(source, ctx)  # raises GuardrailViolation on a bad source
+        if not rows:
+            raise GuardrailViolation(f"Source {source!r} returned no data — nothing to put in the report.")
+        sections = [{"heading": args.get("table_heading") or "Data", "kind": "table", "data": rows}]
 
     title = args.get("title") or "IntelliSource Report"
-    sections: list[dict] = [{"heading": args.get("table_heading") or "Data", "kind": "table", "data": rows}]
 
     chart_type = args.get("chart")
     if chart_type:
         if chart_type not in _CHART_TYPES:
             raise GuardrailViolation(f"chart must be one of {sorted(_CHART_TYPES)}, got {chart_type!r}")
-        png = _render_chart_png(rows, chart_type, args.get("x"), args.get("y"), title)
-        sections.insert(0, {"heading": "Chart", "kind": "chart", "chart_png": png})
+        try:
+            png = _render_chart_png(rows, chart_type, args.get("x"), args.get("y"), title)
+            sections.insert(0, {"heading": "Chart", "kind": "chart", "chart_png": png})
+        except (GuardrailViolation, ValueError):
+            if not isinstance(raw, dict):   # for multi-table sources a missing chart is not fatal
+                raise
 
     narrative = args.get("narrative")
     if narrative:
@@ -285,6 +297,7 @@ register(Tool(
             "y": {"type": "string", "description": "Optional chart value column (auto-detected if omitted)."},
             "narrative": {"type": "string", "description": "Optional summary prose; numbers are verified against fetched data."},
             "table_heading": {"type": "string", "description": "Optional heading for the data table section."},
+            "subtitle": {"type": "string", "description": "Optional subtitle shown on the cover slide."},
         },
         "required": ["format", "source"],
     },

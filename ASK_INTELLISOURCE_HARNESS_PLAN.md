@@ -79,7 +79,7 @@ must be avoided, audit can be emitted as a log/event instead of a DB row — cal
 ## 1. Model cascade & provider abstraction — `services/agent/providers/`
 
 `base.py` — `LLMProvider` interface: `chat(messages, tools=None, json_mode=False, model=...) -> {content, tool_calls}`.
-- `openrouter.py` — refactor the existing `_openrouter_call` ([chat_engine.py:157](backend/services/chat_engine.py)); model id becomes a param (any OpenRouter model).
+- `openai_compat.py` — one OpenAI-compatible class, instantiated for OpenRouter and Gemini (`gemini:google/<model>`, key `GEMINI_API_KEY` sent as `x-goog-api-key` to Vertex AI's OpenAI-compatible endpoint for project 243936589471); refactor of the existing `_openrouter_call` ([chat_engine.py:157](backend/services/chat_engine.py)); model id becomes a param (any OpenRouter model).
 - `ollama.py` — local `http://localhost:11434/api/chat` via `urllib`/`httpx`; supports `format:"json"` for constrained tool-call output (small models are far more reliable constrained).
 
 `config.py` — **role → model** map, env-driven, with cascade fallback:
@@ -238,7 +238,7 @@ backend/
     agent/
       orchestrator.py  registry.py  context.py  config.py
       grounding.py     guardrails.py  schema_card.py  metrics.py
-      providers/  base.py  openrouter.py  ollama.py
+      providers/  base.py  openai_compat.py  ollama.py
       tools/      data_tools.py  analysis_tools.py  chart_tool.py  report_tools.py
     reports/    theme.py  charts.py  excel.py  pptx.py  pdf.py
     artifacts.py

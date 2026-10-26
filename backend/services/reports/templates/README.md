@@ -1,0 +1,1 @@
+Drop an official KPMG PowerPoint master here as `kpmg_master.pptx` (needs a layout named "Blank"); `reports/pptx.py` then builds every deck on it instead of the python-pptx default. Remove the file to go back to the built-in KPMG-style template.

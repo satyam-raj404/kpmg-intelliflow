@@ -140,7 +140,7 @@ def select_relevant_tables(question: str, max_tables: int = 4) -> list[TableCard
         score = 0
         for kw in card.keywords:
             weight = 2 if " " in kw else 1
-            if re.search(rf"\b{re.escape(kw)}\b", q):
+            if re.search(rf"\b{re.escape(kw)}s?\b", q):
                 score += weight
         if re.search(rf"\b{re.escape(card.name.replace('_', ' '))}\b", q):
             score += 3

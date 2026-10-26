@@ -10,7 +10,17 @@ services:
     envVars:
       - key: DATABASE_URL
         sync: false
+      - key: GEMINI_API_KEY
+        sync: false
       - key: OPENROUTER_API_KEY
         sync: false
+      - key: HARNESS_PLANNER_MODEL
+        value: gemini:google/gemini-2.5-flash
+      - key: HARNESS_SQL_MODEL
+        value: gemini:google/gemini-2.5-flash
+      - key: HARNESS_NARRATOR_MODEL
+        value: gemini:google/gemini-2.5-flash
+      - key: HARNESS_HARD_REASON_MODEL
+        value: gemini:google/gemini-2.5-pro
       - key: CORS_ORIGINS
         sync: false

@@ -116,6 +116,9 @@ def test_fast_path_router():
     """Category: Tool selection (speed). Metric-alias and document-number
     questions route without any LLM call; report/chart intent always falls
     through to the full loop even if it also matches a metric alias."""
+    check(router.route('Create a Detailed ppt on the PO number - "2000001126" and its Vendors') == ("deep_dive", ("po", "2000001126")),
+          "deep-dive PO query not routed")
+    check(router.route("Make a PDF of PO 2000001126") == (None, None), "pdf request must not hit the deep-dive route")
     check(router.route("What is the total PO value?") == ("metric", "total_po_value"),
           "metric alias routing broke")
     check(router.route("Tell me about PO 2000001004") == ("document", "2000001004"),
@@ -191,6 +194,116 @@ def test_one_shot_create_report():
         check(any(a["type"] == fmt for a in ctx.artifacts), f"create_report({fmt}) not recorded on ctx.artifacts")
 
 
+def test_chart_spec_tool():
+    """Category: Artifact integrity. create_visual emits an interactive chart_spec
+    (rows -> capped JSON points, no PNG), and a report built from it still embeds
+    a rendered chart."""
+    from services.artifacts import get_artifact
+    ctx = TurnContext(session_id="eval-chart-spec")
+    rows = [{"vendor": f"V{i}", "total_po_value": 1e7 * (i + 1)} for i in range(120)]
+    key = ctx.manifest.put(rows, hint="metric")
+    result = get_tool("create_visual").executor(
+        {"data_key": key, "chart_type": "bar", "x": "vendor", "y": "total_po_value", "title": "Spend"}, ctx)
+    check("artifact_id" in result, "create_visual returned no artifact_id")
+    art = next((a for a in ctx.artifacts if a["type"] == "chart_spec"), None)
+    check(art is not None and "preview" not in art, "create_visual did not record a chart_spec artifact")
+    spec = art["spec"]
+    check(len(spec["points"]) == 50 and spec["total_points"] == 120, "chart spec points not capped at 50")
+    check(spec["unit"] == "inr", f"expected inr unit for total_po_value, got {spec['unit']}")
+    draft = get_tool("start_report").executor({"title": "Eval"}, ctx)
+    get_tool("add_chart_section").executor(
+        {"draft_key": draft["draft_key"], "heading": "Chart", "artifact_id": result["artifact_id"]}, ctx)
+    section = ctx.manifest.get(draft["draft_key"])["sections"][0]
+    check(section["chart_png"][:8] == b"\x89PNG\r\n\x1a\n", "chart_spec did not render to PNG for the report")
+    from services.agent.orchestrator import _ARTIFACT_LINK_RE
+    check(_ARTIFACT_LINK_RE.sub("", "A ![c](/api/chat/artifacts/abc) B") == "A  B",
+          "model-written artifact image link not stripped from the reply")
+
+
+def test_openai_compat_parse():
+    """Category: Provider contract. Gemini quirks: empty tool-call id is filled,
+    thought_signature (extra_content) is kept, transient upstream errors escalate."""
+    from services.agent.providers.base import ProviderUnavailable
+    from services.agent.providers.openai_compat import OpenAICompatProvider
+    p = OpenAICompatProvider("gemini", "http://x", "NOPE")
+    resp = p._parse({"choices": [{"finish_reason": "tool_calls", "message": {"content": None, "tool_calls": [
+        {"id": "", "function": {"name": "get_kpis", "arguments": "{}"},
+         "extra_content": {"google": {"thought_signature": "sig"}}}]}}]}, "m")
+    tc = resp.tool_calls[0]
+    check(tc["id"] == "call_0", f"empty tool-call id not filled: {tc['id']!r}")
+    check(tc["extra_content"]["google"]["thought_signature"] == "sig", "extra_content dropped")
+    try:
+        p._parse({"error": {"code": 503, "message": "The model is overloaded"}}, "m")
+        check(False, "503 upstream error did not raise")
+    except ProviderUnavailable:
+        pass
+
+
+def _deck_text(data: bytes) -> tuple[list[str], int, int]:
+    """(all slide text, picture count, slide count) of a PPTX."""
+    import io
+    from pptx import Presentation
+    prs = Presentation(io.BytesIO(data))
+    texts, pics = [], 0
+    for sl in prs.slides:
+        for sh in sl.shapes:
+            if sh.has_text_frame:
+                texts.append(sh.text_frame.text)
+            if sh.has_table:
+                texts += [c.text for r in sh.table.rows for c in r.cells]
+            pics += sh.shape_type == 13
+    return texts, pics, len(prs.slides)
+
+
+def test_deep_dive_decks():
+    """Category: Deep-dive reports. The PO and vendor decks build deterministically (LLM stubbed
+    to its fallback) from live data: lifecycle, vendor and risk sections with charts, no raw reprs."""
+    from services.agent.tools import deep_dive
+    orig = deep_dive._llm_bullets
+    deep_dive._llm_bullets = lambda topic, facts, fallback, n="": fallback
+    try:
+        res = deep_dive.run("po", "2000001126")
+        texts, pics, n = _deck_text(res["pptx"])
+        blob = " | ".join(texts)
+        check(n >= 15, f"PO deep dive too short: {n} slides")
+        check(pics >= 6, f"PO deep dive should carry >=6 chart images, got {pics}")
+        for needle in ("L&T Construction Ltd", "700300", "Document chain", "Risk register", "Recommended actions"):
+            check(needle in blob, f"PO deep dive is missing {needle!r}")
+        check("[{" not in blob and "{'" not in blob, "raw Python repr leaked into the PO deck")
+        vres = deep_dive.run("vendor", "700300")
+        vtexts, vpics, vn = _deck_text(vres["pptx"])
+        check(vn >= 10 and vpics >= 3, f"vendor deep dive too thin: {vn} slides / {vpics} charts")
+        check("Document chain" not in " | ".join(vtexts), "vendor deck should not include the PO lifecycle section")
+        err = get_tool("create_deep_dive_report").executor({"subject": "po", "id": "1999999999"}, TurnContext(session_id="eval-dd"))
+        check("error" in err, "unknown PO should return an error, not a deck")
+    finally:
+        deep_dive._llm_bullets = orig
+
+
+def test_create_report_dict_source():
+    """Category: Artifact integrity. A dict-of-lists source (find_document) becomes one table per list —
+    the failure that produced a single row of 400-character reprs in the first PO deck."""
+    ctx = TurnContext(session_id="eval-dict-report")
+    doc = get_tool("find_document").executor({"doc_type": "PO", "doc_number": "2000001126"}, ctx)
+    key = ctx.manifest.put(doc, hint="doc")
+    out = get_tool("create_report").executor({"format": "pptx", "source": key, "title": "PO", "chart": "bar"}, ctx)
+    from services.artifacts import get_artifact
+    texts, _, n = _deck_text(get_artifact(out["artifact_id"]).path.read_bytes())
+    blob = " | ".join(texts)
+    check("PO Lines" in blob and "Invoices" in blob, "dict source did not produce one section per list")
+    check("[{" not in blob and "{'" not in blob, "raw Python repr leaked into the report")
+
+
+def test_grounding_dates():
+    """Category: Grounding. A date is ONE claim: verified when present in the data (either format),
+    flagged when not — never shredded into '2023', '-01', '-18'."""
+    from services.agent.grounding import verify_numbers
+    data = [{"posting_date": "2023-01-18", "amount": 111602923.21}]
+    check(verify_numbers("Posted on 2023-01-18 and 18-Jan-2023.", data).all_verified, "known dates must verify")
+    bad = verify_numbers("Posted on 24-Feb-2023.", data).unverified
+    check(bad == ["24-Feb-2023"], f"unknown date should be flagged as one token, got {bad}")
+
+
 def test_report_failure_message():
     """Category: UX. When a report file is requested but none is produced, the
     user gets an explicit failure message — never a silent echo of their prompt."""
@@ -234,6 +347,11 @@ TIER_1_TESTS = [
     test_cache_roundtrip,
     test_flat_report_tool_chain,
     test_one_shot_create_report,
+    test_chart_spec_tool,
+    test_openai_compat_parse,
+    test_deep_dive_decks,
+    test_create_report_dict_source,
+    test_grounding_dates,
     test_report_failure_message,
     test_session_manifest_cross_turn,
 ]

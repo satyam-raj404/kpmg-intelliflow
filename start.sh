@@ -129,7 +129,7 @@ lsof -ti:8001,8080 2>/dev/null | xargs kill -9 2>/dev/null || true
 # ── 2. create the "Intl" venv (reuse if present) ─────────────────────────────
 STEP="creating venv 'Intl'"
 if [[ ! -x "$VENV/bin/python" ]]; then
-  echo "  Creating venv 'Intl' with Python $PY_VER…"
+  echo "  Creating venv 'Intl' with Python ${PY_VER}…"
   "$PY" -m venv "$VENV"
 else
   echo "  Reusing existing venv 'Intl' ($("$VENV/bin/python" -c 'import sys;print("%d.%d"%sys.version_info[:2])'))."
