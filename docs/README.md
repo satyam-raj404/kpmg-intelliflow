@@ -6,6 +6,7 @@ Everything in this folder. Grouped by lifecycle:
 |---|---|---|
 | [`FEATURES.md`](FEATURES.md) | What the application does, end to end | **Start here** if you are new |
 | [`reference/`](reference/) | Technical, functional and KPI reference | Living docs — read when the task touches that area |
+| [`planning/`](planning/) | Project plans and delivery workbooks | Living docs — update as the plan changes |
 | [`architecture/`](architecture/) | Architecture Review Board submission + Mermaid diagrams | Frozen submission artefact |
 | [`deliverables/`](deliverables/) | Presentations, decks and pitch scripts | Frozen submission artefact |
 | [`assets/`](assets/) | Application screenshots | Frozen submission artefact |
@@ -66,6 +67,17 @@ Everything in this folder. Grouped by lifecycle:
 |---|---|
 | [Leadership.md](reference/Leadership.md) | Leadership dashboard brief (28 KB). |
 | [1_Leadership.md](reference/1_Leadership.md) | An earlier, shorter draft of the same (16 KB). **Both are retained pending a decision on which is canonical.** |
+
+---
+
+## Planning
+
+| Document | What it covers |
+|---|---|
+| [Project_Plan_IntelliSource_to_KPRISM.docx](planning/intellisource-kprism-integration/Project_Plan_IntelliSource_to_KPRISM.docx) | 13-week plan to add the Vendor Repository, Profit Centre and Contract Register to KPRISM and upgrade the existing assistant. |
+| [Project_Plan_IntelliSource_to_KPRISM.xlsx](planning/intellisource-kprism-integration/Project_Plan_IntelliSource_to_KPRISM.xlsx) | Single-sheet 13-week timeline with workstreams, owners, status and key release dates. |
+
+Both files are generated from [`../tools/build_intellisource_kprism_plan.py`](../tools/build_intellisource_kprism_plan.py).
 
 ---
 
